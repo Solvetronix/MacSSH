@@ -10,7 +10,7 @@ struct PermissionsManagerView: View {
         VStack(spacing: 0) {
             // Заголовок
             HStack {
-                Text("macOS Permissions Manager")
+                Text("SSH Tools Manager")
                     .font(.title2)
                     .fontWeight(.bold)
                 
@@ -29,30 +29,22 @@ struct PermissionsManagerView: View {
             .padding()
             .background(Color.gray.opacity(0.05))
             .onAppear {
-                // Автоматически проверяем разрешения при открытии
+                // Автоматически проверяем инструменты при открытии
                 permissionsCheck = SSHService.checkAllPermissions()
             }
             
             // Основной контент
             ScrollView {
                 VStack(spacing: 16) {
-                    // Заголовок
-                    Text("MacSSH requires special permissions to execute external commands (ssh, sftp, scp).")
+                                        // Заголовок
+                    Text("SSH Tools Status")
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-
-                    
-
-                    
-                    // Автоматическая проверка разрешений
+                    // Статус SSH инструментов
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Current Permissions Status:")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                        
                         if permissionsCheck.isEmpty {
-                            Text("Loading permissions...")
+                            Text("Loading tools status...")
                                 .foregroundColor(.secondary)
                         } else {
                             ForEach(permissionsCheck, id: \.self) { line in
@@ -89,7 +81,7 @@ struct PermissionsManagerView: View {
             
             // Кнопки внизу - всегда видимые
             HStack {
-                Button("Refresh Permissions") {
+                Button("Check Tools") {
                     permissionsCheck = SSHService.checkAllPermissions()
                 }
                 .buttonStyle(.bordered)
@@ -125,7 +117,7 @@ struct PermissionsManagerView: View {
     private func restartApplication() {
         let alert = NSAlert()
         alert.messageText = "Restart MacSSH"
-        alert.informativeText = "The application will restart to apply permission changes. Continue?"
+        alert.informativeText = "The application will restart to apply changes. Continue?"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Restart")
         alert.addButton(withTitle: "Cancel")

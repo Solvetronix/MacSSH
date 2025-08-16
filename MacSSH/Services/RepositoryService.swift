@@ -237,10 +237,7 @@ class SSHService {
         }
     }
     
-    private static func checkDirectoryAccess(_ path: String) -> Bool {
-        let fileManager = FileManager.default
-        return fileManager.isReadableFile(atPath: path)
-    }
+
     
     private static func getSSHPassPath() -> String? {
         // Проверяем напрямую в известных местах установки
@@ -305,21 +302,13 @@ class SSHService {
 
         // Проверяем доступность команд
         results.append("=== Required SSH Tools ===")
-        
-        // Проверяем доступность команд
-        results.append("\n=== Required SSH Tools ===")
         results.append(checkSSHKeyscanAvailability() ? "✅ ssh-keyscan: Available" : "❌ ssh-keyscan: Not found")
         results.append(checkSSHAvailability() ? "✅ ssh: Available" : "❌ ssh: Not found")
         results.append(checkSFTPAvailability() ? "✅ sftp: Available" : "❌ sftp: Not found")
         results.append(checkSCPAvailability() ? "✅ scp: Available" : "❌ scp: Not found")
         results.append(checkSSHPassAvailability() ? "✅ sshpass: Available" : "❌ sshpass: Not found")
         
-        // Проверяем доступ к директориям
-        results.append("\n=== Directory Access ===")
-        results.append(checkDirectoryAccess("/usr/bin") ? "✅ /usr/bin: Accessible" : "❌ /usr/bin: No access")
-        results.append(checkDirectoryAccess("/usr/local/bin") ? "✅ /usr/local/bin: Accessible" : "❌ /usr/local/bin: No access")
-        results.append(checkDirectoryAccess("/opt/homebrew/bin") ? "✅ /opt/homebrew/bin: Accessible" : "❌ /opt/homebrew/bin: No access")
-        results.append(checkDirectoryAccess("/tmp") ? "✅ /tmp: Accessible" : "❌ /tmp: No access")
+
         
         // Рекомендации
         results.append("\n=== Actions Needed ===")
