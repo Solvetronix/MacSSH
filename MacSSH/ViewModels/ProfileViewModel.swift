@@ -6,6 +6,8 @@ class ProfileViewModel: ObservableObject {
     @Published var isConnecting: Bool = false
     @Published var connectionError: String?
     @Published var connectionLog: [String] = []
+    @Published var showingPermissionsWarning = false
+    @Published var showingPermissionsManager = false
     
     // SFTP properties
     @Published var currentDirectory: String = "."
@@ -19,6 +21,7 @@ class ProfileViewModel: ObservableObject {
     
     init() {
         loadProfiles()
+        checkPermissionsOnStartup()
     }
     
     func addProfile(_ profile: Profile) {
@@ -49,6 +52,44 @@ class ProfileViewModel: ObservableObject {
            let decoded = try? JSONDecoder().decode([Profile].self, from: data) {
             profiles = decoded
         }
+    }
+    
+    private func checkPermissionsOnStartup() {
+        // Проверяем разрешения только при первом запуске или если пользователь не отклонил предупреждение
+        let hasShownWarning = userDefaults.bool(forKey: "hasShownPermissionsWarning")
+        let hasDeclinedWarning = userDefaults.bool(forKey: "hasDeclinedPermissionsWarning")
+        
+        if !hasShownWarning && !hasDeclinedWarning {
+            // Проверяем доступность основных команд
+            let sshKeyscanAvailable = SSHService.checkSSHKeyscanAvailability()
+            let sshAvailable = SSHService.checkSSHAvailability()
+            
+            if !sshKeyscanAvailable || !sshAvailable {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    self.showingPermissionsWarning = true
+                    self.userDefaults.set(true, forKey: "hasShownPermissionsWarning")
+                }
+            }
+        }
+    }
+    
+    private func checkForPermissionError(_ error: Error) -> Bool {
+        let errorDescription = error.localizedDescription.lowercased()
+        print("=== CHECKING PERMISSION ERROR ===")
+        print("Error description: \(error.localizedDescription)")
+        print("Error description (lowercase): \(errorDescription)")
+        print("Contains 'error 5': \(errorDescription.contains("error 5"))")
+        print("Contains 'permission': \(errorDescription.contains("permission"))")
+        print("Contains 'denied': \(errorDescription.contains("denied"))")
+        print("Contains 'external command not found': \(errorDescription.contains("external command not found"))")
+        
+        let isPermissionError = errorDescription.contains("error 5") || 
+                               errorDescription.contains("permission") || 
+                               errorDescription.contains("denied") ||
+                               errorDescription.contains("external command not found")
+        
+        print("Is permission error: \(isPermissionError)")
+        return isPermissionError
     }
     
     func connectToServer(_ profile: Profile) async {
@@ -87,10 +128,25 @@ class ProfileViewModel: ObservableObject {
                 self.connectionError = message
                 self.connectionLog.append("❌ Invalid credentials: \(message)")
             }
+        } catch let SSHConnectionError.permissionDenied(message) {
+            await MainActor.run {
+                self.connectionError = message
+                self.connectionLog.append("❌ Permission denied: \(message)")
+                self.showingPermissionsManager = true
+            }
+        } catch let SSHConnectionError.externalCommandNotFound(message) {
+            await MainActor.run {
+                self.connectionError = message
+                self.connectionLog.append("❌ External command not found: \(message)")
+                self.showingPermissionsManager = true
+            }
         } catch {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
                 self.connectionLog.append("❌ Connection error: \(error.localizedDescription)")
+                if self.checkForPermissionError(error) {
+                    self.showingPermissionsManager = true
+                }
             }
         }
         
@@ -124,6 +180,9 @@ class ProfileViewModel: ObservableObject {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to open terminal: \(error.localizedDescription)")
+                if self.checkForPermissionError(error) {
+                    self.showingPermissionsManager = true
+                }
             }
         }
         
@@ -189,16 +248,27 @@ class ProfileViewModel: ObservableObject {
     func openFileBrowser(for profile: Profile) async {
         print("=== PROFILEVIEWMODEL: openFileBrowser STARTED ===")
         print("Profile: \(profile.name), Host: \(profile.host)")
+        print("Profile keyType: \(profile.keyType)")
+        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("Profile username: \(profile.username)")
+        print("Profile port: \(profile.port)")
         print("Current directory: \(currentDirectory)")
+        print("=== PROFILEVIEWMODEL: About to set isBrowsingFiles = true ===")
         
         await MainActor.run {
+            print("=== PROFILEVIEWMODEL: Setting UI state ===")
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
             self.connectionLog.removeAll()
             self.connectionLog.append("[blue]Opening file browser for \(profile.host)...")
+            print("=== PROFILEVIEWMODEL: UI state set successfully ===")
         }
         
         do {
+            print("=== PROFILEVIEWMODEL: About to call SSHService.listDirectory ===")
+            print("Profile: \(profile.name), Host: \(profile.host)")
+            print("Current directory: \(currentDirectory)")
+            
             let result = try await SSHService.listDirectory(profile, path: currentDirectory)
             await MainActor.run {
                 self.remoteFiles = result.files
@@ -208,9 +278,20 @@ class ProfileViewModel: ObservableObject {
                 self.connectionLog.append("[green]✅ File browser opened successfully")
             }
         } catch {
+            print("=== PROFILEVIEWMODEL: openFileBrowser ERROR ===")
+            print("Error type: \(type(of: error))")
+            print("Error description: \(error.localizedDescription)")
+            print("Error: \(error)")
+            
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to open file browser: \(error.localizedDescription)")
+                self.connectionLog.append("[red]Error type: \(type(of: error))")
+                self.connectionLog.append("[red]Full error: \(error)")
+                if self.checkForPermissionError(error) {
+                    self.connectionLog.append("[yellow]⚠️ This appears to be a permission error")
+                    self.showingPermissionsManager = true
+                }
             }
         }
         
@@ -241,6 +322,9 @@ class ProfileViewModel: ObservableObject {
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to navigate: \(error.localizedDescription)")
+                if self.checkForPermissionError(error) {
+                    self.showingPermissionsManager = true
+                }
             }
         }
         
@@ -269,6 +353,9 @@ class ProfileViewModel: ObservableObject {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to open file: \(error.localizedDescription)")
+                if self.checkForPermissionError(error) {
+                    self.showingPermissionsManager = true
+                }
             }
         }
         
@@ -311,6 +398,9 @@ class ProfileViewModel: ObservableObject {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to mount directory: \(error.localizedDescription)")
+                if self.checkForPermissionError(error) {
+                    self.showingPermissionsManager = true
+                }
             }
         }
         

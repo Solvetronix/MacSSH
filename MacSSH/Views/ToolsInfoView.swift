@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ToolsInfoView: View {
     @State private var toolsAvailability: (sshpass: Bool, sshfs: Bool) = (false, false)
+    @State private var permissionsCheck: [String] = []
+    @State private var showingPermissionsCheck = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -72,6 +74,12 @@ struct ToolsInfoView: View {
             Spacer()
             
             HStack {
+                Button("Check Permissions") {
+                    permissionsCheck = SSHService.checkAllPermissions()
+                    showingPermissionsCheck = true
+                }
+                .buttonStyle(.borderedProminent)
+                
                 Button("Refresh") {
                     toolsAvailability = SSHService.checkToolsAvailability()
                 }
@@ -87,6 +95,9 @@ struct ToolsInfoView: View {
         .frame(width: 500, height: 400)
         .onAppear {
             toolsAvailability = SSHService.checkToolsAvailability()
+        }
+        .sheet(isPresented: $showingPermissionsCheck) {
+            PermissionsCheckView(permissionsCheck: permissionsCheck)
         }
     }
 }
@@ -131,6 +142,41 @@ struct ToolStatusRow: View {
         .padding()
         .background(Color.gray.opacity(0.05))
         .cornerRadius(8)
+    }
+}
+
+struct PermissionsCheckView: View {
+    let permissionsCheck: [String]
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Permissions Check Results")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(permissionsCheck, id: \.self) { line in
+                        Text(line)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(line.contains("❌") ? .red : 
+                                           line.contains("✅") ? .green : 
+                                           line.contains("⚠️") ? .orange : 
+                                           line.contains("===") ? .blue : .primary)
+                    }
+                }
+                .padding()
+            }
+            .frame(maxHeight: 400)
+            
+            Button("Close") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .frame(width: 600, height: 500)
     }
 }
 

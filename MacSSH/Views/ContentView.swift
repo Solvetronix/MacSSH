@@ -4,7 +4,7 @@ struct ContentView: View {
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showingAddProfile = false
     @State private var selectedProfile: Profile?
-    @State private var showingToolsInfo = false
+    @State private var showingPermissionsManager = false
     
     var body: some View {
         NavigationSplitView {
@@ -12,7 +12,7 @@ struct ContentView: View {
                 viewModel: viewModel,
                 showingAddProfile: $showingAddProfile,
                 selectedProfile: $selectedProfile,
-                showingToolsInfo: $showingToolsInfo
+                showingPermissionsManager: $showingPermissionsManager
             )
             .frame(minWidth: 400, idealWidth: 500)
         } detail: {
@@ -26,8 +26,26 @@ struct ContentView: View {
         .sheet(item: $selectedProfile) { profile in
             ProfileFormView(viewModel: viewModel, editingProfile: profile)
         }
-        .sheet(isPresented: $showingToolsInfo) {
-            ToolsInfoView()
+        .sheet(isPresented: $showingPermissionsManager) {
+            PermissionsManagerView()
+        }
+        .sheet(isPresented: $viewModel.showingPermissionsManager) {
+            PermissionsManagerView()
+        }
+        .alert("Permissions Required", isPresented: $viewModel.showingPermissionsWarning) {
+            Button("Open Permissions Manager") {
+                viewModel.showingPermissionsManager = true
+                viewModel.showingPermissionsWarning = false
+            }
+            Button("Remind Me Later") {
+                viewModel.showingPermissionsWarning = false
+            }
+            Button("Don't Show Again", role: .cancel) {
+                viewModel.showingPermissionsWarning = false
+                UserDefaults.standard.set(true, forKey: "hasDeclinedPermissionsWarning")
+            }
+        } message: {
+            Text("MacSSH requires special permissions to execute external commands (ssh, sftp, scp). Please configure permissions to use all features.")
         }
     }
 }
@@ -36,7 +54,7 @@ struct ConnectionListView: View {
     @ObservedObject var viewModel: ProfileViewModel
     @Binding var showingAddProfile: Bool
     @Binding var selectedProfile: Profile?
-    @Binding var showingToolsInfo: Bool
+    @Binding var showingPermissionsManager: Bool
     @State private var profileToDelete: Profile? = nil
     
     var body: some View {
@@ -78,10 +96,10 @@ struct ConnectionListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
-                    Button(action: { showingToolsInfo = true }) {
-                        Image(systemName: "info.circle")
+                    Button(action: { showingPermissionsManager = true }) {
+                        Image(systemName: "lock.shield")
                     }
-                    .help("Tools Information")
+                    .help("macOS Permissions Manager")
                     
                     Button(action: { showingAddProfile = true }) {
                         Image(systemName: "plus")

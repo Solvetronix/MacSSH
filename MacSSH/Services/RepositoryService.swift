@@ -9,6 +9,8 @@ enum SSHConnectionError: Error {
     case processError(String)
     case sshpassNotInstalled(String)
     case sftpError(String)
+    case permissionDenied(String)
+    case externalCommandNotFound(String)
 }
 
 // Структура для представления удаленного файла/папки
@@ -40,6 +42,20 @@ struct SFTPResult {
 
 class SSHService {
     private static func checkSSHPassAvailability() -> Bool {
+        // Проверяем напрямую в известных местах установки
+        let possiblePaths = [
+            "/usr/bin/sshpass",
+            "/usr/local/bin/sshpass", 
+            "/opt/homebrew/bin/sshpass"
+        ]
+        
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return true
+            }
+        }
+        
+        // Если не нашли в известных местах, пробуем через which
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
         process.arguments = ["sshpass"]
@@ -49,16 +65,215 @@ class SSHService {
         process.standardError = pipe
 
         do {
-        try process.run()
-        process.waitUntilExit()
+            try process.run()
+            process.waitUntilExit()
             return process.terminationStatus == 0
         } catch {
             return false
         }
     }
     
+    static func checkSSHKeyscanAvailability() -> Bool {
+        // Сначала проверяем, существует ли файл
+        if !FileManager.default.fileExists(atPath: "/usr/bin/ssh-keyscan") {
+            return false
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["ssh-keyscan"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            
+            // Используем таймаут вместо waitUntilExit() для предотвращения краха
+            let group = DispatchGroup()
+            group.enter()
+            
+            DispatchQueue.global().async {
+                process.waitUntilExit()
+                group.leave()
+            }
+            
+            // Ждем максимум 3 секунды
+            let result = group.wait(timeout: .now() + 3)
+            
+            if result == .timedOut {
+                // Если процесс завис, убиваем его
+                process.terminate()
+                return false
+            }
+            
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+    
+    static func checkSSHAvailability() -> Bool {
+        // Сначала проверяем, существует ли файл
+        if !FileManager.default.fileExists(atPath: "/usr/bin/ssh") {
+            return false
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["ssh"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            
+            // Используем таймаут вместо waitUntilExit() для предотвращения краха
+            let group = DispatchGroup()
+            group.enter()
+            
+            DispatchQueue.global().async {
+                process.waitUntilExit()
+                group.leave()
+            }
+            
+            // Ждем максимум 3 секунды
+            let result = group.wait(timeout: .now() + 3)
+            
+            if result == .timedOut {
+                // Если процесс завис, убиваем его
+                process.terminate()
+                return false
+            }
+            
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+    
+    private static func checkSFTPAvailability() -> Bool {
+        // Сначала проверяем, существует ли файл
+        if !FileManager.default.fileExists(atPath: "/usr/bin/sftp") {
+            return false
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["sftp"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            
+            // Используем таймаут вместо waitUntilExit() для предотвращения краха
+            let group = DispatchGroup()
+            group.enter()
+            
+            DispatchQueue.global().async {
+                process.waitUntilExit()
+                group.leave()
+            }
+            
+            // Ждем максимум 3 секунды
+            let result = group.wait(timeout: .now() + 3)
+            
+            if result == .timedOut {
+                // Если процесс завис, убиваем его
+                process.terminate()
+                return false
+            }
+            
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+    
+    private static func checkSCPAvailability() -> Bool {
+        // Сначала проверяем, существует ли файл
+        if !FileManager.default.fileExists(atPath: "/usr/bin/scp") {
+            return false
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["scp"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            
+            // Используем таймаут вместо waitUntilExit() для предотвращения краха
+            let group = DispatchGroup()
+            group.enter()
+            
+            DispatchQueue.global().async {
+                process.waitUntilExit()
+                group.leave()
+            }
+            
+            // Ждем максимум 3 секунды
+            let result = group.wait(timeout: .now() + 3)
+            
+            if result == .timedOut {
+                // Если процесс завис, убиваем его
+                process.terminate()
+                return false
+            }
+            
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+    
+    private static func checkDirectoryAccess(_ path: String) -> Bool {
+        let fileManager = FileManager.default
+        return fileManager.isReadableFile(atPath: path)
+    }
+    
+    private static func getSSHPassPath() -> String? {
+        // Проверяем напрямую в известных местах установки
+        let possiblePaths = [
+            "/opt/homebrew/bin/sshpass",
+            "/usr/local/bin/sshpass",
+            "/usr/bin/sshpass"
+        ]
+
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        
+        return nil
+    }
+    
         private static func checkSSHFSAvailability() -> Bool {
-        print("=== CHECKING SSHFS AVAILABILITY ===")
+        // Проверяем напрямую в известных местах установки
+        let possiblePaths = [
+            "/usr/bin/sshfs",
+            "/usr/local/bin/sshfs", 
+            "/opt/homebrew/bin/sshfs"
+        ]
+        
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return true
+            }
+        }
+        
+        // Если не нашли в известных местах, пробуем через which
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
         process.arguments = ["sshfs"]
@@ -68,20 +283,10 @@ class SSHService {
         process.standardError = pipe
     
         do {
-            print("Running 'which sshfs' command...")
             try process.run()
-            print("Waiting for process to exit...")
             process.waitUntilExit()
-            print("Process exited with code: \(process.terminationStatus)")
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            
-            let isAvailable = process.terminationStatus == 0 && !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            print("[DEBUG] SSHFS availability check: \(isAvailable), exit code: \(process.terminationStatus), output: '\(output)'")
-            return isAvailable
+            return process.terminationStatus == 0
         } catch {
-            print("[DEBUG] SSHFS availability check error: \(error)")
             return false
         }
     }
@@ -94,10 +299,49 @@ class SSHService {
         )
     }
     
+    /// Проверить все необходимые разрешения и команды
+        static func checkAllPermissions() -> [String] {
+        var results: [String] = []
+
+        // Проверяем доступность команд
+        results.append("=== Required SSH Tools ===")
+        
+        // Проверяем доступность команд
+        results.append("\n=== Required SSH Tools ===")
+        results.append(checkSSHKeyscanAvailability() ? "✅ ssh-keyscan: Available" : "❌ ssh-keyscan: Not found")
+        results.append(checkSSHAvailability() ? "✅ ssh: Available" : "❌ ssh: Not found")
+        results.append(checkSFTPAvailability() ? "✅ sftp: Available" : "❌ sftp: Not found")
+        results.append(checkSCPAvailability() ? "✅ scp: Available" : "❌ scp: Not found")
+        results.append(checkSSHPassAvailability() ? "✅ sshpass: Available" : "❌ sshpass: Not found")
+        
+        // Проверяем доступ к директориям
+        results.append("\n=== Directory Access ===")
+        results.append(checkDirectoryAccess("/usr/bin") ? "✅ /usr/bin: Accessible" : "❌ /usr/bin: No access")
+        results.append(checkDirectoryAccess("/usr/local/bin") ? "✅ /usr/local/bin: Accessible" : "❌ /usr/local/bin: No access")
+        results.append(checkDirectoryAccess("/opt/homebrew/bin") ? "✅ /opt/homebrew/bin: Accessible" : "❌ /opt/homebrew/bin: No access")
+        results.append(checkDirectoryAccess("/tmp") ? "✅ /tmp: Accessible" : "❌ /tmp: No access")
+        
+        // Рекомендации
+        results.append("\n=== Actions Needed ===")
+        if !checkSSHPassAvailability() {
+            results.append("⚠️ Install sshpass: brew install sshpass")
+        }
+        
+        return results
+    }
+    
+
+    
     static func connectToServer(_ profile: Profile) async throws -> [String] {
         var debugLogs: [String] = []
         
         debugLogs.append("[blue]Testing connection to \(profile.host):\(profile.port)...")
+        
+        // Проверяем доступность ssh-keyscan
+        if !checkSSHKeyscanAvailability() {
+            debugLogs.append("[red]❌ ssh-keyscan not available")
+            throw SSHConnectionError.externalCommandNotFound("ssh-keyscan не найден. Убедитесь, что OpenSSH установлен и приложение имеет разрешения на выполнение внешних команд.")
+        }
         
         // Проверяем доступность хоста с помощью ssh-keyscan
         let testProcess = Process()
@@ -129,7 +373,11 @@ class SSHService {
             debugLogs.append("[green]✅ Host is reachable")
         } catch {
             debugLogs.append("[red]❌ Failed to test connection: \(error.localizedDescription)")
-            throw SSHConnectionError.connectionFailed("Failed to test connection: \(error.localizedDescription)")
+            if error.localizedDescription.contains("permission") || error.localizedDescription.contains("denied") {
+                throw SSHConnectionError.permissionDenied("Нет разрешений на выполнение ssh-keyscan. Проверьте настройки безопасности приложения.")
+            } else {
+                throw SSHConnectionError.connectionFailed("Failed to test connection: \(error.localizedDescription)")
+            }
         }
         
         return debugLogs
@@ -271,39 +519,61 @@ class SSHService {
     /// Получить список файлов и папок в указанной директории
     static func listDirectory(_ profile: Profile, path: String = ".") async throws -> SFTPResult {
         print("=== REPOSITORYSERVICE: listDirectory STARTED ===")
+        print("=== REPOSITORYSERVICE: Function called successfully ===")
+        print("=== REPOSITORYSERVICE: About to print profile details ===")
         print("Profile: \(profile.name), Host: \(profile.host)")
         print("Path: \(path)")
+        print("Profile keyType: \(profile.keyType)")
+        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("Profile username: \(profile.username)")
+        print("Profile port: \(profile.port)")
+        print("Profile id: \(profile.id)")
+        print("=== REPOSITORYSERVICE: About to create debugLogs array ===")
         
         var debugLogs: [String] = []
         var files: [RemoteFile] = []
+        print("=== REPOSITORYSERVICE: Created variables ===")
         
         debugLogs.append("[blue]Listing directory: \(path)")
+        print("=== REPOSITORYSERVICE: Added directory log ===")
         
+        print("=== REPOSITORYSERVICE: About to call buildSFTPCommand ===")
         let sftpCommand = try buildSFTPCommand(for: profile)
+        print("=== REPOSITORYSERVICE: buildSFTPCommand completed ===")
         debugLogs.append("[blue]SFTP command: \(sftpCommand)")
         
         // Создаем временный скрипт для SFTP
         let tempScript = try createTempSFTPListScript(for: profile, path: path)
         debugLogs.append("[blue]Created SFTP script: \(tempScript.path)")
         
+        print("=== REPOSITORYSERVICE: About to create Process ===")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [tempScript.path]
+        print("=== REPOSITORYSERVICE: Process created with bash and script ===")
         
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
         
         debugLogs.append("[blue]Executing SFTP list command...")
+        print("=== REPOSITORYSERVICE: About to execute SFTP process ===")
         
         do {
+            debugLogs.append("[blue]Starting SFTP process...")
+            print("=== REPOSITORYSERVICE: Starting SFTP process ===")
             try process.run()
+            print("=== REPOSITORYSERVICE: SFTP process started ===")
+            debugLogs.append("[blue]SFTP process started, waiting for completion...")
+            print("=== REPOSITORYSERVICE: About to wait for SFTP process ===")
             process.waitUntilExit()
+            print("=== REPOSITORYSERVICE: SFTP process completed ===")
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
             
             debugLogs.append("[blue]SFTP exit code: \(process.terminationStatus)")
+            debugLogs.append("[blue]SFTP output length: \(output.count) characters")
             if !output.isEmpty {
                 debugLogs.append("[blue]SFTP output: \(output)")
             }
@@ -312,12 +582,18 @@ class SSHService {
                 files = parseSFTPListOutput(output, basePath: path)
                 debugLogs.append("[green]✅ Successfully listed \(files.count) items")
             } else {
-                debugLogs.append("[red]❌ SFTP command failed")
-                throw SSHConnectionError.sftpError("Failed to list directory: \(output)")
+                debugLogs.append("[red]❌ SFTP command failed with exit code \(process.terminationStatus)")
+                debugLogs.append("[red]❌ SFTP error output: \(output)")
+                throw SSHConnectionError.sftpError("Failed to list directory (exit code \(process.terminationStatus)): \(output)")
             }
             
         } catch {
-            debugLogs.append("[red]❌ SFTP error: \(error.localizedDescription)")
+            print("=== REPOSITORYSERVICE: SFTP process ERROR ===")
+            print("Error type: \(type(of: error))")
+            print("Error description: \(error.localizedDescription)")
+            print("Error: \(error)")
+            debugLogs.append("[red]❌ SFTP process error: \(error.localizedDescription)")
+            debugLogs.append("[red]❌ Error type: \(type(of: error))")
             throw SSHConnectionError.sftpError("SFTP error: \(error.localizedDescription)")
         }
         
@@ -630,15 +906,33 @@ class SSHService {
     // MARK: - Private Helper Methods
     
     private static func buildSFTPCommand(for profile: Profile) throws -> String {
+        print("=== REPOSITORYSERVICE: buildSFTPCommand STARTED ===")
+        print("Profile name: \(profile.name)")
+        print("Profile host: \(profile.host)")
+        print("Profile keyType: \(profile.keyType)")
+        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("SSHPass available: \(checkSSHPassAvailability())")
+        
         var command = ""
         
+        print("=== BUILDING SFTP COMMAND ===")
+        print("Profile keyType: \(profile.keyType)")
+        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("SSHPass available: \(checkSSHPassAvailability())")
+        
+        print("=== REPOSITORYSERVICE: Checking keyType ===")
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
+            print("=== REPOSITORYSERVICE: Password authentication detected ===")
             if !checkSSHPassAvailability() {
+                print("❌ SSHPass not available, throwing error")
                 throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен. Для автоматической передачи пароля установите sshpass: brew install sshpass")
             }
             command = "sshpass -p '\(password)' sftp"
+            print("✅ Using sshpass with password")
         } else {
+            print("=== REPOSITORYSERVICE: Non-password authentication detected ===")
             command = "sftp"
+            print("✅ Using sftp without password")
         }
         
         command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -649,6 +943,7 @@ class SSHService {
         
         command += " \(profile.username)@\(profile.host)"
         
+        print("Final SFTP command: \(command)")
         return command
     }
     
@@ -743,16 +1038,33 @@ class SSHService {
 
     
     private static func createTempSFTPListScript(for profile: Profile, path: String) throws -> URL {
+        print("=== REPOSITORYSERVICE: createTempSFTPListScript STARTED ===")
         let tempDir = FileManager.default.temporaryDirectory
         let scriptURL = tempDir.appendingPathComponent("sftp_list_\(profile.id.uuidString).sh")
         
+        print("=== Creating SFTP script ===")
+        print("Temp directory: \(tempDir.path)")
+        print("Script URL: \(scriptURL.path)")
+        print("Profile: \(profile.name), Host: \(profile.host)")
+        print("Path: \(path)")
+        print("=== REPOSITORYSERVICE: About to create script content ===")
+        
         var scriptContent = "#!/bin/bash\n"
+        print("=== REPOSITORYSERVICE: Created scriptContent variable ===")
         scriptContent += "set -e\n"
         scriptContent += "echo 'Listing directory: \(path)'\n"
         
+        // Добавляем пути к Homebrew в PATH
+        scriptContent += "export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:$PATH\"\n"
+        
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             scriptContent += "export SSHPASS='\(password)'\n"
-            scriptContent += "sshpass -e sftp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            // Используем полный путь к sshpass
+            if let sshpassPath = getSSHPassPath() {
+                scriptContent += "\(sshpassPath) -e sftp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            } else {
+                scriptContent += "sshpass -e sftp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            }
             if profile.port != 22 {
                 scriptContent += " -P \(profile.port)"
             }
@@ -772,10 +1084,19 @@ class SSHService {
         scriptContent += "quit\n"
         scriptContent += "EOF\n"
         
+        print("=== REPOSITORYSERVICE: About to write script to file ===")
         do {
+            print("=== REPOSITORYSERVICE: Writing script content to file ===")
             try scriptContent.write(to: scriptURL, atomically: true, encoding: .utf8)
+            print("=== REPOSITORYSERVICE: Script written successfully ===")
+            print("=== REPOSITORYSERVICE: Setting file permissions ===")
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+            print("=== REPOSITORYSERVICE: File permissions set successfully ===")
         } catch {
+            print("=== REPOSITORYSERVICE: ERROR writing script file ===")
+            print("Error type: \(type(of: error))")
+            print("Error description: \(error.localizedDescription)")
+            print("Error: \(error)")
             throw SSHConnectionError.processError("Failed to create SFTP script: \(error.localizedDescription)")
         }
         
@@ -923,6 +1244,10 @@ class SSHService {
                     errorLogs.append("[red]❌ \(message)")
                 case .sftpError(let message):
                     errorLogs.append("[red]❌ SFTP error: \(message)")
+                case .permissionDenied(let message):
+                    errorLogs.append("[red]❌ Permission denied: \(message)")
+                case .externalCommandNotFound(let message):
+                    errorLogs.append("[red]❌ External command not found: \(message)")
                 }
             } else {
                 errorLogs.append("[red]❌ Error: \(error.localizedDescription)")
