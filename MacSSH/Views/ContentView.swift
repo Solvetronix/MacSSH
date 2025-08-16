@@ -4,13 +4,15 @@ struct ContentView: View {
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showingAddProfile = false
     @State private var selectedProfile: Profile?
+    @State private var showingToolsInfo = false
     
     var body: some View {
         NavigationSplitView {
             ConnectionListView(
                 viewModel: viewModel,
                 showingAddProfile: $showingAddProfile,
-                selectedProfile: $selectedProfile
+                selectedProfile: $selectedProfile,
+                showingToolsInfo: $showingToolsInfo
             )
             .frame(minWidth: 400, idealWidth: 500)
         } detail: {
@@ -24,6 +26,9 @@ struct ContentView: View {
         .sheet(item: $selectedProfile) { profile in
             ProfileFormView(viewModel: viewModel, editingProfile: profile)
         }
+        .sheet(isPresented: $showingToolsInfo) {
+            ToolsInfoView()
+        }
     }
 }
 
@@ -31,6 +36,7 @@ struct ConnectionListView: View {
     @ObservedObject var viewModel: ProfileViewModel
     @Binding var showingAddProfile: Bool
     @Binding var selectedProfile: Profile?
+    @Binding var showingToolsInfo: Bool
     @State private var profileToDelete: Profile? = nil
     
     var body: some View {
@@ -48,7 +54,7 @@ struct ConnectionListView: View {
                         profileToDelete: $profileToDelete
                     )
                 }
-                .width(120)
+                .width(160)
                 
                 TableColumn("Host") { profile in
                     ConnectionHostCell(profile: profile)
@@ -71,9 +77,16 @@ struct ConnectionListView: View {
         .navigationTitle("MacSSH Terminal")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: { showingAddProfile = true }) {
-                    Image(systemName: "plus")
-                }.disabled(viewModel.isConnecting)
+                HStack(spacing: 12) {
+                    Button(action: { showingToolsInfo = true }) {
+                        Image(systemName: "info.circle")
+                    }
+                    .help("Tools Information")
+                    
+                    Button(action: { showingAddProfile = true }) {
+                        Image(systemName: "plus")
+                    }.disabled(viewModel.isConnecting)
+                }
             }
         }
         .alert("Are you sure you want to delete this connection?", isPresented: Binding<Bool>(
@@ -160,6 +173,7 @@ struct ConnectionActionsCell: View {
     @ObservedObject var viewModel: ProfileViewModel
     @Binding var selectedProfile: Profile?
     @Binding var profileToDelete: Profile?
+    @State private var showingFileBrowser = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -182,6 +196,15 @@ struct ConnectionActionsCell: View {
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isConnecting)
+            
+            Button(action: { showingFileBrowser = true }) {
+                HoverableIcon(systemName: "folder", help: "Open File Browser")
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(viewModel.isConnecting)
+        }
+        .sheet(isPresented: $showingFileBrowser) {
+            FileBrowserView(viewModel: viewModel, profile: profile)
         }
     }
 }

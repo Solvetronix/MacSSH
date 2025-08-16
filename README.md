@@ -1,132 +1,164 @@
-# MacSSH Terminal
+# MacSSH - SSH Terminal & File Manager
 
-A modern macOS application for managing SSH connections with a beautiful SwiftUI interface.
+MacSSH - это нативное macOS приложение для управления SSH подключениями с встроенным файловым менеджером для работы с удаленными файлами и папками.
 
-## 🚀 Features
+## Возможности
 
-- **SSH Connection Management**: Save and manage multiple SSH server connections
-- **One-Click Terminal Access**: Open terminal connections to remote servers instantly
-- **Password & Key Authentication**: Support for both password and private key authentication
-- **Connection Testing**: Test server connectivity before connecting
-- **Modern UI**: Clean, native macOS interface built with SwiftUI
-- **Detailed Logs**: View detailed connection logs and debugging information
+### SSH Подключения
+- ✅ Управление профилями SSH подключений
+- ✅ Поддержка аутентификации по паролю и приватному ключу
+- ✅ Автоматическое открытие Terminal.app с SSH подключением
+- ✅ Тестирование подключений
+- ✅ История последних подключений
 
-## 📱 Screenshots
+### Файловый менеджер
+- ✅ Просмотр файлов и папок на удаленном хосте
+- ✅ Навигация по файловой системе
+- ✅ Открытие файлов в Finder (автоматическая загрузка)
+- ✅ Монтирование удаленных директорий в Finder через SSHFS
+- ✅ Отображение информации о файлах (размер, права доступа, дата изменения)
 
-*Screenshots will be added here*
+## Установка
 
-## 🛠 Requirements
+### Требования
+- macOS 13.0 или новее
+- Xcode 15.0 или новее (для сборки из исходников)
 
-- macOS 14.0 or later
-- Xcode 15.0 or later (for development)
-- Swift 5.9 or later
+### Необходимые инструменты
 
-## 🚀 Installation
+Для полной функциональности приложения необходимо установить дополнительные инструменты:
 
-### From Source
+```bash
+# Установка Homebrew (если не установлен)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-1. Clone the repository:
+# Установка необходимых инструментов
+brew install sshpass sshfs
+```
+
+#### Инструменты и их назначение:
+
+- **sshpass** - для автоматической передачи пароля при SSH подключениях
+- **sshfs** - для монтирования удаленных директорий в Finder
+
+### Сборка из исходников
+
+1. Клонируйте репозиторий:
 ```bash
 git clone https://github.com/yourusername/MacSSH.git
 cd MacSSH
 ```
 
-2. Open the project in Xcode:
+2. Откройте проект в Xcode:
 ```bash
 open MacSSH.xcodeproj
 ```
 
-3. Build and run the project (⌘+R)
+3. Соберите и запустите проект (⌘+R)
 
-### From DMG
+## Использование
 
-1. Download the latest DMG file from releases
-2. Open the DMG file
-3. Drag MacSSH Terminal to Applications folder
-4. Launch from Applications
+### Создание SSH профиля
 
-## 📖 Usage
+1. Нажмите кнопку "+" для создания нового профиля
+2. Заполните информацию о подключении:
+   - **Name** - название профиля
+   - **Host** - IP адрес или доменное имя сервера
+   - **Port** - порт SSH (по умолчанию 22)
+   - **Username** - имя пользователя
+   - **Authentication** - выберите тип аутентификации:
+     - Password - пароль
+     - Private Key - приватный ключ
 
-1. **Add a Connection**:
-   - Click the "+" button to add a new SSH connection
-   - Fill in the server details (host, port, username)
-   - Choose authentication method (password or private key)
-   - Save the connection
+### Подключение к серверу
 
-2. **Test Connection**:
-   - Select a connection from the list
-   - Click "Test Connection" to verify connectivity
-   - View detailed logs in the center panel
+1. Выберите профиль из списка
+2. Нажмите кнопку "Test Connection & Open Terminal" для:
+   - Тестирования подключения
+   - Автоматического открытия Terminal.app с SSH сессией
 
-3. **Open Terminal**:
-   - Select a connection
-   - Click "Open Terminal" to launch Terminal.app with SSH connection
-   - The terminal will automatically connect to the remote server
+### Работа с файлами
 
-## 🔧 Configuration
+1. Выберите профиль из списка
+2. Нажмите кнопку "Open File Browser" (папка)
+3. В открывшемся окне файлового браузера:
+   - Просматривайте файлы и папки
+   - Двойной клик по папке для перехода в неё
+   - Используйте кнопки действий:
+     - 📁 **Open directory** - перейти в папку
+     - 💾 **Mount in Finder** - смонтировать папку в Finder
+     - 📄 **Open in Finder** - скачать и открыть файл в Finder
 
-### SSH Key Authentication
+### Монтирование в Finder
 
-1. Generate an SSH key pair (if you haven't already):
-```bash
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-```
+Для монтирования удаленной директории в Finder:
 
-2. Add the public key to your remote server:
-```bash
-ssh-copy-id username@your-server.com
-```
+1. Убедитесь, что установлен `sshfs`
+2. В файловом браузере выберите папку
+3. Нажмите кнопку "Mount in Finder"
+4. Папка появится в Finder как внешний диск
 
-3. In MacSSH Terminal, select "Private Key" authentication and browse to your private key file
+### Открытие файлов
 
-### Password Authentication
+Для открытия файлов:
 
-For password authentication, simply enter your password in the connection form. The app will use `sshpass` for automated login.
+1. В файловом браузере выберите файл
+2. Нажмите кнопку "Open in Finder"
+3. Файл будет скачан во временную папку и открыт в соответствующем приложении
 
-## 🏗 Architecture
-
-- **MVVM Pattern**: Model-View-ViewModel architecture
-- **SwiftUI**: Modern declarative UI framework
-- **UserDefaults**: Local storage for connection profiles
-- **Process**: System integration for SSH commands
-
-## 📁 Project Structure
+## Структура проекта
 
 ```
 MacSSH/
-├── MacSSH/                    # Main application source
-│   ├── Models/               # Data models
-│   ├── Views/                # SwiftUI views
-│   ├── ViewModels/           # View models
-│   ├── Services/             # Business logic services
-│   └── Assets.xcassets/      # App icons and assets
-├── MacSSHTests/              # Unit tests
-├── MacSSHUITests/            # UI tests
-└── MacSSH.xcodeproj/         # Xcode project file
+├── MacSSH/
+│   ├── Views/
+│   │   ├── ContentView.swift          # Основной интерфейс
+│   │   ├── ProfileFormView.swift      # Форма профиля
+│   │   ├── FileBrowserView.swift      # Файловый браузер
+│   │   └── ToolsInfoView.swift        # Информация о инструментах
+│   ├── ViewModels/
+│   │   └── ProfileViewModel.swift     # Логика приложения
+│   ├── Models/
+│   │   └── Profile.swift              # Модель профиля
+│   ├── Services/
+│   │   └── RepositoryService.swift    # SSH и SFTP сервисы
+│   └── Assets.xcassets/               # Ресурсы
+├── MacSSHTests/                       # Unit тесты
+└── MacSSHUITests/                     # UI тесты
 ```
 
-## 🤝 Contributing
+## Технические детали
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### SSH Подключения
+- Использует встроенные macOS SSH клиенты
+- Поддержка `sshpass` для автоматической передачи паролей
+- Автоматическое принятие SSH ключей хостов
 
-## 📄 License
+### Файловый менеджер
+- **SFTP** для просмотра файловой системы
+- **SCP** для скачивания файлов
+- **SSHFS** для монтирования директорий
+- Парсинг вывода `ls -la` для получения информации о файлах
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Безопасность
+- Пароли хранятся в Keychain (планируется)
+- Временные файлы автоматически удаляются
+- Поддержка приватных ключей SSH
 
-## 🙏 Acknowledgments
+## Планы развития
 
-- Built with SwiftUI and Xcode
-- Icons designed for SSH terminal functionality
-- Inspired by the need for a modern SSH connection manager on macOS
+- [ ] Интеграция с macOS Keychain для безопасного хранения паролей
+- [ ] Поддержка загрузки файлов на сервер
+- [ ] Редактирование файлов в удаленном режиме
+- [ ] Поддержка множественных SSH сессий
+- [ ] Интеграция с популярными редакторами кода
+- [ ] Поддержка SFTP закладок
+- [ ] Экспорт/импорт профилей
 
-## 📞 Support
+## Лицензия
 
-If you encounter any issues or have questions, please open an issue on GitHub.
+MIT License - см. файл [LICENSE](LICENSE) для деталей.
 
----
+## Поддержка
 
-**MacSSH Terminal** - Making SSH connections beautiful and simple on macOS 🖥️ 
+Если у вас есть вопросы или предложения, создайте Issue в репозитории. 
