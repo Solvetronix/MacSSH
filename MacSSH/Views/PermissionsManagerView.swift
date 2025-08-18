@@ -31,6 +31,13 @@ struct PermissionsManagerView: View {
             .onAppear {
                 // Автоматически проверяем инструменты при открытии
                 permissionsCheck = SSHService.checkAllPermissions()
+                
+                // Если Full Disk Access не предоставлен, показываем предупреждение
+                if !PermissionsService.forceCheckPermissions() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        PermissionsService.requestFullDiskAccess()
+                    }
+                }
             }
             
             // Основной контент
@@ -52,6 +59,17 @@ struct PermissionsManagerView: View {
                                     // Кликабельные строки для установки
                                     Button(action: {
                                         installPackage(from: line)
+                                    }) {
+                                        Text(line)
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundColor(.orange)
+                                            .padding(.vertical, 1)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else if line.contains("⚠️") && line.contains("Grant Full Disk Access") {
+                                    // Кликабельная строка для запроса Full Disk Access
+                                    Button(action: {
+                                        PermissionsService.requestFullDiskAccess()
                                     }) {
                                         Text(line)
                                             .font(.system(.caption, design: .monospaced))
@@ -85,6 +103,37 @@ struct PermissionsManagerView: View {
                     permissionsCheck = SSHService.checkAllPermissions()
                 }
                 .buttonStyle(.bordered)
+                
+                Button("Force Check Permissions") {
+                    let hasAccess = PermissionsService.forceCheckPermissions()
+                    if hasAccess {
+                        permissionsCheck = SSHService.checkAllPermissions()
+                    } else {
+                        // Показываем предупреждение
+                        let alert = NSAlert()
+                        alert.messageText = "Permissions Check"
+                        alert.informativeText = "Full Disk Access is still not granted. Please check System Settings."
+                        alert.alertStyle = .warning
+                        alert.addButton(withTitle: "OK")
+                        alert.runModal()
+                    }
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Show Instructions") {
+                    showingInstructions = true
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Request Full Disk Access") {
+                    PermissionsService.requestFullDiskAccess()
+                    // Обновляем статус после запроса
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        permissionsCheck = SSHService.checkAllPermissions()
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(PermissionsService.forceCheckPermissions())
                 
                 Button("Close") {
                     dismiss()
@@ -170,10 +219,11 @@ struct PermissionsManagerView: View {
     
     private func checkPermissionsAfterSetup() {
         // Проверяем разрешения после настройки
+        let fullDiskAccess = PermissionsService.forceCheckPermissions()
         let sshKeyscanAvailable = SSHService.checkSSHKeyscanAvailability()
         let sshAvailable = SSHService.checkSSHAvailability()
         
-        if sshKeyscanAvailable && sshAvailable {
+        if fullDiskAccess && sshKeyscanAvailable && sshAvailable {
             // Если разрешения настроены, закрываем модальное окно
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 dismiss()
@@ -265,26 +315,26 @@ struct DetailedInstructionsView: View {
                         
                         DetailedStep(
                             number: "1",
-                            title: "Open System Preferences",
-                            description: "Click the Apple menu → System Preferences, or use Spotlight (⌘+Space) and search for 'Security'"
+                            title: "Open System Settings",
+                            description: "Click the Apple menu → System Settings, or use Spotlight (⌘+Space) and search for 'Privacy'"
                         )
                         
                         DetailedStep(
                             number: "2",
-                            title: "Go to Security & Privacy",
-                            description: "Click on 'Security & Privacy' in the System Preferences window"
+                            title: "Go to Privacy & Security",
+                            description: "Click on 'Privacy & Security' in the System Settings window"
                         )
                         
                         DetailedStep(
                             number: "3",
-                            title: "Select Privacy Tab",
-                            description: "Click on the 'Privacy' tab at the top of the Security & Privacy window"
+                            title: "Scroll to Full Disk Access",
+                            description: "Scroll down to find 'Full Disk Access' in the list of privacy settings"
                         )
                         
                         DetailedStep(
                             number: "4",
-                            title: "Add Full Disk Access",
-                            description: "In the left sidebar, select 'Full Disk Access'. Click the lock icon 🔒 at the bottom, enter your password, then click the '+' button and add MacSSH"
+                            title: "Add Full Disk Access (Required)",
+                            description: "In the left sidebar, select 'Full Disk Access'. Click the lock icon 🔒 at the bottom, enter your password, then click the '+' button and add MacSSH. This permission is required for SSH operations."
                         )
                         
                         DetailedStep(

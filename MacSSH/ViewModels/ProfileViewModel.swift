@@ -60,11 +60,12 @@ class ProfileViewModel: ObservableObject {
         let hasDeclinedWarning = userDefaults.bool(forKey: "hasDeclinedPermissionsWarning")
         
         if !hasShownWarning && !hasDeclinedWarning {
-            // Проверяем доступность основных команд
+            // Проверяем Full Disk Access и доступность основных команд
+            let fullDiskAccess = PermissionsService.forceCheckPermissions()
             let sshKeyscanAvailable = SSHService.checkSSHKeyscanAvailability()
             let sshAvailable = SSHService.checkSSHAvailability()
             
-            if !sshKeyscanAvailable || !sshAvailable {
+            if !fullDiskAccess || !sshKeyscanAvailable || !sshAvailable {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     self.showingPermissionsWarning = true
                     self.userDefaults.set(true, forKey: "hasShownPermissionsWarning")

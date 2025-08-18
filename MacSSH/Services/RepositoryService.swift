@@ -300,6 +300,12 @@ class SSHService {
         static func checkAllPermissions() -> [String] {
         var results: [String] = []
 
+        // Проверяем системные разрешения
+        let systemPermissions = PermissionsService.checkAllPermissions()
+        results.append(contentsOf: systemPermissions)
+        
+        results.append("")
+        
         // Проверяем доступность команд
         results.append("=== Required SSH Tools ===")
         results.append(checkSSHKeyscanAvailability() ? "✅ ssh-keyscan: Available" : "❌ ssh-keyscan: Not found")
@@ -312,6 +318,9 @@ class SSHService {
         
         // Рекомендации
         results.append("\n=== Actions Needed ===")
+        if !PermissionsService.forceCheckPermissions() {
+            results.append("⚠️ Grant Full Disk Access: Required for SSH operations")
+        }
         if !checkSSHPassAvailability() {
             results.append("⚠️ Install sshpass: brew install sshpass")
         }
@@ -325,6 +334,12 @@ class SSHService {
         var debugLogs: [String] = []
         
         debugLogs.append("[blue]Testing connection to \(profile.host):\(profile.port)...")
+        
+        // Проверяем Full Disk Access
+        if !PermissionsService.forceCheckPermissions() {
+            debugLogs.append("[red]❌ Full Disk Access not granted")
+            throw SSHConnectionError.permissionDenied("Full Disk Access не предоставлен. Это разрешение необходимо для выполнения SSH команд.")
+        }
         
         // Проверяем доступность ssh-keyscan
         if !checkSSHKeyscanAvailability() {
@@ -376,6 +391,12 @@ class SSHService {
         var debugLogs: [String] = []
         
         debugLogs.append("[blue]Starting terminal opening process...")
+        
+        // Проверяем Full Disk Access
+        if !PermissionsService.forceCheckPermissions() {
+            debugLogs.append("[red]❌ Full Disk Access not granted")
+            throw SSHConnectionError.permissionDenied("Full Disk Access не предоставлен. Это разрешение необходимо для выполнения SSH команд.")
+        }
         
         let sshCommand: String
         do {
