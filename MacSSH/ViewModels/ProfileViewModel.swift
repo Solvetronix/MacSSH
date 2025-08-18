@@ -11,7 +11,7 @@ class ProfileViewModel: ObservableObject {
     @Published var showingPermissionsManager = false
     
     // SFTP properties
-    @Published var currentDirectory: String = "."
+    @Published var currentDirectory: String = "/"
     @Published var remoteFiles: [RemoteFile] = []
     
     /// Сортирует файлы в стандартном порядке: сначала папки, потом файлы, все по алфавиту
@@ -283,6 +283,10 @@ class ProfileViewModel: ObservableObject {
             print("=== PROFILEVIEWMODEL: Setting UI state ===")
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
+            // По умолчанию открываем корневую директорию
+            if self.currentDirectory == "." || self.currentDirectory.isEmpty {
+                self.currentDirectory = "/"
+            }
             self.connectionLog.removeAll()
             self.connectionLog.append("[blue]Opening file browser for \(profile.host)...")
             print("=== PROFILEVIEWMODEL: UI state set successfully ===")
@@ -339,14 +343,15 @@ class ProfileViewModel: ObservableObject {
         
         do {
             print("=== PROFILEVIEWMODEL: About to call SSHService.listDirectory ===")
-            let result = try await SSHService.listDirectory(profile, path: path)
+            let normalized = normalizePath(path)
+            let result = try await SSHService.listDirectory(profile, path: normalized)
             await MainActor.run {
-                self.currentDirectory = path
+                self.currentDirectory = normalized
                 self.remoteFiles = self.sortFiles(result.files)
                 for log in result.logs {
                     self.connectionLog.append(log)
                 }
-                self.connectionLog.append("[green]✅ Navigated to \(path)")
+                self.connectionLog.append("[green]✅ Navigated to \(normalized)")
             }
         } catch {
             print("=== PROFILEVIEWMODEL: navigateToDirectory ERROR ===")
@@ -454,29 +459,38 @@ class ProfileViewModel: ObservableObject {
     
     /// Получить родительский путь
     private func getParentPath(_ path: String) -> String {
-        if path == "." || path == "/" {
-            return "."
+        let normalized = normalizePath(path)
+        if normalized == "/" { return "/" }
+        // убираем завершающий слеш
+        let trimmed = normalized.hasSuffix("/") && normalized.count > 1 ? String(normalized.dropLast()) : normalized
+        if trimmed.hasPrefix("/") {
+            let parts = trimmed.split(separator: "/", omittingEmptySubsequences: true)
+            if parts.isEmpty { return "/" }
+            let parent = parts.dropLast()
+            return parent.isEmpty ? "/" : "/" + parent.joined(separator: "/")
+        } else {
+            let parts = trimmed.split(separator: "/", omittingEmptySubsequences: true)
+            if parts.isEmpty { return "." }
+            let parent = parts.dropLast()
+            return parent.isEmpty ? "." : parent.joined(separator: "/")
         }
-        
-        let components = path.components(separatedBy: "/")
-        if components.count <= 1 {
-            return "."
-        }
-        
-        let parentComponents = Array(components.dropLast())
-        return parentComponents.isEmpty ? "/" : parentComponents.joined(separator: "/")
     }
     
     /// Получить отображаемое имя пути
-    func getDisplayPath() -> String {
-        if currentDirectory == "." {
-            return "Home Directory"
-        }
-        return currentDirectory
-    }
+    func getDisplayPath() -> String { currentDirectory.isEmpty ? "/" : currentDirectory }
     
     /// Проверить, можно ли перейти в родительскую директорию
     func canNavigateToParent() -> Bool {
-        return currentDirectory != "." && currentDirectory != "/"
+        return currentDirectory != "/"
+    }
+
+    // Нормализуем путь: убираем множественные слеши, пустые, заменяем "." на "/", убираем завершающий слеш
+    private func normalizePath(_ rawPath: String) -> String {
+        var path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.isEmpty || path == "." { return "/" }
+        path = path.replacingOccurrences(of: "//+", with: "/", options: .regularExpression)
+        if path.count > 1 && path.hasSuffix("/") { path.removeLast() }
+        if path.isEmpty { return "/" }
+        return path
     }
 } 
