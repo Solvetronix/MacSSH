@@ -17,7 +17,7 @@ struct MacSSHApp: App {
                 .environmentObject(viewModel)
         }
         
-        WindowGroup("File Browser", id: "fileBrowser") {
+        Window("File Browser", id: "fileBrowser") {
             FileBrowserWindowContent(viewModel: viewModel)
         }
         .windowStyle(.titleBar)
@@ -32,14 +32,14 @@ struct FileBrowserWindowContent: View {
     
     var body: some View {
         let timestamp = Date().timeIntervalSince1970
-        print("🕐 [\(timestamp)] WindowGroup: Evaluating condition")
-        print("🕐 [\(timestamp)] WindowGroup: viewModel.fileBrowserProfile: \(viewModel.fileBrowserProfile?.name ?? "nil")")
+        print("🕐 [\(timestamp)] FileBrowserWindow: Evaluating condition")
+        print("🕐 [\(timestamp)] FileBrowserWindow: viewModel.fileBrowserProfile: \(viewModel.fileBrowserProfile?.name ?? "nil")")
         
         if viewModel.fileBrowserProfile != nil {
-            print("🕐 [\(timestamp)] WindowGroup: Rendering FileBrowserView")
+            print("🕐 [\(timestamp)] FileBrowserWindow: Rendering FileBrowserView")
             return AnyView(FileBrowserView(viewModel: viewModel))
         } else {
-            print("🕐 [\(timestamp)] WindowGroup: Rendering 'No profile selected'")
+            print("🕐 [\(timestamp)] FileBrowserWindow: Rendering 'No profile selected'")
             return AnyView(VStack {
                 Text("No profile selected")
                     .font(.title2)

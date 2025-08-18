@@ -32,6 +32,7 @@ struct FileBrowserView: View {
 
 struct FileBrowserHeader: View {
     @ObservedObject var viewModel: ProfileViewModel
+    @State private var pathInput: String = ""
     
     private var profile: Profile? {
         viewModel.fileBrowserProfile
@@ -56,14 +57,18 @@ struct FileBrowserHeader: View {
             Spacer()
             
             HStack(spacing: 12) {
-                // Path display
-                Text(viewModel.getDisplayPath())
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(4)
+                // Editable path field
+                TextField("Path", text: $pathInput, onCommit: {
+                    guard let profile = profile else { return }
+                    let trimmed = pathInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        Task { await viewModel.navigateToDirectory(profile, path: trimmed) }
+                    }
+                })
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .font(.system(.body, design: .monospaced))
+                .frame(minWidth: 320)
+                .disabled(viewModel.isBrowsingFiles)
                 
                 // Parent directory button
                 if let profile = profile {
@@ -93,6 +98,14 @@ struct FileBrowserHeader: View {
             }
         }
         .padding()
+        .onAppear {
+            // Initialize with the current directory
+            self.pathInput = viewModel.currentDirectory
+        }
+        .onChange(of: viewModel.currentDirectory) { _ in
+            // Keep the input in sync when navigation happens elsewhere
+            self.pathInput = viewModel.currentDirectory
+        }
     }
 }
 
@@ -126,6 +139,11 @@ struct FileBrowserContent: View {
                             .foregroundColor(file.isDirectory ? .blue : .primary)
                         Text(file.name)
                             .font(.system(.body, design: .monospaced))
+                    }
+                    .onTapGesture(count: 2) {
+                        if let profile = profile, file.isDirectory {
+                            Task { await viewModel.navigateToDirectory(profile, path: file.path) }
+                        }
                     }
                 }
                     
