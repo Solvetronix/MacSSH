@@ -1169,11 +1169,22 @@ class SSHService {
                 }
                 
                 // Формируем правильный путь
-                let fullPath: String
+                var fullPath: String
                 if basePath == "." || cleanBasePath.isEmpty {
                     fullPath = cleanName
                 } else {
-                    fullPath = "\(cleanBasePath)/\(cleanName)"
+                    // Убираем дублирующиеся слеши
+                    let normalizedBasePath = cleanBasePath.replacingOccurrences(of: "//+", with: "/", options: .regularExpression)
+                    let normalizedName = cleanName.replacingOccurrences(of: "//+", with: "/", options: .regularExpression)
+                    
+                    if normalizedBasePath.hasSuffix("/") {
+                        fullPath = "\(normalizedBasePath)\(normalizedName)"
+                    } else {
+                        fullPath = "\(normalizedBasePath)/\(normalizedName)"
+                    }
+                    
+                    // Убираем множественные слеши в начале
+                    fullPath = fullPath.replacingOccurrences(of: "^//+", with: "/", options: .regularExpression)
                 }
                 
                 // Парсим дату
@@ -1190,6 +1201,9 @@ class SSHService {
                     permissions: permissions,
                     modifiedDate: modifiedDate
                 )
+                
+                // Отладочная информация для путей
+                print("DEBUG: File path creation - basePath: '\(basePath)', cleanName: '\(cleanName)', fullPath: '\(fullPath)'")
                 
                 files.append(file)
             }
