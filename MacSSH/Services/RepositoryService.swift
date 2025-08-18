@@ -1169,7 +1169,7 @@ class SSHService {
                 }
                 
                 // Формируем правильный путь
-                var fullPath: String
+                let fullPath: String
                 if basePath == "." || cleanBasePath.isEmpty {
                     fullPath = cleanName
                 } else {
@@ -1177,14 +1177,15 @@ class SSHService {
                     let normalizedBasePath = cleanBasePath.replacingOccurrences(of: "//+", with: "/", options: .regularExpression)
                     let normalizedName = cleanName.replacingOccurrences(of: "//+", with: "/", options: .regularExpression)
                     
+                    let tempPath: String
                     if normalizedBasePath.hasSuffix("/") {
-                        fullPath = "\(normalizedBasePath)\(normalizedName)"
+                        tempPath = "\(normalizedBasePath)\(normalizedName)"
                     } else {
-                        fullPath = "\(normalizedBasePath)/\(normalizedName)"
+                        tempPath = "\(normalizedBasePath)/\(normalizedName)"
                     }
                     
                     // Убираем множественные слеши в начале
-                    fullPath = fullPath.replacingOccurrences(of: "^//+", with: "/", options: .regularExpression)
+                    fullPath = tempPath.replacingOccurrences(of: "^//+", with: "/", options: .regularExpression)
                 }
                 
                 // Парсим дату

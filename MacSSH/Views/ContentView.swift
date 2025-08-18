@@ -64,7 +64,16 @@ struct ConnectionListView: View {
                     ConnectionNameCell(profile: profile)
                 }
                 
-                TableColumn("") { profile in
+                TableColumn("Host") { profile in
+                    ConnectionHostCell(profile: profile)
+                }
+                
+                TableColumn("Port") { profile in
+                    ConnectionPortCell(profile: profile)
+                }
+                .width(min: 30, ideal: 35)
+                
+                TableColumn("Options") { profile in
                     ConnectionActionsCell(
                         profile: profile,
                         viewModel: viewModel,
@@ -73,22 +82,6 @@ struct ConnectionListView: View {
                     )
                 }
                 .width(160)
-                
-                TableColumn("Host") { profile in
-                    ConnectionHostCell(profile: profile)
-                }
-                TableColumn("Port") { profile in
-                    ConnectionPortCell(profile: profile)
-                }
-                TableColumn("Username") { profile in
-                    ConnectionUsernameCell(profile: profile)
-                }
-                TableColumn("Auth") { profile in
-                    ConnectionAuthCell(profile: profile)
-                }
-                TableColumn("Last Connection") { profile in
-                    ConnectionLastCell(profile: profile)
-                }
             }
             .frame(minHeight: 200)
         }
