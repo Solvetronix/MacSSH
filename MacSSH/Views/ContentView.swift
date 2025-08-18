@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = ProfileViewModel()
+    @EnvironmentObject var viewModel: ProfileViewModel
     @State private var showingAddProfile = false
     @State private var selectedProfile: Profile?
     @State private var showingPermissionsManager = false
@@ -191,7 +191,7 @@ struct ConnectionActionsCell: View {
     @ObservedObject var viewModel: ProfileViewModel
     @Binding var selectedProfile: Profile?
     @Binding var profileToDelete: Profile?
-    @State private var showingFileBrowser = false
+    @Environment(\.openWindow) private var openWindow
     
     var body: some View {
         HStack(spacing: 12) {
@@ -215,14 +215,25 @@ struct ConnectionActionsCell: View {
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isConnecting)
             
-            Button(action: { showingFileBrowser = true }) {
+            Button(action: { 
+                let timestamp = Date().timeIntervalSince1970
+                print("🕐 [\(timestamp)] Button: Opening file browser for profile: \(profile.name) (\(profile.host))")
+                Task {
+                    print("🕐 [\(timestamp)] Button: Starting openFileBrowser")
+                    await viewModel.openFileBrowser(for: profile)
+                    print("🕐 [\(timestamp)] Button: openFileBrowser completed")
+                    print("🕐 [\(timestamp)] Button: About to set fileBrowserProfile to: \(profile.name)")
+                    viewModel.fileBrowserProfile = profile
+                    print("🕐 [\(timestamp)] Button: fileBrowserProfile set to: \(viewModel.fileBrowserProfile?.name ?? "nil")")
+                    print("🕐 [\(timestamp)] Button: About to open window")
+                    openWindow(id: "fileBrowser")
+                    print("🕐 [\(timestamp)] Button: Window opened")
+                }
+            }) {
                 HoverableIcon(systemName: "folder", help: "Open File Browser")
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isConnecting)
-        }
-        .sheet(isPresented: $showingFileBrowser) {
-            FileBrowserView(viewModel: viewModel, profile: profile)
         }
     }
 }

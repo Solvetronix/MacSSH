@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 class ProfileViewModel: ObservableObject {
     @Published var profiles: [Profile] = []
@@ -12,8 +13,23 @@ class ProfileViewModel: ObservableObject {
     // SFTP properties
     @Published var currentDirectory: String = "."
     @Published var remoteFiles: [RemoteFile] = []
+    
+    /// Сортирует файлы в стандартном порядке: сначала папки, потом файлы, все по алфавиту
+    private func sortFiles(_ files: [RemoteFile]) -> [RemoteFile] {
+        return files.sorted { first, second in
+            // Сначала сортируем по типу: папки перед файлами
+            if first.isDirectory != second.isDirectory {
+                return first.isDirectory && !second.isDirectory
+            }
+            
+            // Затем сортируем по имени (без учета регистра)
+            return first.name.localizedCaseInsensitiveCompare(second.name) == .orderedAscending
+        }
+    }
     @Published var isBrowsingFiles: Bool = false
     @Published var fileBrowserError: String?
+    @Published var showingFileBrowserWindow: Bool = false
+    @Published var fileBrowserProfile: Profile?
     @Published var selectedFileID: RemoteFile.ID?
     
     private let userDefaults = UserDefaults.standard
@@ -245,10 +261,17 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - SFTP Operations
     
+    /// Открыть файловый менеджер в отдельном окне
+    func openFileBrowserWindow(for profile: Profile) {
+        self.fileBrowserProfile = profile
+        self.showingFileBrowserWindow = true
+    }
+    
     /// Открыть файловый браузер для профиля
     func openFileBrowser(for profile: Profile) async {
         print("=== PROFILEVIEWMODEL: openFileBrowser STARTED ===")
         print("Profile: \(profile.name), Host: \(profile.host)")
+        print("Current thread: \(Thread.isMainThread ? "Main" : "Background")")
         print("Profile keyType: \(profile.keyType)")
         print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
         print("Profile username: \(profile.username)")
@@ -272,7 +295,7 @@ class ProfileViewModel: ObservableObject {
             
             let result = try await SSHService.listDirectory(profile, path: currentDirectory)
             await MainActor.run {
-                self.remoteFiles = result.files
+                self.remoteFiles = self.sortFiles(result.files)
                 for log in result.logs {
                     self.connectionLog.append(log)
                 }
@@ -303,6 +326,11 @@ class ProfileViewModel: ObservableObject {
     
     /// Перейти в директорию
     func navigateToDirectory(_ profile: Profile, path: String) async {
+        print("=== PROFILEVIEWMODEL: navigateToDirectory STARTED ===")
+        print("Profile: \(profile.name), Host: \(profile.host)")
+        print("Path: \(path)")
+        print("Current directory: \(currentDirectory)")
+        
         await MainActor.run {
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
@@ -310,16 +338,22 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
+            print("=== PROFILEVIEWMODEL: About to call SSHService.listDirectory ===")
             let result = try await SSHService.listDirectory(profile, path: path)
             await MainActor.run {
                 self.currentDirectory = path
-                self.remoteFiles = result.files
+                self.remoteFiles = self.sortFiles(result.files)
                 for log in result.logs {
                     self.connectionLog.append(log)
                 }
                 self.connectionLog.append("[green]✅ Navigated to \(path)")
             }
         } catch {
+            print("=== PROFILEVIEWMODEL: navigateToDirectory ERROR ===")
+            print("Error type: \(type(of: error))")
+            print("Error description: \(error.localizedDescription)")
+            print("Error: \(error)")
+            
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to navigate: \(error.localizedDescription)")

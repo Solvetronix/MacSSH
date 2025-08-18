@@ -2,48 +2,55 @@ import SwiftUI
 
 struct FileBrowserView: View {
     @ObservedObject var viewModel: ProfileViewModel
-    let profile: Profile
-    @Environment(\.dismiss) private var dismiss
+    
+    private var profile: Profile? {
+        viewModel.fileBrowserProfile
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            FileBrowserHeader(
-                viewModel: viewModel,
-                profile: profile,
-                onClose: { dismiss() }
-            )
-            
-            Divider()
-            
-            // File List
-            FileBrowserContent(
-                viewModel: viewModel,
-                profile: profile
-            )
-        }
-        .frame(minWidth: 600, minHeight: 400)
-        .onAppear {
-            Task {
-                await viewModel.openFileBrowser(for: profile)
+            if viewModel.fileBrowserProfile == nil {
+                VStack {
+                    Text("Loading...")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Header
+                FileBrowserHeader(viewModel: viewModel)
+                
+                Divider()
+                
+                // File List
+                FileBrowserContent(viewModel: viewModel)
             }
         }
+        .frame(minWidth: 600, minHeight: 400)
     }
 }
 
 struct FileBrowserHeader: View {
     @ObservedObject var viewModel: ProfileViewModel
-    let profile: Profile
-    let onClose: () -> Void
+    
+    private var profile: Profile? {
+        viewModel.fileBrowserProfile
+    }
     
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("File Browser")
                     .font(.headline)
-                Text("\(profile.name) (\(profile.host))")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                if let profile = profile {
+                    Text("\(profile.name) (\(profile.host))")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Loading...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
             }
             
             Spacer()
@@ -59,30 +66,30 @@ struct FileBrowserHeader: View {
                     .cornerRadius(4)
                 
                 // Parent directory button
-                Button(action: {
-                    Task {
-                        await viewModel.navigateToParentDirectory(profile)
+                if let profile = profile {
+                    Button(action: {
+                        Task {
+                            await viewModel.navigateToParentDirectory(profile)
+                        }
+                    }) {
+                        Image(systemName: "arrow.up")
+                            .help("Go to parent directory")
                     }
-                }) {
-                    Image(systemName: "arrow.up")
-                        .help("Go to parent directory")
-                }
-                .disabled(!viewModel.canNavigateToParent() || viewModel.isBrowsingFiles)
-                
-                // Refresh button
-                Button(action: {
-                    Task {
-                        await viewModel.openFileBrowser(for: profile)
+                    .disabled(!viewModel.canNavigateToParent() || viewModel.isBrowsingFiles)
+                    
+                    // Refresh button
+                    Button(action: {
+                        Task {
+                            await viewModel.openFileBrowser(for: profile)
+                        }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .help("Refresh")
                     }
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                        .help("Refresh")
+                    .disabled(viewModel.isBrowsingFiles)
                 }
-                .disabled(viewModel.isBrowsingFiles)
                 
-                Button("Close") {
-                    onClose()
-                }
+
             }
         }
         .padding()
@@ -91,7 +98,10 @@ struct FileBrowserHeader: View {
 
 struct FileBrowserContent: View {
     @ObservedObject var viewModel: ProfileViewModel
-    let profile: Profile
+    
+    private var profile: Profile? {
+        viewModel.fileBrowserProfile
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -153,11 +163,7 @@ struct FileBrowserContent: View {
                     .width(150)
                     
                     TableColumn("Actions") { file in
-                        FileActionsCell(
-                            file: file,
-                            viewModel: viewModel,
-                            profile: profile
-                        )
+                        FileActionsCell(file: file, viewModel: viewModel)
                     }
                     .width(80)
                 }
@@ -175,6 +181,8 @@ struct FileBrowserContent: View {
     }
     
     private func handleFileAction(_ file: RemoteFile) {
+        guard let profile = profile else { return }
+        
         if file.isDirectory {
             Task {
                 await viewModel.navigateToDirectory(profile, path: file.path)
@@ -197,44 +205,42 @@ struct FileBrowserContent: View {
 struct FileActionsCell: View {
     let file: RemoteFile
     @ObservedObject var viewModel: ProfileViewModel
-    let profile: Profile
+    
+    private var profile: Profile? {
+        viewModel.fileBrowserProfile
+    }
     
     var body: some View {
         HStack(spacing: 8) {
-            if file.isDirectory {
-                Button(action: {
-                    Task {
-                        await viewModel.navigateToDirectory(profile, path: file.path)
+            if let profile = profile {
+                if file.isDirectory {
+                    Button(action: {
+                        Task {
+                            await viewModel.navigateToDirectory(profile, path: file.path)
+                        }
+                    }) {
+                        Image(systemName: "folder")
+                            .help("Open directory")
                     }
-                }) {
-                    Image(systemName: "folder")
-                        .help("Open directory")
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(viewModel.isBrowsingFiles)
-            } else {
-                Button(action: {
-                    Task {
-                        await viewModel.openFileInFinder(profile, file: file)
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(viewModel.isBrowsingFiles)
+                } else {
+                    Button(action: {
+                        Task {
+                            await viewModel.openFileInFinder(profile, file: file)
+                        }
+                    }) {
+                        Image(systemName: "doc")
+                            .help("Download and Open")
                     }
-                }) {
-                    Image(systemName: "doc")
-                        .help("Download and Open")
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(viewModel.isConnecting)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(viewModel.isConnecting)
             }
         }
     }
 }
 
 #Preview {
-    FileBrowserView(
-        viewModel: ProfileViewModel(),
-        profile: Profile(
-            name: "Test Server",
-            host: "example.com",
-            username: "user"
-        )
-    )
+    FileBrowserView(viewModel: ProfileViewModel())
 }
