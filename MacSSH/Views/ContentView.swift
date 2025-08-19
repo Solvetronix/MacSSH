@@ -61,6 +61,7 @@ struct ConnectionListView: View {
     @Binding var selectedProfile: Profile?
     @Binding var showingPermissionsManager: Bool
     @State private var profileToDelete: Profile? = nil
+    @State private var showingAboutDialog = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -109,7 +110,7 @@ struct ConnectionListView: View {
                         Divider()
                         
                         Button("About MacSSH") {
-                            // TODO: Show about dialog
+                            showingAboutDialog = true
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -141,6 +142,19 @@ struct ConnectionListView: View {
         }, message: {
             Text("This action cannot be undone.")
         })
+        .alert("About MacSSH", isPresented: $showingAboutDialog) {
+            Button("OK") { }
+        } message: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("MacSSH Terminal")
+                    .font(.headline)
+                Text("Version \(viewModel.getCurrentVersion())")
+                    .font(.subheadline)
+                Text("SSH connection manager with file browser and VS Code integration")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 }
 

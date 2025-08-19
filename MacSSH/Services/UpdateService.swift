@@ -2,25 +2,35 @@ import Foundation
 import AppKit
 
 class UpdateService {
-    private static let repositoryOwner = "dmitryborisenko" // Replace with your GitHub username
+    private static let repositoryOwner = "Solvetronix" // Replace with your GitHub username
     private static let repositoryName = "MacSSH" // Replace with your repository name
     private static let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     
     /// Checks for available updates from GitHub
     static func checkForUpdates() async -> UpdateInfo? {
+        print("🔍 [UpdateService] Starting update check...")
+        print("🔍 [UpdateService] Current version: \(currentVersion)")
+        
         let urlString = "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest"
+        print("🔍 [UpdateService] Checking URL: \(urlString)")
         
         guard let url = URL(string: urlString) else {
-            print("❌ Invalid URL for GitHub API")
+            print("❌ [UpdateService] Invalid URL for GitHub API")
             return nil
         }
         
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                print("❌ Failed to fetch release info: \(response)")
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [UpdateService] Invalid HTTP response")
+                return nil
+            }
+            
+            print("🔍 [UpdateService] HTTP Status: \(httpResponse.statusCode)")
+            
+            guard httpResponse.statusCode == 200 else {
+                print("❌ [UpdateService] Failed to fetch release info: \(httpResponse.statusCode)")
                 return nil
             }
             
@@ -28,16 +38,24 @@ class UpdateService {
             decoder.dateDecodingStrategy = .iso8601
             
             let release = try decoder.decode(GitHubRelease.self, from: data)
+            print("🔍 [UpdateService] Found release: \(release.tagName)")
             
             // Find .dmg asset
             guard let dmgAsset = release.assets.first(where: { $0.name.hasSuffix(".dmg") }) else {
-                print("❌ No .dmg file found in release")
+                print("❌ [UpdateService] No .dmg file found in release")
                 return nil
             }
             
             // Parse version and compare
             let releaseVersion = release.tagName.replacingOccurrences(of: "v", with: "")
             let isNewer = compareVersions(releaseVersion, currentVersion) > 0
+            
+            // TEMPORARY: Always show update for testing purposes
+            let alwaysShowUpdate = true
+            
+            print("🔍 [UpdateService] Release version: \(releaseVersion)")
+            print("🔍 [UpdateService] Is newer: \(isNewer)")
+            print("🔍 [UpdateService] Always show update (testing): \(alwaysShowUpdate)")
             
             let dateFormatter = ISO8601DateFormatter()
             let publishedDate = dateFormatter.date(from: release.publishedAt) ?? Date()
@@ -46,12 +64,12 @@ class UpdateService {
                 version: releaseVersion,
                 downloadUrl: dmgAsset.browserDownloadUrl,
                 releaseNotes: release.body,
-                isNewer: isNewer,
+                isNewer: alwaysShowUpdate, // TEMPORARY: Always show as newer for testing
                 publishedAt: publishedDate
             )
             
         } catch {
-            print("❌ Error checking for updates: \(error)")
+            print("❌ [UpdateService] Error checking for updates: \(error)")
             return nil
         }
     }
@@ -88,6 +106,9 @@ class UpdateService {
     
     /// Installs the downloaded update
     static func installUpdate(from fileURL: URL) async -> Bool {
+        print("🔍 [UpdateService] Starting update installation...")
+        print("🔍 [UpdateService] File URL: \(fileURL.path)")
+        
         do {
             // Open the .dmg file
             let process = Process()
@@ -97,12 +118,70 @@ class UpdateService {
             try process.run()
             process.waitUntilExit()
             
-            print("✅ Update installer opened")
+            print("✅ [UpdateService] Update installer opened")
+            
+            // Wait a bit for the installer to open
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            
+            // Restart the application
+            print("🔍 [UpdateService] Restarting application...")
+            await restartApplication()
+            
             return true
             
         } catch {
-            print("❌ Error installing update: \(error)")
+            print("❌ [UpdateService] Error installing update: \(error)")
             return false
+        }
+    }
+    
+    /// Restarts the current application
+    private static func restartApplication() async {
+        print("🔍 [UpdateService] Preparing to restart application...")
+        
+        // Get the current app bundle path
+        let appPath = Bundle.main.bundlePath
+        if appPath.isEmpty {
+            print("❌ [UpdateService] Could not get app bundle path")
+            return
+        }
+        
+        print("🔍 [UpdateService] App path: \(appPath)")
+        
+        // Create a script to restart the app
+        let script = """
+        #!/bin/bash
+        sleep 1
+        open "\(appPath)"
+        """
+        
+        let tempScriptURL = FileManager.default.temporaryDirectory.appendingPathComponent("restart_app.sh")
+        
+        do {
+            try script.write(to: tempScriptURL, atomically: true, encoding: .utf8)
+            
+            // Make script executable
+            let chmodProcess = Process()
+            chmodProcess.executableURL = URL(fileURLWithPath: "/bin/chmod")
+            chmodProcess.arguments = ["+x", tempScriptURL.path]
+            try chmodProcess.run()
+            chmodProcess.waitUntilExit()
+            
+            // Run the restart script
+            let restartProcess = Process()
+            restartProcess.executableURL = tempScriptURL
+            try restartProcess.run()
+            
+            print("✅ [UpdateService] Restart script executed")
+            
+            // Exit the current app
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                print("🔍 [UpdateService] Exiting application...")
+                NSApplication.shared.terminate(nil)
+            }
+            
+        } catch {
+            print("❌ [UpdateService] Error creating restart script: \(error)")
         }
     }
     

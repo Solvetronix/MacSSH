@@ -545,14 +545,30 @@ class ProfileViewModel: ObservableObject {
     
     /// Check for available updates
     func checkForUpdates() async {
+        print("🔍 [ProfileViewModel] Starting update check...")
+        
         await MainActor.run {
             isCheckingForUpdates = true
+            connectionLog.append("[blue]Checking for updates...")
         }
         
         if let update = await UpdateService.checkForUpdates() {
+            print("🔍 [ProfileViewModel] Update found: \(update.version)")
+            
+            if update.isNewer {
+                await MainActor.run {
+                    updateInfo = update
+                    showingUpdateView = true
+                    connectionLog.append("[green]✅ Update available: v\(update.version)")
+                }
+            } else {
+                await MainActor.run {
+                    connectionLog.append("[yellow]ℹ️ You already have the latest version (v\(update.version))")
+                }
+            }
+        } else {
             await MainActor.run {
-                updateInfo = update
-                showingUpdateView = true
+                connectionLog.append("[red]❌ Failed to check for updates")
             }
         }
         
