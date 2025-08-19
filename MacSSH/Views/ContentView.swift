@@ -153,6 +153,13 @@ struct ConnectionListView: View {
                 Text("SSH connection manager with file browser and VS Code integration")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                Text("")
+                Text("Looking for developers to help improve this app!")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                Text("Visit GitHub to contribute")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
     }
