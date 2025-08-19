@@ -110,18 +110,81 @@ class UpdateService {
         print("🔍 [UpdateService] File URL: \(fileURL.path)")
         
         do {
-            // Open the .dmg file
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            process.arguments = [fileURL.path]
+            // Mount the .dmg file
+            let mountProcess = Process()
+            mountProcess.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            mountProcess.arguments = ["attach", fileURL.path, "-nobrowse"]
             
-            try process.run()
-            process.waitUntilExit()
+            let mountPipe = Pipe()
+            mountProcess.standardOutput = mountPipe
+            mountProcess.standardError = mountPipe
             
-            print("✅ [UpdateService] Update installer opened")
+            try mountProcess.run()
+            mountProcess.waitUntilExit()
             
-            // Wait a bit for the installer to open
-            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            let mountOutput = String(data: mountPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            print("🔍 [UpdateService] Mount output: \(mountOutput)")
+            
+            // Extract volume path from output
+            let lines = mountOutput.components(separatedBy: .newlines)
+            var volumePath: String?
+            
+            for line in lines {
+                if line.contains("/Volumes/") && line.contains("MacSSH") {
+                    let components = line.components(separatedBy: .whitespaces)
+                    for component in components {
+                        if component.hasPrefix("/Volumes/") {
+                            volumePath = component
+                            break
+                        }
+                    }
+                    break
+                }
+            }
+            
+            guard let volumePath = volumePath else {
+                print("❌ [UpdateService] Could not find mounted volume")
+                return false
+            }
+            
+            print("🔍 [UpdateService] Found volume: \(volumePath)")
+            
+            // Copy the new app to Applications
+            let sourceAppPath = "\(volumePath)/MacSSH.app"
+            let destAppPath = "/Applications/MacSSH.app"
+            
+            // Remove old app first
+            let removeProcess = Process()
+            removeProcess.executableURL = URL(fileURLWithPath: "/bin/rm")
+            removeProcess.arguments = ["-rf", destAppPath]
+            
+            try removeProcess.run()
+            removeProcess.waitUntilExit()
+            
+            print("🔍 [UpdateService] Removed old app")
+            
+            // Copy new app
+            let copyProcess = Process()
+            copyProcess.executableURL = URL(fileURLWithPath: "/bin/cp")
+            copyProcess.arguments = ["-R", sourceAppPath, destAppPath]
+            
+            try copyProcess.run()
+            copyProcess.waitUntilExit()
+            
+            print("🔍 [UpdateService] Copied new app")
+            
+            // Unmount the volume
+            let unmountProcess = Process()
+            unmountProcess.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            unmountProcess.arguments = ["detach", volumePath]
+            
+            try unmountProcess.run()
+            unmountProcess.waitUntilExit()
+            
+            print("🔍 [UpdateService] Unmounted volume")
+            
+            // Wait a bit for file system to settle
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
             
             // Restart the application
             print("🔍 [UpdateService] Restarting application...")
