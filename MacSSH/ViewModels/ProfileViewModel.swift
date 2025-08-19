@@ -10,6 +10,11 @@ class ProfileViewModel: ObservableObject {
     @Published var showingPermissionsWarning = false
     @Published var showingPermissionsManager = false
     
+    // Update properties
+    @Published var showingUpdateView = false
+    @Published var updateInfo: UpdateInfo?
+    @Published var isCheckingForUpdates = false
+    
     // SFTP properties
     @Published var currentDirectory: String = "/"
     @Published var remoteFiles: [RemoteFile] = []
@@ -534,5 +539,35 @@ class ProfileViewModel: ObservableObject {
         if path.count > 1 && path.hasSuffix("/") { path.removeLast() }
         if path.isEmpty { return "/" }
         return path
+    }
+    
+    // MARK: - Update Methods
+    
+    /// Check for available updates
+    func checkForUpdates() async {
+        await MainActor.run {
+            isCheckingForUpdates = true
+        }
+        
+        if let update = await UpdateService.checkForUpdates() {
+            await MainActor.run {
+                updateInfo = update
+                showingUpdateView = true
+            }
+        }
+        
+        await MainActor.run {
+            isCheckingForUpdates = false
+        }
+    }
+    
+    /// Get current app version
+    func getCurrentVersion() -> String {
+        return UpdateService.getCurrentVersion()
+    }
+    
+    /// Open GitHub releases page
+    func openGitHubReleases() {
+        UpdateService.openGitHubReleases()
     }
 } 

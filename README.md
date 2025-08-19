@@ -19,6 +19,12 @@ MacSSH is a native macOS application for managing SSH connections with a built-i
 - ✅ Mount remote directories in Finder via SSHFS
 - ✅ Display file information (size, permissions, modification date)
 
+### Updates
+- ✅ Automatic update checking via GitHub
+- ✅ One-click download and installation
+- ✅ Version comparison and release notes
+- ✅ Manual update option
+
 ## Installation
 
 ### Requirements
@@ -146,6 +152,19 @@ When opening a file in VS Code/Cursor:
 - VS Code/Cursor opens with the downloaded file
 - All changes are automatically synchronized with the remote server when saved
 - Change tracking works in the background
+
+### Checking for Updates
+
+MacSSH includes an automatic update system:
+
+1. Click the "More Options" menu (⋯) in the toolbar
+2. Select "Check for Updates"
+3. If an update is available:
+   - Review version changes and release notes
+   - Click "Download & Install" to update
+   - Or click "View on GitHub" for manual download
+
+For detailed information about the update system, see [UPDATE_SYSTEM.md](UPDATE_SYSTEM.md).
 
 ## Project Structure
 

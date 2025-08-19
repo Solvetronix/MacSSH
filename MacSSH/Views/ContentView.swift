@@ -32,6 +32,11 @@ struct ContentView: View {
         .sheet(isPresented: $viewModel.showingPermissionsManager) {
             PermissionsManagerView()
         }
+        .sheet(isPresented: $viewModel.showingUpdateView) {
+            if let updateInfo = viewModel.updateInfo {
+                UpdateView(updateInfo: updateInfo)
+            }
+        }
         .alert("Permissions Required", isPresented: $viewModel.showingPermissionsWarning) {
             Button("Open Permissions Manager") {
                 viewModel.showingPermissionsManager = true
@@ -89,6 +94,28 @@ struct ConnectionListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
+                    Menu {
+                        Button("Check for Updates") {
+                            Task {
+                                await viewModel.checkForUpdates()
+                            }
+                        }
+                        .disabled(viewModel.isCheckingForUpdates)
+                        
+                        Button("View on GitHub") {
+                            viewModel.openGitHubReleases()
+                        }
+                        
+                        Divider()
+                        
+                        Button("About MacSSH") {
+                            // TODO: Show about dialog
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .help("More Options")
+                    
                     Button(action: { showingPermissionsManager = true }) {
                         Image(systemName: "lock.shield")
                     }
