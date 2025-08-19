@@ -2,28 +2,7 @@
 
 MacSSH is a native macOS application for managing SSH connections with a built-in file manager for working with remote files and folders.
 
-## 🔍 What MacSSH Searches For
 
-MacSSH automatically detects and checks for the following software on your system:
-
-### **Text Editors** (Required for file editing)
-- **VS Code** or **Cursor** - for editing remote files with automatic synchronization
-- Searches in: `/usr/local/bin/code`, `/opt/homebrew/bin/code`, `/Applications/Visual Studio Code.app/`, `/Applications/Cursor.app/`
-
-### **SSH Tools** (Built into macOS)
-- **ssh**, **ssh-keyscan**, **sftp**, **scp** - for SSH connections and file operations
-- Located in: `/usr/bin/`
-
-### **Additional Tools** (Optional but recommended)
-- **sshpass** - for password-based authentication
-- **sshfs** - for mounting remote directories in Finder
-- Searches in: `/opt/homebrew/bin/`, `/usr/local/bin/`, `/usr/bin/`
-
-### **System Permissions**
-- **Full Disk Access** - required for executing external commands
-- **Accessibility** - for automation features
-
-**💡 Tip**: You can check the status of all tools and permissions in **Tools > SSH Tools Manager**
 
 ## 👥 Contributing & Development
 
