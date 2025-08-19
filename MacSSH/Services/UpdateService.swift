@@ -50,8 +50,8 @@ class UpdateService {
             let releaseVersion = release.tagName.replacingOccurrences(of: "v", with: "")
             let isNewer = compareVersions(releaseVersion, currentVersion) > 0
             
-            // TEMPORARY: Always show update for testing purposes
-            let alwaysShowUpdate = true
+            // Check if this is actually a newer version
+            let alwaysShowUpdate = false // MODIFIED: Disabled for normal operation
             
             print("📝 [UpdateService] Release version: \(releaseVersion)")
             print("📝 [UpdateService] Is newer: \(isNewer)")
