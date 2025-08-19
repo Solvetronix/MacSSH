@@ -1,98 +1,98 @@
 # Full Disk Access Implementation
 
-## Обзор
+## Overview
 
-Добавлена полная поддержка проверки и запроса разрешения Full Disk Access для приложения MacSSH.
+Added full support for checking and requesting Full Disk Access permission for the MacSSH application.
 
-## Что было добавлено
+## What was added
 
-### 1. Новый сервис PermissionsService.swift
+### 1. New PermissionsService.swift service
 
-Создан новый сервис `PermissionsService` со следующими возможностями:
+Created a new `PermissionsService` with the following capabilities:
 
-- **checkFullDiskAccess()** - проверяет наличие разрешения Full Disk Access
-- **requestFullDiskAccess()** - запрашивает разрешение через диалог
-- **openSystemPreferences()** - открывает System Settings на странице Privacy & Security
-- **checkAllPermissions()** - проверяет все системные разрешения
-- **canExecuteExternalCommands()** - проверяет возможность выполнения внешних команд
+- **checkFullDiskAccess()** - checks for Full Disk Access permission
+- **requestFullDiskAccess()** - requests permission through dialog
+- **openSystemPreferences()** - opens System Settings on Privacy & Security page
+- **checkAllPermissions()** - checks all system permissions
+- **canExecuteExternalCommands()** - checks ability to execute external commands
 
-### 2. Обновлен SSHService
+### 2. Updated SSHService
 
-- Добавлена проверка Full Disk Access в методы `connectToServer()` и `openTerminal()`
-- Обновлен метод `checkAllPermissions()` для включения проверки системных разрешений
-- Добавлены рекомендации по предоставлению Full Disk Access
+- Added Full Disk Access check in `connectToServer()` and `openTerminal()` methods
+- Updated `checkAllPermissions()` method to include system permission checks
+- Added recommendations for granting Full Disk Access
 
-### 3. Обновлен PermissionsManagerView
+### 3. Updated PermissionsManagerView
 
-- Добавлена кнопка "Request Full Disk Access" для запроса разрешения
-- Добавлена кнопка "Show Instructions" для показа подробных инструкций
-- Автоматическая проверка Full Disk Access при открытии окна
-- Кликабельные строки для запроса разрешений
-- Автоматическое обновление статуса после запроса разрешений
+- Added "Request Full Disk Access" button for requesting permission
+- Added "Show Instructions" button for showing detailed instructions
+- Automatic Full Disk Access check when opening the window
+- Clickable rows for requesting permissions
+- Automatic status update after requesting permissions
 
-### 4. Обновлен ProfileViewModel
+### 4. Updated ProfileViewModel
 
-- Добавлена проверка Full Disk Access при запуске приложения
-- Обновлена логика показа предупреждений о разрешениях
+- Added Full Disk Access check on application startup
+- Updated permission warning display logic
 
-### 5. Обновлены инструкции
+### 5. Updated instructions
 
-- Обновлены инструкции для новых версий macOS (System Settings вместо System Preferences)
-- Добавлено подчеркивание важности Full Disk Access
-- Улучшены описания шагов
+- Updated instructions for new macOS versions (System Settings instead of System Preferences)
+- Added emphasis on the importance of Full Disk Access
+- Improved step descriptions
 
-## Как это работает
+## How it works
 
-### Проверка Full Disk Access
+### Full Disk Access Check
 
-1. **Проверка доступа к системным директориям** - проверяется доступ к `/System/Library/CoreServices`, `/usr/bin`, `/usr/sbin`
-2. **Проверка через команду ls** - выполняется команда `ls /System/Library/CoreServices` для проверки реального доступа
-3. **Fallback проверки** - если команды не выполняются, считается что разрешения нет
+1. **System directory access check** - checks access to `/System/Library/CoreServices`, `/usr/bin`, `/usr/sbin`
+2. **Check via ls command** - executes `ls /System/Library/CoreServices` to check real access
+3. **Fallback checks** - if commands don't execute, it's considered that permission is not granted
 
-### Запрос разрешения
+### Permission Request
 
-1. **Показ диалога** - пользователю показывается диалог с объяснением необходимости разрешения
-2. **Открытие System Settings** - при нажатии "Open System Settings" открывается соответствующая страница
-3. **Поддержка старых версий** - автоматический fallback на System Preferences для старых версий macOS
+1. **Show dialog** - user is shown a dialog explaining the need for permission
+2. **Open System Settings** - clicking "Open System Settings" opens the appropriate page
+3. **Old version support** - automatic fallback to System Preferences for old macOS versions
 
-### Интеграция в UI
+### UI Integration
 
-1. **Автоматическая проверка** - при открытии PermissionsManagerView автоматически проверяется статус
-2. **Кликабельные элементы** - строки с предупреждениями о разрешениях можно кликать для запроса
-3. **Динамическое обновление** - статус обновляется после запроса разрешений
-4. **Визуальная обратная связь** - кнопки отключаются когда разрешения уже предоставлены
+1. **Automatic check** - status is automatically checked when opening PermissionsManagerView
+2. **Clickable elements** - permission warning rows can be clicked to request
+3. **Dynamic update** - status updates after requesting permissions
+4. **Visual feedback** - buttons are disabled when permissions are already granted
 
-## Использование
+## Usage
 
-### Для пользователей
+### For users
 
-1. При первом запуске приложения появится предупреждение о необходимости разрешений
-2. В SSH Tools Manager можно увидеть статус Full Disk Access
-3. Можно кликнуть на предупреждение или кнопку "Request Full Disk Access" для запроса
-4. System Settings откроется автоматически на нужной странице
-5. После предоставления разрешения статус обновится автоматически
+1. On first application launch, a warning about required permissions will appear
+2. In SSH Tools Manager, you can see the Full Disk Access status
+3. You can click on the warning or "Request Full Disk Access" button to request
+4. System Settings will open automatically on the correct page
+5. After granting permission, status will update automatically
 
-### Для разработчиков
+### For developers
 
 ```swift
-// Проверка Full Disk Access
+// Check Full Disk Access
 let hasAccess = PermissionsService.checkFullDiskAccess()
 
-// Запрос разрешения
+// Request permission
 PermissionsService.requestFullDiskAccess()
 
-// Проверка всех разрешений
+// Check all permissions
 let permissions = PermissionsService.checkAllPermissions()
 ```
 
-## Совместимость
+## Compatibility
 
-- Поддерживает macOS 13.0+ (System Settings)
-- Автоматический fallback для старых версий (System Preferences)
-- Работает с различными архитектурами (Intel/Apple Silicon)
+- Supports macOS 13.0+ (System Settings)
+- Automatic fallback for old versions (System Preferences)
+- Works with various architectures (Intel/Apple Silicon)
 
-## Безопасность
+## Security
 
-- Проверки выполняются безопасно без нарушения sandbox
-- Запросы разрешений происходят через стандартные API macOS
-- Нет прямого доступа к системным файлам без разрешения
+- Checks are performed safely without violating sandbox
+- Permission requests happen through standard macOS APIs
+- No direct access to system files without permission

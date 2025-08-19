@@ -14,15 +14,15 @@ class ProfileViewModel: ObservableObject {
     @Published var currentDirectory: String = "/"
     @Published var remoteFiles: [RemoteFile] = []
     
-    /// Сортирует файлы в стандартном порядке: сначала папки, потом файлы, все по алфавиту
+    /// Sorts files in standard order: folders first, then files, all alphabetically
     private func sortFiles(_ files: [RemoteFile]) -> [RemoteFile] {
         return files.sorted { first, second in
-            // Сначала сортируем по типу: папки перед файлами
+            // First sort by type: folders before files
             if first.isDirectory != second.isDirectory {
                 return first.isDirectory && !second.isDirectory
             }
             
-            // Затем сортируем по имени (без учета регистра)
+            // Then sort by name (case insensitive)
             return first.name.localizedCaseInsensitiveCompare(second.name) == .orderedAscending
         }
     }

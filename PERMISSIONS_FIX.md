@@ -1,104 +1,104 @@
 # MacSSH Permissions Fix Guide
 
-## Проблема
+## Problem
 
-Если вы получаете ошибку `SSHConnectionError error 5` при запуске установленного приложения MacSSH, это означает, что у приложения нет необходимых разрешений для выполнения внешних команд (ssh, ssh-keyscan, sftp, scp).
+If you receive an `SSHConnectionError error 5` when running the installed MacSSH application, it means the application doesn't have the necessary permissions to execute external commands (ssh, ssh-keyscan, sftp, scp).
 
-## Причина
+## Cause
 
-В macOS приложения, подписанные и установленные, имеют ограниченные разрешения по умолчанию. Приложение не может выполнять внешние команды без явного разрешения пользователя.
+In macOS, signed and installed applications have limited permissions by default. The application cannot execute external commands without explicit user permission.
 
-## Решение
+## Solution
 
-### 1. Добавьте MacSSH в Full Disk Access
+### 1. Add MacSSH to Full Disk Access
 
-1. Откройте **System Preferences** (Системные настройки)
-2. Перейдите в **Security & Privacy** (Безопасность и конфиденциальность)
-3. Выберите вкладку **Privacy** (Конфиденциальность)
-4. В левой панели выберите **Full Disk Access**
-5. Нажмите на замок 🔒 внизу окна и введите пароль администратора
-6. Нажмите кнопку **+** и добавьте приложение MacSSH
-7. Убедитесь, что галочка рядом с MacSSH установлена
+1. Open **System Preferences**
+2. Go to **Security & Privacy**
+3. Select the **Privacy** tab
+4. In the left panel, select **Full Disk Access**
+5. Click the lock 🔒 at the bottom of the window and enter your administrator password
+6. Click the **+** button and add the MacSSH application
+7. Make sure the checkbox next to MacSSH is checked
 
-### 2. Добавьте MacSSH в Accessibility
+### 2. Add MacSSH to Accessibility
 
-1. В том же окне **Security & Privacy > Privacy**
-2. В левой панели выберите **Accessibility**
-3. Нажмите на замок 🔒 и введите пароль администратора
-4. Нажмите кнопку **+** и добавьте приложение MacSSH
-5. Убедитесь, что галочка рядом с MacSSH установлена
+1. In the same **Security & Privacy > Privacy** window
+2. In the left panel, select **Accessibility**
+3. Click the lock 🔒 and enter your administrator password
+4. Click the **+** button and add the MacSSH application
+5. Make sure the checkbox next to MacSSH is checked
 
-### 3. Добавьте MacSSH в Automation (если необходимо)
+### 3. Add MacSSH to Automation (if necessary)
 
-1. В том же окне **Security & Privacy > Privacy**
-2. В левой панели выберите **Automation**
-3. Нажмите на замок 🔒 и введите пароль администратора
-4. Нажмите кнопку **+** и добавьте приложение MacSSH
-5. Разрешите доступ к Terminal.app
+1. In the same **Security & Privacy > Privacy** window
+2. In the left panel, select **Automation**
+3. Click the lock 🔒 and enter your administrator password
+4. Click the **+** button and add the MacSSH application
+5. Allow access to Terminal.app
 
-### 4. Установите необходимые инструменты
+### 4. Install Required Tools
 
-#### sshpass (для автоматической передачи паролей)
+#### sshpass (for automatic password transmission)
 ```bash
 brew install sshpass
 ```
 
-#### sshfs (для монтирования удаленных директорий)
+#### sshfs (for mounting remote directories)
 ```bash
 brew install --cask macfuse
 brew install sshfs
 ```
 
-### 5. Перезапустите MacSSH
+### 5. Restart MacSSH
 
-После внесения всех изменений:
-1. Полностью закройте MacSSH
-2. Запустите MacSSH заново
-3. Попробуйте подключиться к серверу
+After making all changes:
+1. Completely close MacSSH
+2. Launch MacSSH again
+3. Try connecting to the server
 
-## Проверка разрешений
+## Checking Permissions
 
-В приложении MacSSH:
-1. Откройте меню **Tools > Required Tools**
-2. Нажмите кнопку **Check Permissions**
-3. Просмотрите результаты проверки
+In the MacSSH application:
+1. Open **Tools > Required Tools** menu
+2. Click **Check Permissions** button
+3. Review the check results
 
-## Альтернативное решение
+## Alternative Solution
 
-Если проблема все еще остается, попробуйте:
+If the problem persists, try:
 
-1. **Запустить из исходников** (временно):
+1. **Run from source** (temporarily):
    ```bash
    cd /path/to/MacSSH
    xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Debug
    ```
 
-2. **Проверить логи системы**:
-   - Откройте **Console.app**
-   - Найдите записи, связанные с MacSSH
-   - Ищите ошибки доступа или разрешений
+2. **Check system logs**:
+   - Open **Console.app**
+   - Find entries related to MacSSH
+   - Look for access or permission errors
 
-3. **Сбросить разрешения**:
-   - Удалите MacSSH из всех списков разрешений
-   - Перезапустите MacSSH
-   - Повторно добавьте разрешения
+3. **Reset permissions**:
+   - Remove MacSSH from all permission lists
+   - Restart MacSSH
+   - Re-add permissions
 
-## Технические детали
+## Technical Details
 
-Приложение MacSSH использует следующие внешние команды:
-- `ssh-keyscan` - для проверки доступности хоста
-- `ssh` - для подключения к серверу
-- `sftp` - для работы с файлами
-- `scp` - для копирования файлов
-- `sshfs` - для монтирования директорий (опционально)
-- `sshpass` - для автоматической передачи паролей (опционально)
+The MacSSH application uses the following external commands:
+- `ssh-keyscan` - for checking host availability
+- `ssh` - for connecting to server
+- `sftp` - for working with files
+- `scp` - for copying files
+- `sshfs` - for mounting directories (optional)
+- `sshpass` - for automatic password transmission (optional)
 
-Все эти команды требуют разрешений на выполнение в macOS.
+All these commands require execution permissions in macOS.
 
-## Поддержка
+## Support
 
-Если проблема не решается, создайте issue в репозитории проекта с описанием:
-- Версии macOS
-- Версии MacSSH
-- Точного текста ошибки
-- Результатов проверки разрешений
+If the problem is not resolved, create an issue in the project repository with a description of:
+- macOS version
+- MacSSH version
+- Exact error text
+- Permission check results

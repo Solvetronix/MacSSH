@@ -216,7 +216,7 @@ struct ConnectionActionsCell: View {
                     viewModel.fileBrowserProfile = profile
                     print("🕐 [\(timestamp)] Button: fileBrowserProfile set to: \(viewModel.fileBrowserProfile?.name ?? "nil")")
                     
-                    // Открываем файловый браузер только если это первое открытие или если нет файлов
+                    // Open file browser only if it's the first opening or if there are no files
                     if viewModel.remoteFiles.isEmpty {
                         print("🕐 [\(timestamp)] Button: Starting openFileBrowser (first time)")
                         await viewModel.openFileBrowser(for: profile)

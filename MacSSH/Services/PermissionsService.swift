@@ -4,24 +4,24 @@ import Security
 
 class PermissionsService {
     
-    /// Проверяет, имеет ли приложение разрешение на Full Disk Access
+    /// Checks if the application has Full Disk Access permission
     static func checkFullDiskAccess() -> Bool {
-        // Проверяем возможность выполнения SSH команд напрямую
+        // Check ability to execute SSH commands directly
         let sshWorks = canExecuteSSHCommands()
         
-        // Дополнительная проверка - пытаемся выполнить простую команду
+        // Additional check - try to execute a simple command
         let simpleCommandWorks = canExecuteExternalCommands()
         
-        // Если хотя бы одна проверка прошла успешно, считаем что разрешения есть
+        // If at least one check passed successfully, consider that permissions exist
         return sshWorks || simpleCommandWorks
     }
     
-    /// Проверяет возможность выполнения SSH команд
+    /// Checks ability to execute SSH commands
     private static func canExecuteSSHCommands() -> Bool {
-        // Проверяем ssh-keyscan - это основная команда, которую использует приложение
+        // Check ssh-keyscan - this is the main command used by the application
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh-keyscan")
-        process.arguments = ["-v"] // Verbose mode для проверки
+        process.arguments = ["-v"] // Verbose mode for checking
         
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -30,7 +30,7 @@ class PermissionsService {
         do {
             try process.run()
             
-            // Используем таймаут для предотвращения зависания
+            // Use timeout to prevent hanging
             let group = DispatchGroup()
             group.enter()
             
@@ -39,24 +39,24 @@ class PermissionsService {
                 group.leave()
             }
             
-            // Ждем максимум 3 секунды
+            // Wait maximum 3 seconds
             let result = group.wait(timeout: .now() + 3)
             
             if result == .timedOut {
-                // Если процесс завис, убиваем его
+                // If process hung, kill it
                 process.terminate()
                 return false
             }
             
-            // Если команда выполнилась успешно (exit code 0 или 1 для справки), значит разрешение есть
+            // If command executed successfully (exit code 0 or 1 for help), then permission exists
             return process.terminationStatus == 0 || process.terminationStatus == 1
         } catch {
-            // Если команда не выполнилась из-за отсутствия разрешений, значит разрешения нет
+            // If command didn't execute due to lack of permissions, then no permissions
             return false
         }
     }
     
-    /// Запрашивает разрешение на Full Disk Access
+    /// Requests Full Disk Access permission
     static func requestFullDiskAccess() {
         let alert = NSAlert()
         alert.messageText = "Full Disk Access Required"

@@ -1,33 +1,33 @@
-# Быстрое решение проблемы с разрешениями MacSSH
+# Quick Fix for MacSSH Permissions Issue
 
-## Проблема
-Ошибка `SSHConnectionError error 5` при запуске установленного приложения.
+## Problem
+`SSHConnectionError error 5` when running the installed application.
 
-## Быстрое решение (5 минут)
+## Quick Solution (5 minutes)
 
-### 1. Откройте настройки безопасности
+### 1. Open Security Settings
 - **System Preferences** → **Security & Privacy** → **Privacy**
 
-### 2. Добавьте MacSSH в Full Disk Access
-- Выберите **Full Disk Access** в левой панели
-- Нажмите замок 🔒 и введите пароль
-- Нажмите **+** и добавьте MacSSH
-- ✅ Поставьте галочку
+### 2. Add MacSSH to Full Disk Access
+- Select **Full Disk Access** in the left panel
+- Click the lock 🔒 and enter your password
+- Click **+** and add MacSSH
+- ✅ Check the box
 
-### 3. Добавьте MacSSH в Accessibility
-- Выберите **Accessibility** в левой панели
-- Нажмите замок 🔒 и введите пароль
-- Нажмите **+** и добавьте MacSSH
-- ✅ Поставьте галочку
+### 3. Add MacSSH to Accessibility
+- Select **Accessibility** in the left panel
+- Click the lock 🔒 and enter your password
+- Click **+** and add MacSSH
+- ✅ Check the box
 
-### 4. Перезапустите MacSSH
-- Полностью закройте приложение
-- Запустите заново
+### 4. Restart MacSSH
+- Completely close the application
+- Launch it again
 
-## Готово! 🎉
+## Done! 🎉
 
-Теперь приложение должно работать корректно.
+The application should now work correctly.
 
-## Если не помогло
+## If it didn't help
 
-См. подробную инструкцию: [PERMISSIONS_FIX.md](PERMISSIONS_FIX.md)
+See detailed instructions: [PERMISSIONS_FIX.md](PERMISSIONS_FIX.md)

@@ -13,7 +13,7 @@ class VSCodeService {
     private static var fileWatchers: [String: DispatchSourceFileSystemObject] = [:]
     private static var fileMapping: [String: (profile: Profile, remotePath: String)] = [:]
     
-    /// Проверяет доступность VS Code или Cursor
+    /// Checks VS Code or Cursor availability
     static func checkVSCodeAvailability() -> Bool {
         print("=== VSCodeService: checkVSCodeAvailability STARTED ===")
         
@@ -56,7 +56,7 @@ class VSCodeService {
         }
     }
     
-    /// Получает путь к VS Code или Cursor
+    /// Gets path to VS Code or Cursor
     private static func getVSCodePath() -> String? {
         let possiblePaths = [
             "/usr/local/bin/code",
@@ -76,7 +76,7 @@ class VSCodeService {
         return nil
     }
     
-    /// Открывает файл в VS Code и настраивает отслеживание изменений
+    /// Opens file in VS Code and sets up change tracking
     static func openFileInVSCode(_ profile: Profile, remotePath: String) async throws -> [String] {
         var debugLogs: [String] = []
         

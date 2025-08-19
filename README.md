@@ -1,205 +1,205 @@
 # MacSSH - SSH Terminal & File Manager
 
-MacSSH - это нативное macOS приложение для управления SSH подключениями с встроенным файловым менеджером для работы с удаленными файлами и папками.
+MacSSH is a native macOS application for managing SSH connections with a built-in file manager for working with remote files and folders.
 
-## Возможности
+## Features
 
-### SSH Подключения
-- ✅ Управление профилями SSH подключений
-- ✅ Поддержка аутентификации по паролю и приватному ключу
-- ✅ Автоматическое открытие Terminal.app с SSH подключением
-- ✅ Тестирование подключений
-- ✅ История последних подключений
+### SSH Connections
+- ✅ SSH connection profile management
+- ✅ Password and private key authentication support
+- ✅ Automatic Terminal.app opening with SSH connection
+- ✅ Connection testing
+- ✅ Recent connections history
 
-### Файловый менеджер
-- ✅ Просмотр файлов и папок на удаленном хосте
-- ✅ Навигация по файловой системе
-- ✅ Открытие файлов в VS Code/Cursor с автоматической синхронизацией изменений
-- ✅ Открытие файлов в Finder (автоматическая загрузка)
-- ✅ Монтирование удаленных директорий в Finder через SSHFS
-- ✅ Отображение информации о файлах (размер, права доступа, дата изменения)
+### File Manager
+- ✅ Browse files and folders on remote hosts
+- ✅ Navigate through the file system
+- ✅ Open files in VS Code/Cursor with automatic change synchronization
+- ✅ Open files in Finder (automatic download)
+- ✅ Mount remote directories in Finder via SSHFS
+- ✅ Display file information (size, permissions, modification date)
 
-## Установка
+## Installation
 
-### Требования
-- macOS 13.0 или новее
-- Xcode 15.0 или новее (для сборки из исходников)
-- VS Code или Cursor (для редактирования файлов с автоматической синхронизацией)
+### Requirements
+- macOS 13.0 or newer
+- Xcode 15.0 or newer (for building from source)
+- VS Code or Cursor (for editing files with automatic synchronization)
 
-### ⚠️ Важно: Разрешения в macOS
+### ⚠️ Important: macOS Permissions
 
-Приложение MacSSH требует специальных разрешений для выполнения внешних команд (ssh, sftp, scp). Приложение автоматически проверяет и запрашивает необходимые разрешения.
+The MacSSH application requires special permissions to execute external commands (ssh, sftp, scp). The application automatically checks and requests necessary permissions.
 
-**Требуемые разрешения:**
-1. **Full Disk Access** - обязательно для выполнения SSH команд
-2. **Accessibility** - для автоматизации (опционально)
+**Required permissions:**
+1. **Full Disk Access** - required for executing SSH commands
+2. **Accessibility** - for automation (optional)
 
-**Автоматическая настройка:**
-- Приложение автоматически проверяет разрешения при запуске
-- В SSH Tools Manager можно увидеть статус всех разрешений
-- Кнопка "Request Full Disk Access" автоматически откроет System Settings
-- Подробные инструкции доступны в SSH Tools Manager
+**Automatic setup:**
+- The application automatically checks permissions on startup
+- You can see the status of all permissions in SSH Tools Manager
+- The "Request Full Disk Access" button automatically opens System Settings
+- Detailed instructions are available in SSH Tools Manager
 
-**Ручная настройка:**
-Если автоматическая настройка не работает, следуйте инструкциям в файле [PERMISSIONS_FIX.md](PERMISSIONS_FIX.md).
+**Manual setup:**
+If automatic setup doesn't work, follow the instructions in the [PERMISSIONS_FIX.md](PERMISSIONS_FIX.md) file.
 
-### Необходимые инструменты
+### Required Tools
 
-Для полной функциональности приложения необходимо установить дополнительные инструменты:
+For full application functionality, you need to install additional tools:
 
 ```bash
-# Установка Homebrew (если не установлен)
+# Install Homebrew (if not installed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Установка необходимых инструментов
+# Install required tools
 brew install sshpass sshfs
 ```
 
-#### Инструменты и их назначение:
+#### Tools and their purpose:
 
-- **sshpass** - для автоматической передачи пароля при SSH подключениях
-- **sshfs** - для монтирования удаленных директорий в Finder
+- **sshpass** - for automatic password transmission during SSH connections
+- **sshfs** - for mounting remote directories in Finder
 
-### Сборка из исходников
+### Building from Source
 
-1. Клонируйте репозиторий:
+1. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/MacSSH.git
 cd MacSSH
 ```
 
-2. Откройте проект в Xcode:
+2. Open the project in Xcode:
 ```bash
 open MacSSH.xcodeproj
 ```
 
-3. Соберите и запустите проект (⌘+R)
+3. Build and run the project (⌘+R)
 
-## Использование
+## Usage
 
-### Проверка разрешений
+### Checking Permissions
 
-Приложение автоматически проверяет разрешения при запуске. Для ручной проверки:
+The application automatically checks permissions on startup. For manual checking:
 
-1. Откройте меню **Tools > SSH Tools Manager**
-2. Просмотрите статус всех разрешений и инструментов
-3. Используйте кнопки:
-   - **Check Tools** - перепроверить статус
-   - **Request Full Disk Access** - запросить разрешение
-   - **Show Instructions** - показать подробные инструкции
-4. Следуйте рекомендациям для настройки недостающих разрешений
+1. Open **Tools > SSH Tools Manager** menu
+2. Review the status of all permissions and tools
+3. Use the buttons:
+   - **Check Tools** - recheck status
+   - **Request Full Disk Access** - request permission
+   - **Show Instructions** - show detailed instructions
+4. Follow the recommendations to configure missing permissions
 
-### Создание SSH профиля
+### Creating an SSH Profile
 
-1. Нажмите кнопку "+" для создания нового профиля
-2. Заполните информацию о подключении:
-   - **Name** - название профиля
-   - **Host** - IP адрес или доменное имя сервера
-   - **Port** - порт SSH (по умолчанию 22)
-   - **Username** - имя пользователя
-   - **Authentication** - выберите тип аутентификации:
-     - Password - пароль
-     - Private Key - приватный ключ
+1. Click the "+" button to create a new profile
+2. Fill in the connection information:
+   - **Name** - profile name
+   - **Host** - IP address or domain name of the server
+   - **Port** - SSH port (default 22)
+   - **Username** - username
+   - **Authentication** - choose authentication type:
+     - Password - password
+     - Private Key - private key
 
-### Подключение к серверу
+### Connecting to Server
 
-1. Выберите профиль из списка
-2. Нажмите кнопку "Test Connection & Open Terminal" для:
-   - Тестирования подключения
-   - Автоматического открытия Terminal.app с SSH сессией
+1. Select a profile from the list
+2. Click "Test Connection & Open Terminal" button to:
+   - Test the connection
+   - Automatically open Terminal.app with SSH session
 
-### Работа с файлами
+### Working with Files
 
-1. Выберите профиль из списка
-2. Нажмите кнопку "Open File Browser" (папка)
-3. В открывшемся окне файлового браузера:
-   - Просматривайте файлы и папки
-   - Двойной клик по папке для перехода в неё
-   - Используйте кнопки действий:
-     - 📁 **Open directory** - перейти в папку
-     - 💾 **Mount in Finder** - смонтировать папку в Finder
-     - 📝 **Open in VS Code/Cursor** - открыть файл в VS Code/Cursor с синхронизацией
-     - 📄 **Open in Finder** - скачать и открыть файл в Finder
+1. Select a profile from the list
+2. Click "Open File Browser" button (folder icon)
+3. In the opened file browser window:
+   - Browse files and folders
+   - Double-click on a folder to navigate into it
+   - Use action buttons:
+     - 📁 **Open directory** - navigate to folder
+     - 💾 **Mount in Finder** - mount folder in Finder
+     - 📝 **Open in VS Code/Cursor** - open file in VS Code/Cursor with synchronization
+     - 📄 **Open in Finder** - download and open file in Finder
 
-### Монтирование в Finder
+### Mounting in Finder
 
-Для монтирования удаленной директории в Finder:
+To mount a remote directory in Finder:
 
-1. Убедитесь, что установлен `sshfs`
-2. В файловом браузере выберите папку
-3. Нажмите кнопку "Mount in Finder"
-4. Папка появится в Finder как внешний диск
+1. Make sure `sshfs` is installed
+2. In the file browser, select a folder
+3. Click "Mount in Finder" button
+4. The folder will appear in Finder as an external drive
 
-### Открытие файлов
+### Opening Files
 
-Для открытия файлов:
+To open files:
 
-1. В файловом браузере выберите файл
-2. Используйте кнопки действий:
-   - 📝 **Open in VS Code/Cursor** - открыть файл в VS Code/Cursor с автоматической синхронизацией изменений
-   - 📄 **Open in Finder** - скачать и открыть файл в Finder
+1. In the file browser, select a file
+2. Use action buttons:
+   - 📝 **Open in VS Code/Cursor** - open file in VS Code/Cursor with automatic change synchronization
+   - 📄 **Open in Finder** - download and open file in Finder
 
-#### Редактирование в VS Code/Cursor
+#### Editing in VS Code/Cursor
 
-При открытии файла в VS Code/Cursor:
-- Файл автоматически скачивается во временную папку
-- VS Code/Cursor открывается с загруженным файлом
-- Все изменения автоматически синхронизируются с удаленным сервером при сохранении
-- Отслеживание изменений работает в фоновом режиме
+When opening a file in VS Code/Cursor:
+- The file is automatically downloaded to a temporary folder
+- VS Code/Cursor opens with the downloaded file
+- All changes are automatically synchronized with the remote server when saved
+- Change tracking works in the background
 
-## Структура проекта
+## Project Structure
 
 ```
 MacSSH/
 ├── MacSSH/
 │   ├── Views/
-│   │   ├── ContentView.swift          # Основной интерфейс
-│   │   ├── ProfileFormView.swift      # Форма профиля
-│   │   ├── FileBrowserView.swift      # Файловый браузер
-│   │   └── ToolsInfoView.swift        # Информация о инструментах
+│   │   ├── ContentView.swift          # Main interface
+│   │   ├── ProfileFormView.swift      # Profile form
+│   │   ├── FileBrowserView.swift      # File browser
+│   │   └── ToolsInfoView.swift        # Tools information
 │   ├── ViewModels/
-│   │   └── ProfileViewModel.swift     # Логика приложения
+│   │   └── ProfileViewModel.swift     # Application logic
 │   ├── Models/
-│   │   └── Profile.swift              # Модель профиля
+│   │   └── Profile.swift              # Profile model
 │   ├── Services/
-│   │   └── RepositoryService.swift    # SSH и SFTP сервисы
-│   └── Assets.xcassets/               # Ресурсы
-├── MacSSHTests/                       # Unit тесты
-└── MacSSHUITests/                     # UI тесты
+│   │   └── RepositoryService.swift    # SSH and SFTP services
+│   └── Assets.xcassets/               # Resources
+├── MacSSHTests/                       # Unit tests
+└── MacSSHUITests/                     # UI tests
 ```
 
-## Технические детали
+## Technical Details
 
-### SSH Подключения
-- Использует встроенные macOS SSH клиенты
-- Поддержка `sshpass` для автоматической передачи паролей
-- Автоматическое принятие SSH ключей хостов
+### SSH Connections
+- Uses built-in macOS SSH clients
+- Support for `sshpass` for automatic password transmission
+- Automatic acceptance of SSH host keys
 
-### Файловый менеджер
-- **SFTP** для просмотра файловой системы
-- **SCP** для скачивания файлов
-- **SSHFS** для монтирования директорий
-- Парсинг вывода `ls -la` для получения информации о файлах
+### File Manager
+- **SFTP** for browsing the file system
+- **SCP** for downloading files
+- **SSHFS** for mounting directories
+- Parsing `ls -la` output to get file information
 
-### Безопасность
-- Пароли хранятся в Keychain (планируется)
-- Временные файлы автоматически удаляются
-- Поддержка приватных ключей SSH
+### Security
+- Passwords stored in Keychain (planned)
+- Temporary files automatically deleted
+- SSH private key support
 
-## Планы развития
+## Development Plans
 
-- [ ] Интеграция с macOS Keychain для безопасного хранения паролей
-- [ ] Поддержка загрузки файлов на сервер
-- [ ] Редактирование файлов в удаленном режиме
-- [ ] Поддержка множественных SSH сессий
-- [ ] Интеграция с популярными редакторами кода
-- [ ] Поддержка SFTP закладок
-- [ ] Экспорт/импорт профилей
+- [ ] Integration with macOS Keychain for secure password storage
+- [ ] Support for uploading files to server
+- [ ] Remote file editing
+- [ ] Multiple SSH session support
+- [ ] Integration with popular code editors
+- [ ] SFTP bookmarks support
+- [ ] Profile export/import
 
-## Лицензия
+## License
 
-MIT License - см. файл [LICENSE](LICENSE) для деталей.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Поддержка
+## Support
 
-Если у вас есть вопросы или предложения, создайте Issue в репозитории. 
+If you have questions or suggestions, create an Issue in the repository. 

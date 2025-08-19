@@ -256,19 +256,19 @@ struct FileActionsCell: View {
                     .buttonStyle(PlainButtonStyle())
                     .disabled(viewModel.isBrowsingFiles)
                 } else {
-                    // Кнопка для открытия в VS Code
+                    // Button for opening in VS Code
                     Button(action: {
                         Task {
                             await viewModel.openFileInVSCode(profile, file: file)
                         }
                     }) {
-                        Image(systemName: "doc.text")
+                        Image(systemName: "chevron.left.forwardslash.chevron.right")
                             .help("Open in VS Code/Cursor")
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(viewModel.isConnecting)
                     
-                    // Кнопка для открытия в Finder
+                    // Button for opening in Finder
                     Button(action: {
                         Task {
                             await viewModel.openFileInFinder(profile, file: file)
