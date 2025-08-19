@@ -17,13 +17,14 @@ struct MacSSHApp: App {
                 .environmentObject(viewModel)
         }
         
-        Window("File Browser", id: "fileBrowser") {
+        WindowGroup("File Browser", id: "fileBrowser") {
             FileBrowserWindowContent(viewModel: viewModel)
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 800, height: 600)
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .handlesExternalEvents(matching: Set(arrayLiteral: "fileBrowser"))
     }
 }
 
@@ -44,6 +45,11 @@ struct FileBrowserWindowContent: View {
                 Text("No profile selected")
                     .font(.title2)
                     .foregroundColor(.secondary)
+                Text("Please select a profile and click 'Open File Browser'")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity))
         }

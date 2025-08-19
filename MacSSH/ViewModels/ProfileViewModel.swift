@@ -40,6 +40,11 @@ class ProfileViewModel: ObservableObject {
         checkPermissionsOnStartup()
     }
     
+    deinit {
+        // Останавливаем отслеживание всех файлов при закрытии приложения
+        VSCodeService.stopWatchingAllFiles()
+    }
+    
     func addProfile(_ profile: Profile) {
         profiles.append(profile)
         saveProfiles()
@@ -283,7 +288,7 @@ class ProfileViewModel: ObservableObject {
             print("=== PROFILEVIEWMODEL: Setting UI state ===")
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
-            // По умолчанию открываем корневую директорию
+            // По умолчанию открываем корневую директорию только если это первое открытие
             if self.currentDirectory == "." || self.currentDirectory.isEmpty {
                 self.currentDirectory = "/"
             }
@@ -330,10 +335,16 @@ class ProfileViewModel: ObservableObject {
     
     /// Перейти в директорию
     func navigateToDirectory(_ profile: Profile, path: String) async {
-        print("=== PROFILEVIEWMODEL: navigateToDirectory STARTED ===")
-        print("Profile: \(profile.name), Host: \(profile.host)")
-        print("Path: \(path)")
-        print("Current directory: \(currentDirectory)")
+        let timestamp = Date().timeIntervalSince1970
+        print("🔥 [\(timestamp)] === PROFILEVIEWMODEL: navigateToDirectory STARTED ===")
+        print("🔥 [\(timestamp)] Profile: \(profile.name), Host: \(profile.host)")
+        print("🔥 [\(timestamp)] Path: \(path)")
+        print("🔥 [\(timestamp)] Current directory: \(currentDirectory)")
+        print("🔥 [\(timestamp)] Thread: \(Thread.isMainThread ? "Main" : "Background")")
+        print("🔥 [\(timestamp)] Stack trace:")
+        Thread.callStackSymbols.prefix(10).forEach { symbol in
+            print("🔥 [\(timestamp)]   \(symbol)")
+        }
         
         await MainActor.run {
             self.isBrowsingFiles = true
@@ -393,6 +404,37 @@ class ProfileViewModel: ObservableObject {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to open file: \(error.localizedDescription)")
+                if self.checkForPermissionError(error) {
+                    self.showingPermissionsManager = true
+                }
+            }
+        }
+        
+        await MainActor.run {
+            self.isConnecting = false
+        }
+    }
+    
+    /// Открыть файл в VS Code
+    func openFileInVSCode(_ profile: Profile, file: RemoteFile) async {
+        await MainActor.run {
+            self.isConnecting = true
+            self.connectionError = nil
+            self.connectionLog.append("[blue]Opening file in VS Code: \(file.name)")
+        }
+        
+        do {
+            let logs = try await VSCodeService.openFileInVSCode(profile, remotePath: file.path)
+            await MainActor.run {
+                for log in logs {
+                    self.connectionLog.append(log)
+                }
+                self.connectionLog.append("[green]✅ File opened in VS Code")
+            }
+        } catch {
+            await MainActor.run {
+                self.connectionError = error.localizedDescription
+                self.connectionLog.append("❌ Failed to open file in VS Code: \(error.localizedDescription)")
                 if self.checkForPermissionError(error) {
                     self.showingPermissionsManager = true
                 }

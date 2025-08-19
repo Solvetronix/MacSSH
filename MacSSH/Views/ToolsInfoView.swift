@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ToolsInfoView: View {
-    @State private var toolsAvailability: (sshpass: Bool, sshfs: Bool) = (false, false)
+    @State private var toolsAvailability: (sshpass: Bool, sshfs: Bool, vscode: Bool) = (false, false, false)
     @State private var permissionsCheck: [String] = []
     @State private var showingPermissionsCheck = false
     @Environment(\.dismiss) private var dismiss
@@ -25,6 +25,13 @@ struct ToolsInfoView: View {
                     description: "For mounting remote directories in Finder",
                     isAvailable: toolsAvailability.sshfs,
                     installCommand: "brew install --cask macfuse && brew install sshfs"
+                )
+                
+                ToolStatusRow(
+                    name: "VS Code/Cursor",
+                    description: "For editing files with automatic sync",
+                    isAvailable: toolsAvailability.vscode,
+                    installCommand: "Download VS Code from https://code.visualstudio.com/ or Cursor from https://cursor.sh/"
                 )
             }
             

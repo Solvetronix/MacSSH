@@ -61,8 +61,13 @@ struct FileBrowserHeader: View {
                 TextField("Path", text: $pathInput, onCommit: {
                     guard let profile = profile else { return }
                     let trimmed = pathInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
+                    if !trimmed.isEmpty && trimmed != viewModel.currentDirectory {
+                        let timestamp = Date().timeIntervalSince1970
+                        print("🎯 [\(timestamp)] TextField navigation to: \(trimmed) (current: \(viewModel.currentDirectory))")
                         Task { await viewModel.navigateToDirectory(profile, path: trimmed) }
+                    } else {
+                        let timestamp = Date().timeIntervalSince1970
+                        print("🎯 [\(timestamp)] TextField navigation SKIPPED: \(trimmed) (same as current: \(viewModel.currentDirectory))")
                     }
                 })
                 .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -73,6 +78,8 @@ struct FileBrowserHeader: View {
                 // Parent directory button
                 if let profile = profile {
                     Button(action: {
+                        let timestamp = Date().timeIntervalSince1970
+                        print("🎯 [\(timestamp)] Parent directory button clicked")
                         Task {
                             await viewModel.navigateToParentDirectory(profile)
                         }
@@ -84,8 +91,10 @@ struct FileBrowserHeader: View {
                     
                     // Refresh button
                     Button(action: {
+                        let timestamp = Date().timeIntervalSince1970
+                        print("🎯 [\(timestamp)] Refresh button clicked, current dir: \(viewModel.currentDirectory)")
                         Task {
-                            await viewModel.openFileBrowser(for: profile)
+                            await viewModel.navigateToDirectory(profile, path: viewModel.currentDirectory)
                         }
                     }) {
                         Image(systemName: "arrow.clockwise")
@@ -142,6 +151,8 @@ struct FileBrowserContent: View {
                     }
                     .onTapGesture(count: 2) {
                         if let profile = profile, file.isDirectory {
+                            let timestamp = Date().timeIntervalSince1970
+                            print("🎯 [\(timestamp)] Double-tap navigation to: \(file.path)")
                             Task { await viewModel.navigateToDirectory(profile, path: file.path) }
                         }
                     }
@@ -183,7 +194,7 @@ struct FileBrowserContent: View {
                     TableColumn("Actions") { file in
                         FileActionsCell(file: file, viewModel: viewModel)
                     }
-                    .width(80)
+                    .width(120)
                 }
             }
         }
@@ -233,6 +244,8 @@ struct FileActionsCell: View {
             if let profile = profile {
                 if file.isDirectory {
                     Button(action: {
+                        let timestamp = Date().timeIntervalSince1970
+                        print("🎯 [\(timestamp)] Button navigation to: \(file.path)")
                         Task {
                             await viewModel.navigateToDirectory(profile, path: file.path)
                         }
@@ -243,13 +256,26 @@ struct FileActionsCell: View {
                     .buttonStyle(PlainButtonStyle())
                     .disabled(viewModel.isBrowsingFiles)
                 } else {
+                    // Кнопка для открытия в VS Code
+                    Button(action: {
+                        Task {
+                            await viewModel.openFileInVSCode(profile, file: file)
+                        }
+                    }) {
+                        Image(systemName: "doc.text")
+                            .help("Open in VS Code/Cursor")
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(viewModel.isConnecting)
+                    
+                    // Кнопка для открытия в Finder
                     Button(action: {
                         Task {
                             await viewModel.openFileInFinder(profile, file: file)
                         }
                     }) {
                         Image(systemName: "doc")
-                            .help("Download and Open")
+                            .help("Download and Open in Finder")
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(viewModel.isConnecting)

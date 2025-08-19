@@ -212,12 +212,19 @@ struct ConnectionActionsCell: View {
                 let timestamp = Date().timeIntervalSince1970
                 print("🕐 [\(timestamp)] Button: Opening file browser for profile: \(profile.name) (\(profile.host))")
                 Task {
-                    print("🕐 [\(timestamp)] Button: Starting openFileBrowser")
-                    await viewModel.openFileBrowser(for: profile)
-                    print("🕐 [\(timestamp)] Button: openFileBrowser completed")
-                    print("🕐 [\(timestamp)] Button: About to set fileBrowserProfile to: \(profile.name)")
+                    print("🕐 [\(timestamp)] Button: Setting fileBrowserProfile to: \(profile.name)")
                     viewModel.fileBrowserProfile = profile
                     print("🕐 [\(timestamp)] Button: fileBrowserProfile set to: \(viewModel.fileBrowserProfile?.name ?? "nil")")
+                    
+                    // Открываем файловый браузер только если это первое открытие или если нет файлов
+                    if viewModel.remoteFiles.isEmpty {
+                        print("🕐 [\(timestamp)] Button: Starting openFileBrowser (first time)")
+                        await viewModel.openFileBrowser(for: profile)
+                        print("🕐 [\(timestamp)] Button: openFileBrowser completed")
+                    } else {
+                        print("🕐 [\(timestamp)] Button: Skipping openFileBrowser (files already loaded)")
+                    }
+                    
                     print("🕐 [\(timestamp)] Button: About to open window")
                     openWindow(id: "fileBrowser")
                     print("🕐 [\(timestamp)] Button: Window opened")

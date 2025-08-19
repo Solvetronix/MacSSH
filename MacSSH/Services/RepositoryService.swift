@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import AppKit
 
 enum SSHConnectionError: Error {
     case connectionFailed(String)
@@ -41,7 +42,7 @@ struct SFTPResult {
 }
 
 class SSHService {
-    private static func checkSSHPassAvailability() -> Bool {
+    static func checkSSHPassAvailability() -> Bool {
         // Проверяем напрямую в известных местах установки
         let possiblePaths = [
             "/usr/bin/sshpass",
@@ -289,10 +290,11 @@ class SSHService {
     }
     
     /// Проверить доступность всех необходимых инструментов
-    static func checkToolsAvailability() -> (sshpass: Bool, sshfs: Bool) {
+    static func checkToolsAvailability() -> (sshpass: Bool, sshfs: Bool, vscode: Bool) {
         return (
             sshpass: checkSSHPassAvailability(),
-            sshfs: checkSSHFSAvailability()
+            sshfs: checkSSHFSAvailability(),
+            vscode: VSCodeService.checkVSCodeAvailability()
         )
     }
     
@@ -313,6 +315,7 @@ class SSHService {
         results.append(checkSFTPAvailability() ? "✅ sftp: Available" : "❌ sftp: Not found")
         results.append(checkSCPAvailability() ? "✅ scp: Available" : "❌ scp: Not found")
         results.append(checkSSHPassAvailability() ? "✅ sshpass: Available" : "❌ sshpass: Not found")
+        results.append(VSCodeService.checkVSCodeAvailability() ? "✅ VS Code/Cursor: Available" : "❌ VS Code/Cursor: Not found")
         
 
         
@@ -323,6 +326,9 @@ class SSHService {
         }
         if !checkSSHPassAvailability() {
             results.append("⚠️ Install sshpass: brew install sshpass")
+        }
+        if !VSCodeService.checkVSCodeAvailability() {
+            results.append("⚠️ Install VS Code: https://code.visualstudio.com/ or Cursor: https://cursor.sh/")
         }
         
         return results
