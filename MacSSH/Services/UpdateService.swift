@@ -106,10 +106,18 @@ class UpdateService {
     
     /// Installs the downloaded update
     static func installUpdate(from fileURL: URL) async -> Bool {
-        print("📝 [UpdateService] Starting update installation...")
-        print("📝 [UpdateService] File URL: \(fileURL.path)")
+        print("🔍 [UpdateService] Starting update installation...")
+        print("🔍 [UpdateService] File URL: \(fileURL.path)")
         
         do {
+            // Check if file exists
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                print("❌ [UpdateService] DMG file does not exist: \(fileURL.path)")
+                return false
+            }
+            
+            print("✅ [UpdateService] DMG file exists")
+            
             // Mount the .dmg file
             let mountProcess = Process()
             mountProcess.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
@@ -123,7 +131,13 @@ class UpdateService {
             mountProcess.waitUntilExit()
             
             let mountOutput = String(data: mountPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            print("📝 [UpdateService] Mount output: \(mountOutput)")
+            print("🔍 [UpdateService] Mount output: \(mountOutput)")
+            print("🔍 [UpdateService] Mount exit code: \(mountProcess.terminationStatus)")
+            
+            guard mountProcess.terminationStatus == 0 else {
+                print("❌ [UpdateService] Failed to mount DMG")
+                return false
+            }
             
             // Extract volume path from output
             let lines = mountOutput.components(separatedBy: .newlines)
@@ -147,21 +161,33 @@ class UpdateService {
                 return false
             }
             
-            print("📝 [UpdateService] Found volume: \(volumePath)")
+            print("🔍 [UpdateService] Found volume: \(volumePath)")
             
             // Copy the new app to Applications
             let sourceAppPath = "\(volumePath)/MacSSH.app"
             let destAppPath = "/Applications/MacSSH.app"
             
-            // Remove old app first
-            let removeProcess = Process()
-            removeProcess.executableURL = URL(fileURLWithPath: "/bin/rm")
-            removeProcess.arguments = ["-rf", destAppPath]
+            // Check if source app exists
+            guard FileManager.default.fileExists(atPath: sourceAppPath) else {
+                print("❌ [UpdateService] Source app does not exist: \(sourceAppPath)")
+                return false
+            }
             
-            try removeProcess.run()
-            removeProcess.waitUntilExit()
+            print("✅ [UpdateService] Source app exists")
             
-            print("📝 [UpdateService] Removed old app")
+            // Remove old app first (only if it exists)
+            if FileManager.default.fileExists(atPath: destAppPath) {
+                let removeProcess = Process()
+                removeProcess.executableURL = URL(fileURLWithPath: "/bin/rm")
+                removeProcess.arguments = ["-rf", destAppPath]
+                
+                try removeProcess.run()
+                removeProcess.waitUntilExit()
+                
+                print("🔍 [UpdateService] Removed old app, exit code: \(removeProcess.terminationStatus)")
+            } else {
+                print("🔍 [UpdateService] No old app to remove")
+            }
             
             // Copy new app
             let copyProcess = Process()
@@ -171,7 +197,15 @@ class UpdateService {
             try copyProcess.run()
             copyProcess.waitUntilExit()
             
-            print("📝 [UpdateService] Copied new app")
+            print("🔍 [UpdateService] Copy process exit code: \(copyProcess.terminationStatus)")
+            
+            // Verify copy was successful
+            guard FileManager.default.fileExists(atPath: destAppPath) else {
+                print("❌ [UpdateService] Failed to copy app to Applications")
+                return false
+            }
+            
+            print("✅ [UpdateService] Successfully copied new app")
             
             // Unmount the volume
             let unmountProcess = Process()
@@ -181,13 +215,13 @@ class UpdateService {
             try unmountProcess.run()
             unmountProcess.waitUntilExit()
             
-            print("📝 [UpdateService] Unmounted volume")
+            print("🔍 [UpdateService] Unmounted volume, exit code: \(unmountProcess.terminationStatus)")
             
             // Wait a bit for file system to settle
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             
             // Restart the application
-            print("📝 [UpdateService] Restarting application...")
+            print("🔍 [UpdateService] Restarting application...")
             await restartApplication()
             
             return true
@@ -200,28 +234,32 @@ class UpdateService {
     
     /// Restarts the current application
     private static func restartApplication() async {
-        print("📝 [UpdateService] Preparing to restart application...")
+        print("🔍 [UpdateService] Preparing to restart application...")
         
-        // Get the current app bundle path
-        let appPath = Bundle.main.bundlePath
-        if appPath.isEmpty {
-            print("❌ [UpdateService] Could not get app bundle path")
+        // Check if the new app exists in Applications
+        let newAppPath = "/Applications/MacSSH.app"
+        guard FileManager.default.fileExists(atPath: newAppPath) else {
+            print("❌ [UpdateService] New app does not exist at: \(newAppPath)")
             return
         }
         
-        print("📝 [UpdateService] App path: \(appPath)")
+        print("✅ [UpdateService] New app exists at: \(newAppPath)")
         
         // Create a script to restart the app
         let script = """
         #!/bin/bash
-        sleep 1
-        open "\(appPath)"
+        echo "Starting MacSSH restart script..."
+        sleep 2
+        echo "Opening MacSSH from Applications..."
+        open "/Applications/MacSSH.app"
+        echo "MacSSH restart script completed"
         """
         
         let tempScriptURL = FileManager.default.temporaryDirectory.appendingPathComponent("restart_app.sh")
         
         do {
             try script.write(to: tempScriptURL, atomically: true, encoding: .utf8)
+            print("🔍 [UpdateService] Created restart script at: \(tempScriptURL.path)")
             
             // Make script executable
             let chmodProcess = Process()
@@ -230,6 +268,8 @@ class UpdateService {
             try chmodProcess.run()
             chmodProcess.waitUntilExit()
             
+            print("🔍 [UpdateService] Made script executable, exit code: \(chmodProcess.terminationStatus)")
+            
             // Run the restart script
             let restartProcess = Process()
             restartProcess.executableURL = tempScriptURL
@@ -237,8 +277,11 @@ class UpdateService {
             
             print("✅ [UpdateService] Restart script executed")
             
+            // Wait a bit before exiting
+            try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            
             // Exit the current app
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 print("🔍 [UpdateService] Exiting application...")
                 NSApplication.shared.terminate(nil)
             }
