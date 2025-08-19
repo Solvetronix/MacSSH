@@ -84,45 +84,45 @@ class VSCodeService {
         debugLogs.append("[blue][\(timestamp)] VSCodeService: openFileInVSCode STARTED")
         debugLogs.append("[blue][\(timestamp)] Opening file in VS Code/Cursor: \(remotePath)")
         
-        // Добавляем логирование в основной поток
+        // Add logging to main thread
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] VSCodeService: openFileInVSCode STARTED")
-            print("🕐 [\(timestamp)] Opening file in VS Code/Cursor: \(remotePath)")
+            print("📝 [\(timestamp)] VSCodeService: openFileInVSCode STARTED")
+            print("📝 [\(timestamp)] Opening file in VS Code/Cursor: \(remotePath)")
         }
         
-        // Проверяем доступность VS Code или Cursor
+        // Check VS Code or Cursor availability
         debugLogs.append("[blue][\(timestamp)] Checking VS Code/Cursor availability...")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] Checking VS Code/Cursor availability...")
+            print("📝 [\(timestamp)] Checking VS Code/Cursor availability...")
         }
         if !checkVSCodeAvailability() {
             debugLogs.append("[red][\(timestamp)] ❌ VS Code/Cursor not found")
             DispatchQueue.main.async {
-                print("🕐 [\(timestamp)] ❌ VS Code/Cursor not found")
+                print("📝 [\(timestamp)] ❌ VS Code/Cursor not found")
             }
-            throw VSCodeError.vscodeNotFound("VS Code или Cursor не найден. Убедитесь, что VS Code или Cursor установлен и команда 'code' доступна в PATH.")
+            throw VSCodeError.vscodeNotFound("VS Code or Cursor not found. Please ensure VS Code or Cursor is installed and the 'code' command is available in PATH.")
         }
         debugLogs.append("[green][\(timestamp)] ✅ VS Code/Cursor availability check passed")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] ✅ VS Code/Cursor availability check passed")
+            print("📝 [\(timestamp)] ✅ VS Code/Cursor availability check passed")
         }
         
-        // Создаем временную директорию для файла
+        // Create temporary directory for file
         debugLogs.append("[blue][\(timestamp)] Creating temporary directory...")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] Creating temporary directory...")
+            print("📝 [\(timestamp)] Creating temporary directory...")
         }
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("MacSSH_VSCode_\(profile.id.uuidString)")
         
         debugLogs.append("[blue][\(timestamp)] Temp directory path: \(tempDir.path)")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] Temp directory path: \(tempDir.path)")
+            print("📝 [\(timestamp)] Temp directory path: \(tempDir.path)")
         }
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         debugLogs.append("[green][\(timestamp)] ✅ Temporary directory created")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] ✅ Temporary directory created")
+            print("📝 [\(timestamp)] ✅ Temporary directory created")
         }
         
         let fileName = URL(fileURLWithPath: remotePath).lastPathComponent
@@ -134,17 +134,17 @@ class VSCodeService {
         // Скачиваем файл
         debugLogs.append("[blue][\(timestamp)] Building SCP command...")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] Building SCP command...")
+            print("📝 [\(timestamp)] Building SCP command...")
         }
         let scpCommand = try buildSCPCommand(for: profile, remotePath: remotePath, localPath: localPath.path)
         debugLogs.append("[blue][\(timestamp)] SCP command: \(scpCommand)")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] SCP command: \(scpCommand)")
+            print("📝 [\(timestamp)] SCP command: \(scpCommand)")
         }
         
         debugLogs.append("[blue][\(timestamp)] Creating SCP process...")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] Creating SCP process...")
+            print("📝 [\(timestamp)] Creating SCP process...")
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -156,23 +156,23 @@ class VSCodeService {
         
         debugLogs.append("[blue][\(timestamp)] Executing SCP download...")
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] Executing SCP download...")
+            print("📝 [\(timestamp)] Executing SCP download...")
         }
         
         do {
             debugLogs.append("[blue][\(timestamp)] Running SCP process...")
             DispatchQueue.main.async {
-                print("🕐 [\(timestamp)] Running SCP process...")
+                print("📝 [\(timestamp)] Running SCP process...")
             }
             try process.run()
             debugLogs.append("[blue][\(timestamp)] SCP process started, waiting for completion...")
             DispatchQueue.main.async {
-                print("🕐 [\(timestamp)] SCP process started, waiting for completion...")
+                print("📝 [\(timestamp)] SCP process started, waiting for completion...")
             }
             process.waitUntilExit()
             debugLogs.append("[blue][\(timestamp)] SCP process completed")
             DispatchQueue.main.async {
-                print("🕐 [\(timestamp)] SCP process completed")
+                print("📝 [\(timestamp)] SCP process completed")
             }
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
@@ -180,33 +180,33 @@ class VSCodeService {
             
             debugLogs.append("[blue][\(timestamp)] SCP exit code: \(process.terminationStatus)")
             DispatchQueue.main.async {
-                print("🕐 [\(timestamp)] SCP exit code: \(process.terminationStatus)")
+                print("📝 [\(timestamp)] SCP exit code: \(process.terminationStatus)")
             }
             if !output.isEmpty {
                 debugLogs.append("[blue][\(timestamp)] SCP output: \(output)")
                 DispatchQueue.main.async {
-                    print("🕐 [\(timestamp)] SCP output: \(output)")
+                    print("📝 [\(timestamp)] SCP output: \(output)")
                 }
             }
             
             if process.terminationStatus == 0 {
                 debugLogs.append("[green][\(timestamp)] ✅ File downloaded successfully")
                 DispatchQueue.main.async {
-                    print("🕐 [\(timestamp)] ✅ File downloaded successfully")
+                    print("📝 [\(timestamp)] ✅ File downloaded successfully")
                 }
                 
-                // Настраиваем отслеживание изменений файла
+                // Set up file change tracking
                 debugLogs.append("[blue][\(timestamp)] Setting up file watcher...")
                 DispatchQueue.main.async {
-                    print("🕐 [\(timestamp)] Setting up file watcher...")
+                    print("📝 [\(timestamp)] Setting up file watcher...")
                 }
                 try setupFileWatcher(localPath: localPath.path, profile: profile, remotePath: remotePath)
                 debugLogs.append("[green][\(timestamp)] ✅ File watcher set up successfully")
                 DispatchQueue.main.async {
-                    print("🕐 [\(timestamp)] ✅ File watcher set up successfully")
+                    print("📝 [\(timestamp)] ✅ File watcher set up successfully")
                 }
                 
-                // Открываем файл в VS Code
+                // Open file in VS Code
                 debugLogs.append("[blue][\(timestamp)] Opening file in VS Code/Cursor...")
                 let vscodePath = getVSCodePath() ?? "code"
                 debugLogs.append("[blue][\(timestamp)] VS Code path: \(vscodePath)")
@@ -224,12 +224,12 @@ class VSCodeService {
                 debugLogs.append("[blue][\(timestamp)] VS Code process completed with exit code: \(openProcess.terminationStatus)")
                 
                 debugLogs.append("[green][\(timestamp)] ✅ File opened in VS Code/Cursor")
-                debugLogs.append("[yellow][\(timestamp)] ⚠️ Изменения будут автоматически синхронизированы с сервером")
+                debugLogs.append("[yellow][\(timestamp)] ⚠️ Changes will be automatically synchronized with the server")
             } else {
                 debugLogs.append("[red][\(timestamp)] ❌ SCP download failed")
                 DispatchQueue.main.async {
-                    print("🕐 [\(timestamp)] ❌ SCP download failed")
-                    print("🕐 [\(timestamp)] SCP output: \(output)")
+                    print("📝 [\(timestamp)] ❌ SCP download failed")
+                    print("📝 [\(timestamp)] SCP output: \(output)")
                 }
                 throw VSCodeError.fileDownloadFailed("Failed to download file: \(output)")
             }
@@ -237,9 +237,9 @@ class VSCodeService {
         } catch {
             debugLogs.append("[red][\(timestamp)] ❌ SCP error: \(error.localizedDescription)")
             DispatchQueue.main.async {
-                print("🕐 [\(timestamp)] ❌ SCP error: \(error.localizedDescription)")
-                print("🕐 [\(timestamp)] Error type: \(type(of: error))")
-                print("🕐 [\(timestamp)] Error details: \(error)")
+                print("📝 [\(timestamp)] ❌ SCP error: \(error.localizedDescription)")
+                print("📝 [\(timestamp)] Error type: \(type(of: error))")
+                print("📝 [\(timestamp)] Error details: \(error)")
             }
             throw VSCodeError.fileDownloadFailed("SCP error: \(error.localizedDescription)")
         }
@@ -306,29 +306,29 @@ class VSCodeService {
         print("[\(timestamp)] ✅ File watcher started successfully")
     }
     
-    /// Загружает измененный файл на сервер
+    /// Uploads modified file to server
     private static func uploadFileToServer(localPath: String, profile: Profile, remotePath: String) async {
         let timestamp = Date().timeIntervalSince1970
-        print("[\(timestamp)] VSCodeService: uploadFileToServer STARTED")
-        print("[\(timestamp)] Local path: \(localPath)")
-        print("[\(timestamp)] Remote path: \(remotePath)")
+        print("📝 [\(timestamp)] VSCodeService: uploadFileToServer STARTED")
+        print("📝 [\(timestamp)] Local path: \(localPath)")
+        print("📝 [\(timestamp)] Remote path: \(remotePath)")
         
         var debugLogs: [String] = []
         
-        debugLogs.append("[blue]Uploading file to server: \(remotePath)")
+        debugLogs.append("[blue][\(timestamp)] Uploading file to server: \(remotePath)")
         
-        // Проверяем, что файл все еще существует
+        // Check if file still exists
         guard FileManager.default.fileExists(atPath: localPath) else {
-            debugLogs.append("[red]❌ Local file no longer exists")
-            print("[\(timestamp)] ❌ Local file no longer exists")
+            debugLogs.append("[red][\(timestamp)] ❌ Local file no longer exists")
+            print("📝 [\(timestamp)] ❌ Local file no longer exists")
             return
         }
         
         do {
-            // Создаем команду для загрузки файла
+            // Create command for file upload
             let scpCommand = try buildSCPUploadCommand(for: profile, localPath: localPath, remotePath: remotePath)
-            debugLogs.append("[blue]SCP upload command: \(scpCommand)")
-            print("[\(timestamp)] SCP upload command: \(scpCommand)")
+            debugLogs.append("[blue][\(timestamp)] SCP upload command: \(scpCommand)")
+            print("📝 [\(timestamp)] SCP upload command: \(scpCommand)")
             
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -338,8 +338,8 @@ class VSCodeService {
             process.standardOutput = pipe
             process.standardError = pipe
             
-            debugLogs.append("[blue]Executing SCP upload...")
-            print("[\(timestamp)] Executing SCP upload...")
+            debugLogs.append("[blue][\(timestamp)] Executing SCP upload...")
+            print("📝 [\(timestamp)] Executing SCP upload...")
             
             try process.run()
             process.waitUntilExit()
@@ -347,20 +347,20 @@ class VSCodeService {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
             
-            debugLogs.append("[blue]SCP upload exit code: \(process.terminationStatus)")
-            print("[\(timestamp)] SCP upload exit code: \(process.terminationStatus)")
+            debugLogs.append("[blue][\(timestamp)] SCP upload exit code: \(process.terminationStatus)")
+            print("📝 [\(timestamp)] SCP upload exit code: \(process.terminationStatus)")
             
             if !output.isEmpty {
-                debugLogs.append("[blue]SCP upload output: \(output)")
-                print("[\(timestamp)] SCP upload output: \(output)")
+                debugLogs.append("[blue][\(timestamp)] SCP upload output: \(output)")
+                print("📝 [\(timestamp)] SCP upload output: \(output)")
             }
             
             if process.terminationStatus == 0 {
-                debugLogs.append("[green]✅ File uploaded successfully")
-                print("[\(timestamp)] ✅ File uploaded successfully")
+                debugLogs.append("[green][\(timestamp)] ✅ File uploaded successfully")
+                print("📝 [\(timestamp)] ✅ File uploaded successfully")
             } else {
-                debugLogs.append("[red]❌ File upload failed: \(output)")
-                print("[\(timestamp)] ❌ File upload failed: \(output)")
+                debugLogs.append("[red][\(timestamp)] ❌ File upload failed: \(output)")
+                print("📝 [\(timestamp)] ❌ File upload failed: \(output)")
             }
             
         } catch {
@@ -397,13 +397,13 @@ class VSCodeService {
         print("[\(timestamp)] Remote path: \(remotePath)")
         print("[\(timestamp)] Local path: \(localPath)")
         
-        // Добавляем логирование в основной поток
+        // Add logging to main thread
         DispatchQueue.main.async {
-            print("🕐 [\(timestamp)] VSCodeService: buildSCPCommand STARTED")
-            print("🕐 [\(timestamp)] Profile keyType: \(profile.keyType)")
-            print("🕐 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-            print("🕐 [\(timestamp)] Remote path: \(remotePath)")
-            print("🕐 [\(timestamp)] Local path: \(localPath)")
+            print("📝 [\(timestamp)] VSCodeService: buildSCPCommand STARTED")
+            print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
+            print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+            print("📝 [\(timestamp)] Remote path: \(remotePath)")
+            print("📝 [\(timestamp)] Local path: \(localPath)")
         }
         
         var command = ""

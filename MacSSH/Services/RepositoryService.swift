@@ -532,84 +532,82 @@ class SSHService {
     
     // MARK: - SFTP Operations
     
-    /// Получить список файлов и папок в указанной директории
+    /// Get list of files and folders in specified directory
     static func listDirectory(_ profile: Profile, path: String = ".") async throws -> SFTPResult {
-        print("=== REPOSITORYSERVICE: listDirectory STARTED ===")
-        print("=== REPOSITORYSERVICE: Function called successfully ===")
-        print("=== REPOSITORYSERVICE: About to print profile details ===")
-        print("Profile: \(profile.name), Host: \(profile.host)")
-        print("Path: \(path)")
-        print("Profile keyType: \(profile.keyType)")
-        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("Profile username: \(profile.username)")
-        print("Profile port: \(profile.port)")
-        print("Profile id: \(profile.id)")
-        print("=== REPOSITORYSERVICE: About to create debugLogs array ===")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] RepositoryService: listDirectory STARTED")
+        print("📝 [\(timestamp)] Profile: \(profile.name), Host: \(profile.host)")
+        print("📝 [\(timestamp)] Path: \(path)")
+        print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
+        print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("📝 [\(timestamp)] Profile username: \(profile.username)")
+        print("📝 [\(timestamp)] Profile port: \(profile.port)")
+        print("📝 [\(timestamp)] Profile id: \(profile.id)")
         
         var debugLogs: [String] = []
         var files: [RemoteFile] = []
-        print("=== REPOSITORYSERVICE: Created variables ===")
+        print("📝 [\(timestamp)] RepositoryService: Created variables")
         
-        debugLogs.append("[blue]Listing directory: \(path)")
-        print("=== REPOSITORYSERVICE: Added directory log ===")
+        debugLogs.append("[blue][\(timestamp)] Listing directory: \(path)")
+        print("📝 [\(timestamp)] RepositoryService: Added directory log")
         
-        print("=== REPOSITORYSERVICE: About to call buildSFTPCommand ===")
+        print("📝 [\(timestamp)] RepositoryService: About to call buildSFTPCommand")
         let sftpCommand = try buildSFTPCommand(for: profile)
-        print("=== REPOSITORYSERVICE: buildSFTPCommand completed ===")
-        debugLogs.append("[blue]SFTP command: \(sftpCommand)")
+        print("📝 [\(timestamp)] RepositoryService: buildSFTPCommand completed")
+        debugLogs.append("[blue][\(timestamp)] SFTP command: \(sftpCommand)")
         
-        // Создаем временный скрипт для SFTP
+        // Create temporary script for SFTP
         let tempScript = try createTempSFTPListScript(for: profile, path: path)
-        debugLogs.append("[blue]Created SFTP script: \(tempScript.path)")
+        debugLogs.append("[blue][\(timestamp)] Created SFTP script: \(tempScript.path)")
         
-        print("=== REPOSITORYSERVICE: About to create Process ===")
+        print("📝 [\(timestamp)] RepositoryService: About to create Process")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [tempScript.path]
-        print("=== REPOSITORYSERVICE: Process created with bash and script ===")
+        print("📝 [\(timestamp)] RepositoryService: Process created with bash and script")
         
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
         
-        debugLogs.append("[blue]Executing SFTP list command...")
-        print("=== REPOSITORYSERVICE: About to execute SFTP process ===")
+        debugLogs.append("[blue][\(timestamp)] Executing SFTP list command...")
+        print("📝 [\(timestamp)] RepositoryService: About to execute SFTP process")
         
         do {
-            debugLogs.append("[blue]Starting SFTP process...")
-            print("=== REPOSITORYSERVICE: Starting SFTP process ===")
+            debugLogs.append("[blue][\(timestamp)] Starting SFTP process...")
+            print("📝 [\(timestamp)] RepositoryService: Starting SFTP process")
             try process.run()
-            print("=== REPOSITORYSERVICE: SFTP process started ===")
-            debugLogs.append("[blue]SFTP process started, waiting for completion...")
-            print("=== REPOSITORYSERVICE: About to wait for SFTP process ===")
+            print("📝 [\(timestamp)] RepositoryService: SFTP process started")
+            debugLogs.append("[blue][\(timestamp)] SFTP process started, waiting for completion...")
+            print("📝 [\(timestamp)] RepositoryService: About to wait for SFTP process")
             process.waitUntilExit()
-            print("=== REPOSITORYSERVICE: SFTP process completed ===")
+            print("📝 [\(timestamp)] RepositoryService: SFTP process completed")
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
             
             debugLogs.append("[blue]SFTP exit code: \(process.terminationStatus)")
-            debugLogs.append("[blue]SFTP output length: \(output.count) characters")
+            debugLogs.append("[blue][\(timestamp)] SFTP output length: \(output.count) characters")
             if !output.isEmpty {
-                debugLogs.append("[blue]SFTP output: \(output)")
+                debugLogs.append("[blue][\(timestamp)] SFTP output: \(output)")
             }
             
             if process.terminationStatus == 0 {
                 files = parseSFTPListOutput(output, basePath: path)
-                debugLogs.append("[green]✅ Successfully listed \(files.count) items")
+                debugLogs.append("[green][\(timestamp)] ✅ Successfully listed \(files.count) items")
             } else {
-                debugLogs.append("[red]❌ SFTP command failed with exit code \(process.terminationStatus)")
-                debugLogs.append("[red]❌ SFTP error output: \(output)")
+                debugLogs.append("[red][\(timestamp)] ❌ SFTP command failed with exit code \(process.terminationStatus)")
+                debugLogs.append("[red][\(timestamp)] ❌ SFTP error output: \(output)")
                 throw SSHConnectionError.sftpError("Failed to list directory (exit code \(process.terminationStatus)): \(output)")
             }
             
         } catch {
-            print("=== REPOSITORYSERVICE: SFTP process ERROR ===")
-            print("Error type: \(type(of: error))")
-            print("Error description: \(error.localizedDescription)")
-            print("Error: \(error)")
-            debugLogs.append("[red]❌ SFTP process error: \(error.localizedDescription)")
-            debugLogs.append("[red]❌ Error type: \(type(of: error))")
+            print("📝 [\(timestamp)] RepositoryService: SFTP process ERROR")
+            print("📝 [\(timestamp)] Error type: \(type(of: error))")
+            print("📝 [\(timestamp)] Error description: \(error.localizedDescription)")
+            print("📝 [\(timestamp)] Error: \(error)")
+            debugLogs.append("[red][\(timestamp)] ❌ SFTP process error: \(error.localizedDescription)")
+            debugLogs.append("[red][\(timestamp)] ❌ Error type: \(type(of: error))")
             throw SSHConnectionError.sftpError("SFTP error: \(error.localizedDescription)")
         }
         
@@ -922,33 +920,34 @@ class SSHService {
     // MARK: - Private Helper Methods
     
     private static func buildSFTPCommand(for profile: Profile) throws -> String {
-        print("=== REPOSITORYSERVICE: buildSFTPCommand STARTED ===")
-        print("Profile name: \(profile.name)")
-        print("Profile host: \(profile.host)")
-        print("Profile keyType: \(profile.keyType)")
-        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("SSHPass available: \(checkSSHPassAvailability())")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] RepositoryService: buildSFTPCommand STARTED")
+        print("📝 [\(timestamp)] Profile name: \(profile.name)")
+        print("📝 [\(timestamp)] Profile host: \(profile.host)")
+        print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
+        print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("📝 [\(timestamp)] SSHPass available: \(checkSSHPassAvailability())")
         
         var command = ""
         
-        print("=== BUILDING SFTP COMMAND ===")
-        print("Profile keyType: \(profile.keyType)")
-        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("SSHPass available: \(checkSSHPassAvailability())")
+        print("📝 [\(timestamp)] RepositoryService: Building SFTP command")
+        print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
+        print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("📝 [\(timestamp)] SSHPass available: \(checkSSHPassAvailability())")
         
-        print("=== REPOSITORYSERVICE: Checking keyType ===")
+        print("📝 [\(timestamp)] RepositoryService: Checking keyType")
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
-            print("=== REPOSITORYSERVICE: Password authentication detected ===")
+            print("📝 [\(timestamp)] RepositoryService: Password authentication detected")
             if !checkSSHPassAvailability() {
-                print("❌ SSHPass not available, throwing error")
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен. Для автоматической передачи пароля установите sshpass: brew install sshpass")
+                print("📝 [\(timestamp)] ❌ SSHPass not available, throwing error")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is not installed. To automatically pass passwords, install sshpass: brew install sshpass")
             }
             command = "sshpass -p '\(password)' sftp"
-            print("✅ Using sshpass with password")
+            print("📝 [\(timestamp)] ✅ Using sshpass with password")
         } else {
-            print("=== REPOSITORYSERVICE: Non-password authentication detected ===")
+            print("📝 [\(timestamp)] RepositoryService: Non-password authentication detected")
             command = "sftp"
-            print("✅ Using sftp without password")
+            print("📝 [\(timestamp)] ✅ Using sftp without password")
         }
         
         command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -1054,28 +1053,29 @@ class SSHService {
 
     
     private static func createTempSFTPListScript(for profile: Profile, path: String) throws -> URL {
-        print("=== REPOSITORYSERVICE: createTempSFTPListScript STARTED ===")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] RepositoryService: createTempSFTPListScript STARTED")
         let tempDir = FileManager.default.temporaryDirectory
         let scriptURL = tempDir.appendingPathComponent("sftp_list_\(profile.id.uuidString).sh")
         
-        print("=== Creating SFTP script ===")
-        print("Temp directory: \(tempDir.path)")
-        print("Script URL: \(scriptURL.path)")
-        print("Profile: \(profile.name), Host: \(profile.host)")
-        print("Path: \(path)")
-        print("=== REPOSITORYSERVICE: About to create script content ===")
+        print("📝 [\(timestamp)] RepositoryService: Creating SFTP script")
+        print("📝 [\(timestamp)] RepositoryService: Temp directory: \(tempDir.path)")
+        print("📝 [\(timestamp)] RepositoryService: Script URL: \(scriptURL.path)")
+        print("📝 [\(timestamp)] RepositoryService: Profile: \(profile.name), Host: \(profile.host)")
+        print("📝 [\(timestamp)] RepositoryService: Path: \(path)")
+        print("📝 [\(timestamp)] RepositoryService: About to create script content")
         
         var scriptContent = "#!/bin/bash\n"
-        print("=== REPOSITORYSERVICE: Created scriptContent variable ===")
+        print("📝 [\(timestamp)] RepositoryService: Created scriptContent variable")
         scriptContent += "set -e\n"
         scriptContent += "echo 'Listing directory: \(path)'\n"
         
-        // Добавляем пути к Homebrew в PATH
+        // Add Homebrew paths to PATH
         scriptContent += "export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:$PATH\"\n"
         
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             scriptContent += "export SSHPASS='\(password)'\n"
-            // Используем полный путь к sshpass
+            // Use full path to sshpass
             if let sshpassPath = getSSHPassPath() {
                 scriptContent += "\(sshpassPath) -e sftp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
             } else {
@@ -1100,19 +1100,19 @@ class SSHService {
         scriptContent += "quit\n"
         scriptContent += "EOF\n"
         
-        print("=== REPOSITORYSERVICE: About to write script to file ===")
+        print("📝 [\(timestamp)] RepositoryService: About to write script to file")
         do {
-            print("=== REPOSITORYSERVICE: Writing script content to file ===")
+            print("📝 [\(timestamp)] RepositoryService: Writing script content to file")
             try scriptContent.write(to: scriptURL, atomically: true, encoding: .utf8)
-            print("=== REPOSITORYSERVICE: Script written successfully ===")
-            print("=== REPOSITORYSERVICE: Setting file permissions ===")
+            print("📝 [\(timestamp)] RepositoryService: Script written successfully")
+            print("📝 [\(timestamp)] RepositoryService: Setting file permissions")
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
-            print("=== REPOSITORYSERVICE: File permissions set successfully ===")
+            print("📝 [\(timestamp)] RepositoryService: File permissions set successfully")
         } catch {
-            print("=== REPOSITORYSERVICE: ERROR writing script file ===")
-            print("Error type: \(type(of: error))")
-            print("Error description: \(error.localizedDescription)")
-            print("Error: \(error)")
+            print("📝 [\(timestamp)] RepositoryService: ERROR writing script file")
+            print("📝 [\(timestamp)] RepositoryService: Error type: \(type(of: error))")
+            print("📝 [\(timestamp)] RepositoryService: Error description: \(error.localizedDescription)")
+            print("📝 [\(timestamp)] RepositoryService: Error: \(error)")
             throw SSHConnectionError.processError("Failed to create SFTP script: \(error.localizedDescription)")
         }
         

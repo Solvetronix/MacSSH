@@ -277,35 +277,36 @@ class ProfileViewModel: ObservableObject {
         self.showingFileBrowserWindow = true
     }
     
-    /// Открыть файловый браузер для профиля
+    /// Open file browser for profile
     func openFileBrowser(for profile: Profile) async {
-        print("=== PROFILEVIEWMODEL: openFileBrowser STARTED ===")
-        print("Profile: \(profile.name), Host: \(profile.host)")
-        print("Current thread: \(Thread.isMainThread ? "Main" : "Background")")
-        print("Profile keyType: \(profile.keyType)")
-        print("Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("Profile username: \(profile.username)")
-        print("Profile port: \(profile.port)")
-        print("Current directory: \(currentDirectory)")
-        print("=== PROFILEVIEWMODEL: About to set isBrowsingFiles = true ===")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] ProfileViewModel: openFileBrowser STARTED")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
+        print("📝 [\(timestamp)] ProfileViewModel: Current thread: \(Thread.isMainThread ? "Main" : "Background")")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile keyType: \(profile.keyType)")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile username: \(profile.username)")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile port: \(profile.port)")
+        print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
+        print("📝 [\(timestamp)] ProfileViewModel: About to set isBrowsingFiles = true")
         
         await MainActor.run {
-            print("=== PROFILEVIEWMODEL: Setting UI state ===")
+            print("📝 [\(timestamp)] ProfileViewModel: Setting UI state")
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
-            // По умолчанию открываем корневую директорию только если это первое открытие
+            // By default, open root directory only if this is the first opening
             if self.currentDirectory == "." || self.currentDirectory.isEmpty {
                 self.currentDirectory = "/"
             }
             self.connectionLog.removeAll()
             self.connectionLog.append("[blue]Opening file browser for \(profile.host)...")
-            print("=== PROFILEVIEWMODEL: UI state set successfully ===")
+            print("📝 [\(timestamp)] ProfileViewModel: UI state set successfully")
         }
         
         do {
-            print("=== PROFILEVIEWMODEL: About to call SSHService.listDirectory ===")
-            print("Profile: \(profile.name), Host: \(profile.host)")
-            print("Current directory: \(currentDirectory)")
+            print("📝 [\(timestamp)] ProfileViewModel: About to call SSHService.listDirectory")
+            print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
+            print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
             
             let result = try await SSHService.listDirectory(profile, path: currentDirectory)
             await MainActor.run {
@@ -316,10 +317,10 @@ class ProfileViewModel: ObservableObject {
                 self.connectionLog.append("[green]✅ File browser opened successfully")
             }
         } catch {
-            print("=== PROFILEVIEWMODEL: openFileBrowser ERROR ===")
-            print("Error type: \(type(of: error))")
-            print("Error description: \(error.localizedDescription)")
-            print("Error: \(error)")
+            print("📝 [\(timestamp)] ProfileViewModel: openFileBrowser ERROR")
+            print("📝 [\(timestamp)] ProfileViewModel: Error type: \(type(of: error))")
+            print("📝 [\(timestamp)] ProfileViewModel: Error description: \(error.localizedDescription)")
+            print("📝 [\(timestamp)] ProfileViewModel: Error: \(error)")
             
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
@@ -338,17 +339,17 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Перейти в директорию
+    /// Navigate to directory
     func navigateToDirectory(_ profile: Profile, path: String) async {
         let timestamp = Date().timeIntervalSince1970
-        print("🔥 [\(timestamp)] === PROFILEVIEWMODEL: navigateToDirectory STARTED ===")
-        print("🔥 [\(timestamp)] Profile: \(profile.name), Host: \(profile.host)")
-        print("🔥 [\(timestamp)] Path: \(path)")
-        print("🔥 [\(timestamp)] Current directory: \(currentDirectory)")
-        print("🔥 [\(timestamp)] Thread: \(Thread.isMainThread ? "Main" : "Background")")
-        print("🔥 [\(timestamp)] Stack trace:")
+        print("📝 [\(timestamp)] ProfileViewModel: navigateToDirectory STARTED")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
+        print("📝 [\(timestamp)] ProfileViewModel: Path: \(path)")
+        print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
+        print("📝 [\(timestamp)] ProfileViewModel: Thread: \(Thread.isMainThread ? "Main" : "Background")")
+        print("📝 [\(timestamp)] ProfileViewModel: Stack trace:")
         Thread.callStackSymbols.prefix(10).forEach { symbol in
-            print("🔥 [\(timestamp)]   \(symbol)")
+            print("📝 [\(timestamp)]   \(symbol)")
         }
         
         await MainActor.run {
@@ -358,7 +359,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            print("=== PROFILEVIEWMODEL: About to call SSHService.listDirectory ===")
+            print("📝 [\(timestamp)] ProfileViewModel: About to call SSHService.listDirectory")
             let normalized = normalizePath(path)
             let result = try await SSHService.listDirectory(profile, path: normalized)
             await MainActor.run {
@@ -370,10 +371,10 @@ class ProfileViewModel: ObservableObject {
                 self.connectionLog.append("[green]✅ Navigated to \(normalized)")
             }
         } catch {
-            print("=== PROFILEVIEWMODEL: navigateToDirectory ERROR ===")
-            print("Error type: \(type(of: error))")
-            print("Error description: \(error.localizedDescription)")
-            print("Error: \(error)")
+            print("📝 [\(timestamp)] ProfileViewModel: navigateToDirectory ERROR")
+            print("📝 [\(timestamp)] ProfileViewModel: Error type: \(type(of: error))")
+            print("📝 [\(timestamp)] ProfileViewModel: Error description: \(error.localizedDescription)")
+            print("📝 [\(timestamp)] ProfileViewModel: Error: \(error)")
             
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
@@ -451,13 +452,14 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Монтировать директорию в Finder
+    /// Mount directory in Finder
     func mountDirectoryInFinder(_ profile: Profile, directory: RemoteFile) async {
-        print("=== PROFILEVIEWMODEL: mountDirectoryInFinder FUNCTION STARTED ===")
-        print("Profile: \(profile.name), Host: \(profile.host)")
-        print("Directory: \(directory.name), Path: \(directory.path)")
-        print("Current directory: \(currentDirectory)")
-        print("=== PROFILEVIEWMODEL: About to set isConnecting = true ===")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] ProfileViewModel: mountDirectoryInFinder FUNCTION STARTED")
+        print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
+        print("📝 [\(timestamp)] ProfileViewModel: Directory: \(directory.name), Path: \(directory.path)")
+        print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
+        print("📝 [\(timestamp)] ProfileViewModel: About to set isConnecting = true")
         
         await MainActor.run {
             self.isConnecting = true
@@ -468,13 +470,13 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            print("=== PROFILEVIEWMODEL: About to call SSHService.mountDirectoryInFinder ===")
-            print("Profile: \(profile.name), Host: \(profile.host)")
-            print("Directory path: \(directory.path)")
-            print("Directory name: \(directory.name)")
+            print("📝 [\(timestamp)] ProfileViewModel: About to call SSHService.mountDirectoryInFinder")
+            print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
+            print("📝 [\(timestamp)] ProfileViewModel: Directory path: \(directory.path)")
+            print("📝 [\(timestamp)] ProfileViewModel: Directory name: \(directory.name)")
             let logs = try await SSHService.mountDirectoryInFinder(profile, remotePath: directory.path)
-            print("=== PROFILEVIEWMODEL: SSHService.mountDirectoryInFinder returned successfully ===")
-            print("Logs count: \(logs.count)")
+            print("📝 [\(timestamp)] ProfileViewModel: SSHService.mountDirectoryInFinder returned successfully")
+            print("📝 [\(timestamp)] ProfileViewModel: Logs count: \(logs.count)")
             await MainActor.run {
                 for log in logs {
                     self.connectionLog.append(log)
@@ -495,7 +497,7 @@ class ProfileViewModel: ObservableObject {
             self.isConnecting = false
         }
         
-        print("=== PROFILEVIEWMODEL: mountDirectoryInFinder FUNCTION COMPLETED ===")
+        print("📝 [\(timestamp)] ProfileViewModel: mountDirectoryInFinder FUNCTION COMPLETED")
     }
     
     /// Перейти в родительскую директорию
@@ -545,7 +547,7 @@ class ProfileViewModel: ObservableObject {
     
     /// Check for available updates
     func checkForUpdates() async {
-        print("🔍 [ProfileViewModel] Starting update check...")
+        print("📝 [ProfileViewModel] Starting update check...")
         
         await MainActor.run {
             isCheckingForUpdates = true
@@ -553,7 +555,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         if let update = await UpdateService.checkForUpdates() {
-            print("🔍 [ProfileViewModel] Update found: \(update.version)")
+            print("📝 [ProfileViewModel] Update found: \(update.version)")
             
             if update.isNewer {
                 await MainActor.run {

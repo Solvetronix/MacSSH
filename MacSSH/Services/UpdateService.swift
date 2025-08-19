@@ -8,11 +8,11 @@ class UpdateService {
     
     /// Checks for available updates from GitHub
     static func checkForUpdates() async -> UpdateInfo? {
-        print("🔍 [UpdateService] Starting update check...")
-        print("🔍 [UpdateService] Current version: \(currentVersion)")
+        print("📝 [UpdateService] Starting update check...")
+        print("📝 [UpdateService] Current version: \(currentVersion)")
         
         let urlString = "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest"
-        print("🔍 [UpdateService] Checking URL: \(urlString)")
+        print("📝 [UpdateService] Checking URL: \(urlString)")
         
         guard let url = URL(string: urlString) else {
             print("❌ [UpdateService] Invalid URL for GitHub API")
@@ -27,7 +27,7 @@ class UpdateService {
                 return nil
             }
             
-            print("🔍 [UpdateService] HTTP Status: \(httpResponse.statusCode)")
+            print("📝 [UpdateService] HTTP Status: \(httpResponse.statusCode)")
             
             guard httpResponse.statusCode == 200 else {
                 print("❌ [UpdateService] Failed to fetch release info: \(httpResponse.statusCode)")
@@ -38,7 +38,7 @@ class UpdateService {
             decoder.dateDecodingStrategy = .iso8601
             
             let release = try decoder.decode(GitHubRelease.self, from: data)
-            print("🔍 [UpdateService] Found release: \(release.tagName)")
+            print("📝 [UpdateService] Found release: \(release.tagName)")
             
             // Find .dmg asset
             guard let dmgAsset = release.assets.first(where: { $0.name.hasSuffix(".dmg") }) else {
@@ -53,9 +53,9 @@ class UpdateService {
             // TEMPORARY: Always show update for testing purposes
             let alwaysShowUpdate = true
             
-            print("🔍 [UpdateService] Release version: \(releaseVersion)")
-            print("🔍 [UpdateService] Is newer: \(isNewer)")
-            print("🔍 [UpdateService] Always show update (testing): \(alwaysShowUpdate)")
+            print("📝 [UpdateService] Release version: \(releaseVersion)")
+            print("📝 [UpdateService] Is newer: \(isNewer)")
+            print("📝 [UpdateService] Always show update (testing): \(alwaysShowUpdate)")
             
             let dateFormatter = ISO8601DateFormatter()
             let publishedDate = dateFormatter.date(from: release.publishedAt) ?? Date()
@@ -106,8 +106,8 @@ class UpdateService {
     
     /// Installs the downloaded update
     static func installUpdate(from fileURL: URL) async -> Bool {
-        print("🔍 [UpdateService] Starting update installation...")
-        print("🔍 [UpdateService] File URL: \(fileURL.path)")
+        print("📝 [UpdateService] Starting update installation...")
+        print("📝 [UpdateService] File URL: \(fileURL.path)")
         
         do {
             // Mount the .dmg file
@@ -123,7 +123,7 @@ class UpdateService {
             mountProcess.waitUntilExit()
             
             let mountOutput = String(data: mountPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            print("🔍 [UpdateService] Mount output: \(mountOutput)")
+            print("📝 [UpdateService] Mount output: \(mountOutput)")
             
             // Extract volume path from output
             let lines = mountOutput.components(separatedBy: .newlines)
@@ -147,7 +147,7 @@ class UpdateService {
                 return false
             }
             
-            print("🔍 [UpdateService] Found volume: \(volumePath)")
+            print("📝 [UpdateService] Found volume: \(volumePath)")
             
             // Copy the new app to Applications
             let sourceAppPath = "\(volumePath)/MacSSH.app"
@@ -161,7 +161,7 @@ class UpdateService {
             try removeProcess.run()
             removeProcess.waitUntilExit()
             
-            print("🔍 [UpdateService] Removed old app")
+            print("📝 [UpdateService] Removed old app")
             
             // Copy new app
             let copyProcess = Process()
@@ -171,7 +171,7 @@ class UpdateService {
             try copyProcess.run()
             copyProcess.waitUntilExit()
             
-            print("🔍 [UpdateService] Copied new app")
+            print("📝 [UpdateService] Copied new app")
             
             // Unmount the volume
             let unmountProcess = Process()
@@ -181,13 +181,13 @@ class UpdateService {
             try unmountProcess.run()
             unmountProcess.waitUntilExit()
             
-            print("🔍 [UpdateService] Unmounted volume")
+            print("📝 [UpdateService] Unmounted volume")
             
             // Wait a bit for file system to settle
             try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
             
             // Restart the application
-            print("🔍 [UpdateService] Restarting application...")
+            print("📝 [UpdateService] Restarting application...")
             await restartApplication()
             
             return true
@@ -200,7 +200,7 @@ class UpdateService {
     
     /// Restarts the current application
     private static func restartApplication() async {
-        print("🔍 [UpdateService] Preparing to restart application...")
+        print("📝 [UpdateService] Preparing to restart application...")
         
         // Get the current app bundle path
         let appPath = Bundle.main.bundlePath
@@ -209,7 +209,7 @@ class UpdateService {
             return
         }
         
-        print("🔍 [UpdateService] App path: \(appPath)")
+        print("📝 [UpdateService] App path: \(appPath)")
         
         // Create a script to restart the app
         let script = """
@@ -268,6 +268,16 @@ class UpdateService {
     
     /// Gets current app version
     static func getCurrentVersion() -> String {
+        // Try to read version directly from Info.plist
+        if let path = Bundle.main.path(forResource: "Info", ofType: "plist"),
+           let plist = NSDictionary(contentsOfFile: path),
+           let version = plist["CFBundleShortVersionString"] as? String {
+            print("🔍 [UpdateService] Version from Info.plist: \(version)")
+            return version
+        }
+        
+        // Fallback to cached version
+        print("🔍 [UpdateService] Using cached version: \(currentVersion)")
         return currentVersion
     }
     
