@@ -4,10 +4,11 @@ import AppKit
 class UpdateService {
     private static let repositoryOwner = "Solvetronix" // Replace with your GitHub username
     private static let repositoryName = "MacSSH" // Replace with your repository name
-    private static let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    // Removed cached version - will read dynamically
     
     /// Checks for available updates from GitHub
     static func checkForUpdates() async -> UpdateInfo? {
+        let currentVersion = getCurrentVersion()
         print("📝 [UpdateService] Starting update check...")
         print("📝 [UpdateService] Current version: \(currentVersion)")
         
@@ -64,7 +65,7 @@ class UpdateService {
                 version: releaseVersion,
                 downloadUrl: dmgAsset.browserDownloadUrl,
                 releaseNotes: release.body,
-                isNewer: alwaysShowUpdate, // TEMPORARY: Always show as newer for testing
+                isNewer: isNewer, // FIXED: Use actual version comparison
                 publishedAt: publishedDate
             )
             
@@ -319,9 +320,15 @@ class UpdateService {
             return version
         }
         
-        // Fallback to cached version
-        print("🔍 [UpdateService] Using cached version: \(currentVersion)")
-        return currentVersion
+        // Fallback to Bundle.main.infoDictionary
+        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+            print("🔍 [UpdateService] Version from Bundle.main: \(version)")
+            return version
+        }
+        
+        // Final fallback
+        print("🔍 [UpdateService] Using fallback version: 1.0.0")
+        return "1.0.0"
     }
     
     /// Opens GitHub releases page
