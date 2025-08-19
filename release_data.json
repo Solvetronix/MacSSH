@@ -1,7 +1,0 @@
-{
-  "tag_name": "v1.0.0",
-  "name": "MacSSH 1.0.0",
-  "body": "## What's New\n\n• Initial release with SSH connection management\n• File browser with VS Code integration\n• Automatic file synchronization\n• macOS permissions management\n• Automatic update system\n\n## Features\n\n- SSH connection profile management\n- Password and private key authentication\n- File browser with remote file editing\n- VS Code/Cursor integration with auto-sync\n- Mount remote directories in Finder\n- Automatic update checking via GitHub\n\n## Requirements\n\n- macOS 13.0 or newer\n- VS Code or Cursor (for file editing)\n- sshpass and sshfs (optional)",
-  "draft": false,
-  "prerelease": false
-}
