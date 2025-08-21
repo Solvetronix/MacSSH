@@ -7,7 +7,8 @@
         
         <item>
             <title>MacSSH 1.8.6</title>
-            <sparkle:version>1.8.6</sparkle:version>
+            <sparkle:version>186</sparkle:version>
+            <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
             <description><![CDATA[
                 <h2>What's New in MacSSH 1.8.6</h2>
                 <ul>
@@ -28,7 +29,8 @@
         
         <item>
             <title>MacSSH 1.8.5</title>
-            <sparkle:version>1.8.5</sparkle:version>
+            <sparkle:version>185</sparkle:version>
+            <sparkle:shortVersionString>1.8.5</sparkle:shortVersionString>
             <description><![CDATA[
                 <h2>What's New in MacSSH 1.8.5</h2>
                 <ul>
