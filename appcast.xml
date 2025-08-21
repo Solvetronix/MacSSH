@@ -7,6 +7,7 @@
         
         <item>
             <title>MacSSH 1.8.6</title>
+            <sparkle:version>1.8.6</sparkle:version>
             <description><![CDATA[
                 <h2>What's New in MacSSH 1.8.6</h2>
                 <ul>
@@ -19,7 +20,6 @@
             ]]></description>
             <pubDate>Wed, 21 Aug 2025 22:55:00 +0000</pubDate>
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.6/MacSSH-1.8.6.dmg"
-                       sparkle:version="1.8.6"
                        sparkle:os="macos"
                        length="9658151"
                        type="application/octet-stream"
@@ -28,6 +28,7 @@
         
         <item>
             <title>MacSSH 1.8.5</title>
+            <sparkle:version>1.8.5</sparkle:version>
             <description><![CDATA[
                 <h2>What's New in MacSSH 1.8.5</h2>
                 <ul>
@@ -40,7 +41,6 @@
             ]]></description>
             <pubDate>Wed, 21 Aug 2025 22:35:00 +0000</pubDate>
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.5/MacSSH-1.8.5.dmg"
-                       sparkle:version="1.8.5"
                        sparkle:os="macos"
                        length="9602336"
                        type="application/octet-stream"
@@ -49,6 +49,7 @@
                
                <item>
                    <title>MacSSH 1.8.4</title>
+                   <sparkle:version>1.8.4</sparkle:version>
                    <description><![CDATA[
                        <h2>What's New in MacSSH 1.8.4</h2>
                        <ul>
@@ -61,7 +62,6 @@
                    ]]></description>
                    <pubDate>Wed, 21 Aug 2025 22:11:00 +0000</pubDate>
                    <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.4/MacSSH-1.8.4.dmg"
-                              sparkle:version="1.8.4"
                               sparkle:os="macos"
                               length="9602336"
                               type="application/octet-stream"
