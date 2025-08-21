@@ -39,5 +39,15 @@
     
     <key>SUEnableLogging</key>
     <true/>
+    
+    <!-- Additional Sparkle settings to fix update button issue -->
+    <key>SUEnableRelaunching</key>
+    <true/>
+    
+    <key>SUEnableAutomaticUpdating</key>
+    <true/>
+    
+    <key>SUEnableInstallerLauncherService</key>
+    <true/>
 </dict>
 </plist> 

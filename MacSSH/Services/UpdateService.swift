@@ -19,6 +19,30 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         return "https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml"
     }
     
+    // MARK: - Additional Delegate Methods for Update Button Fix
+    
+    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationInvocation: @escaping () -> Void) {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Will install update on quit")
+    }
+    
+    func updater(_ updater: SPUUpdater, didFinishLoading appcast: SUAppcast) {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Finished loading appcast with \(appcast.items.count) items")
+        for item in appcast.items {
+            UpdateService.log("   - Found item: \(item.title) version \(item.displayVersionString ?? "unknown")")
+        }
+    }
+    
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Found valid update: \(item.title) version \(item.displayVersionString ?? "unknown")")
+    }
+    
+    func updater(_ updater: SPUUpdater, didNotFindUpdate error: Error?) {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Did not find update")
+        if let error = error {
+            UpdateService.log("   - Error: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - Logging
     
     static var logCallback: ((String) -> Void)?
