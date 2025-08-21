@@ -35,6 +35,17 @@ This is critical for testing the automatic update system:
 **❌ Common Mistake**: Installing the new version locally immediately after release
 **✅ Correct Way**: Test automatic update from the previous installed version
 
+### 4. Appcast.xml Update (CRITICAL!)
+**🚨 ALWAYS push appcast.xml to GitHub AFTER creating the release!**
+
+This is the most critical step that is often forgotten:
+- Without updating appcast.xml on GitHub, Sparkle won't know about the new release
+- Users will never see the update notification
+- The entire release process becomes useless
+
+**❌ Common Mistake**: Creating the release but forgetting to push appcast.xml
+**✅ Correct Way**: Always push appcast.xml after creating the release
+
 ## 🔧 Prerequisites
 
 ### 1. Install GitHub CLI
@@ -166,6 +177,34 @@ gh release create v1.8.4 \
 # Publish the draft release
 gh release edit v1.8.4 --draft=false
 ```
+
+### Step 4: Update and Push appcast.xml (CRITICAL STEP!)
+
+**🚨 CRITICAL: This step is MANDATORY and must NEVER be skipped!**
+
+After creating the GitHub release, you MUST update and push the appcast.xml file:
+
+```bash
+# 1. Verify appcast.xml has the new version
+grep -A 3 -B 3 "sparkle:version" appcast.xml
+
+# 2. Push appcast.xml to GitHub
+git add appcast.xml
+git commit -m "Update appcast.xml with version 1.8.4 for new release"
+git push origin main
+
+# 3. Verify the update is live
+curl -s "https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml" | grep -A 3 -B 3 "1.8.4"
+```
+
+**Why this is critical:**
+- Without updating appcast.xml, Sparkle won't know about the new release
+- Users will never see the update notification
+- The entire release process becomes useless
+- This is the most common mistake that breaks automatic updates
+
+**❌ Common Mistake**: Creating the release but forgetting to push appcast.xml
+**✅ Correct Way**: Always push appcast.xml after creating the release
 
 ### Step 4: Update Appcast for Sparkle
 
