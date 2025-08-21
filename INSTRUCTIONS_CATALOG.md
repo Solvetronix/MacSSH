@@ -47,6 +47,7 @@
 4. **`docs/VERSION_MANAGEMENT_GUIDE.md`** - 🆕 Xcode Project Version Management
 5. **`docs/QUICK_VERSION_FIX.md`** - 🆕 Quick Fix for Application Version Problem
 6. **`docs/SPARKLE_UPDATE_BUTTON_FIX.md`** - 🆕 Solution for Sparkle not showing update button despite newer version available
+7. **`docs/SPARKLE_VERSION_FORMAT_FIX.md`** - 🆕 Fix for incorrect sparkle:version format in appcast.xml
 7. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
 
 ### 📋 Release Management
@@ -71,7 +72,8 @@
 3. Study `docs/AUTOMATIC_UPDATE_GUIDE.md` for complete system understanding
 4. **Use `docs/VERSION_MANAGEMENT_GUIDE.md` for solving application version problems**
 5. **Use `docs/SPARKLE_UPDATE_BUTTON_FIX.md` for solving Sparkle update button issues**
-6. **Use `docs/GITHUB_RELEASE_GUIDE.md` for creating releases with GitHub CLI (⚠️ CRITICAL: version management)**
+6. **Use `docs/SPARKLE_VERSION_FORMAT_FIX.md` for fixing appcast.xml version format issues**
+7. **Use `docs/GITHUB_RELEASE_GUIDE.md` for creating releases with GitHub CLI (⚠️ CRITICAL: version management)**
 7. Use `docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md` for creating new releases
 
 ### For Users
