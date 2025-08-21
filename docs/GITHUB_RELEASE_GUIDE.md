@@ -24,6 +24,17 @@ This is critical because:
 **❌ Common Mistake**: Creating a release without pushing changes first
 **✅ Correct Way**: Push all changes, then create the release
 
+### 3. Local Installation for Testing
+**🚨 DO NOT install the new version locally after creating a release!**
+
+This is critical for testing the automatic update system:
+- Keep the previous version (e.g., 1.8.4) installed in `/Applications`
+- After creating release 1.8.5, test the automatic update from 1.8.4 → 1.8.5
+- This verifies that Sparkle can find and install the new version automatically
+
+**❌ Common Mistake**: Installing the new version locally immediately after release
+**✅ Correct Way**: Test automatic update from the previous installed version
+
 ## 🔧 Prerequisites
 
 ### 1. Install GitHub CLI
@@ -305,7 +316,9 @@ echo "📝 Don't forget to update docs/appcast.xml with the new release entry!"
 ### Post-Release
 - [ ] Appcast entry added to `docs/appcast.xml`
 - [ ] Digital signature generated and added
-- [ ] Release tested with automatic updates
+- [ ] **DO NOT install new version locally** ⚠️ CRITICAL
+- [ ] Test automatic update from previous installed version
+- [ ] Verify Sparkle finds and installs the new version
 - [ ] Documentation updated
 
 ## 🔍 Troubleshooting
@@ -359,6 +372,8 @@ gh release delete v1.8.4 --yes
 5. **Keep appcast.xml updated**
 6. **Use consistent naming** for all files
 7. **Verify digital signatures** are correct
+8. **DO NOT install new version locally** - test automatic update instead
+9. **Keep previous version installed** for testing update process
 
 ---
 
