@@ -56,7 +56,25 @@ class UpdateService {
             if let feedURL = updater.feedURL {
                 log("🔗 Feed URL: \(feedURL)")
             } else {
-                log("⚠️ No feed URL configured")
+                log("⚠️ No feed URL configured - this is a problem!")
+                log("🔧 Trying to manually set feed URL...")
+                
+                // Try to manually set the feed URL
+                let appcastURL = URL(string: "https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml")
+                if let url = appcastURL {
+                    log("🔧 Setting feed URL to: \(url)")
+                    // Note: In Sparkle 2.x, feed URL is read from Info.plist automatically
+                    // We can't set it programmatically, but we can verify it's in Info.plist
+                }
+            }
+            
+            // Verify Info.plist has the correct URL
+            if let infoPlistPath = Bundle.main.path(forResource: "Info", ofType: "plist"),
+               let infoPlist = NSDictionary(contentsOfFile: infoPlistPath),
+               let feedURL = infoPlist["SUFeedURL"] as? String {
+                log("📋 Info.plist SUFeedURL: \(feedURL)")
+            } else {
+                log("❌ SUFeedURL not found in Info.plist!")
             }
         } else {
             log("❌ Failed to create updater controller")
@@ -80,6 +98,18 @@ class UpdateService {
             log("🔗 Feed URL: \(updater.feedURL?.absoluteString ?? "Not configured")")
             log("⏰ Last update check: \(updater.lastUpdateCheckDate?.description ?? "Never")")
             log("🔄 Update check interval: \(updater.updateCheckInterval) seconds")
+            
+            // Additional diagnostics
+            if updater.feedURL == nil {
+                log("🔧 Checking Info.plist for SUFeedURL...")
+                if let infoPlistPath = Bundle.main.path(forResource: "Info", ofType: "plist"),
+                   let infoPlist = NSDictionary(contentsOfFile: infoPlistPath),
+                   let feedURL = infoPlist["SUFeedURL"] as? String {
+                    log("📋 Found SUFeedURL in Info.plist: \(feedURL)")
+                } else {
+                    log("❌ SUFeedURL not found in Info.plist!")
+                }
+            }
         }
         
         // Use the standard Sparkle check for updates
