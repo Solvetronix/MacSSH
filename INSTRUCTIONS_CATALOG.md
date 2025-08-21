@@ -14,6 +14,7 @@
 - **`docs/SPARKLE_XCODE_SETUP.md`** - 🆕 Detailed instruction for adding Sparkle to Xcode project
 - **`docs/VERSION_MANAGEMENT_GUIDE.md`** - 🆕 Xcode Project Version Management (solving incorrect version problem)
 - **`docs/QUICK_VERSION_FIX.md`** - 🆕 Quick Fix for Application Version Problem
+- **`docs/SPARKLE_UPDATE_BUTTON_FIX.md`** - 🆕 Solution for Sparkle not showing update button despite newer version available
 - **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI for Sparkle updates (⚠️ CRITICAL: version management)
 - **`docs/UPDATE_SYSTEM_SUMMARY.md`** - Final summary of all changes in the update system
 
@@ -45,7 +46,8 @@
 3. **`docs/AUTOMATIC_UPDATE_GUIDE.md`** - Complete update guide
 4. **`docs/VERSION_MANAGEMENT_GUIDE.md`** - 🆕 Xcode Project Version Management
 5. **`docs/QUICK_VERSION_FIX.md`** - 🆕 Quick Fix for Application Version Problem
-6. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
+6. **`docs/SPARKLE_UPDATE_BUTTON_FIX.md`** - 🆕 Solution for Sparkle not showing update button despite newer version available
+7. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
 
 ### 📋 Release Management
 1. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI for Sparkle updates (⚠️ CRITICAL: version management)
@@ -68,8 +70,9 @@
 2. Study `docs/SPARKLE_SETUP.md` for setting up automatic updates
 3. Study `docs/AUTOMATIC_UPDATE_GUIDE.md` for complete system understanding
 4. **Use `docs/VERSION_MANAGEMENT_GUIDE.md` for solving application version problems**
-5. **Use `docs/GITHUB_RELEASE_GUIDE.md` for creating releases with GitHub CLI (⚠️ CRITICAL: version management)**
-6. Use `docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md` for creating new releases
+5. **Use `docs/SPARKLE_UPDATE_BUTTON_FIX.md` for solving Sparkle update button issues**
+6. **Use `docs/GITHUB_RELEASE_GUIDE.md` for creating releases with GitHub CLI (⚠️ CRITICAL: version management)**
+7. Use `docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md` for creating new releases
 
 ### For Users
 1. Review `README.md` for basic information

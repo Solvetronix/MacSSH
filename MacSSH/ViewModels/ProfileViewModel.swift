@@ -627,12 +627,12 @@ class ProfileViewModel: ObservableObject {
             connectionLog.append("🔍 [\(timestamp)] [ProfileViewModel] Using Sparkle update system...")
         }
         
-        // Use only Sparkle for updates
-        print("📝 [\(timestamp)] [ProfileViewModel] Using Sparkle update system")
-        await UpdateService.checkForUpdates()
+        // Use the new force check method that bypasses time restrictions
+        print("📝 [\(timestamp)] [ProfileViewModel] Using Sparkle force update system")
+        await UpdateService.forceCheckForUpdates()
         
         await MainActor.run {
-            connectionLog.append("✅ [\(timestamp)] [ProfileViewModel] Sparkle update system activated")
+            connectionLog.append("✅ [\(timestamp)] [ProfileViewModel] Sparkle force update system activated")
             isCheckingForUpdates = false
         }
     }
