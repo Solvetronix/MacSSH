@@ -70,6 +70,7 @@
         
         <item>
             <title>MacSSH 1.8.2</title>
+            <sparkle:version>1.8.2</sparkle:version>
             <description><![CDATA[
                 <h2>What's New in MacSSH 1.8.2</h2>
                 <ul>
@@ -82,7 +83,6 @@
             ]]></description>
             <pubDate>Mon, 21 Aug 2025 12:00:00 +0000</pubDate>
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.2/MacSSH-1.8.2.dmg"
-                       sparkle:version="1.8.2"
                        sparkle:os="macos"
                        length="1152000"
                        type="application/octet-stream"
