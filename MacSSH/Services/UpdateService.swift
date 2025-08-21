@@ -1,14 +1,129 @@
 import Foundation
 import AppKit
+import Sparkle
 
 class UpdateService {
-    private static let repositoryOwner = "Solvetronix" // Replace with your GitHub username
-    private static let repositoryName = "MacSSH" // Replace with your repository name
+    private static let repositoryOwner = "Solvetronix"
+    private static let repositoryName = "MacSSH"
     
-    /// Checks for available updates from GitHub
+    // MARK: - Sparkle Integration
+    
+    private static var updater: SPUUpdater?
+    private static var updaterController: SPUStandardUpdaterController?
+    
+    // MARK: - Logging
+    
+    static var logCallback: ((String) -> Void)?
+    
+    private static func log(_ message: String) {
+        let timestamp = Date().timeIntervalSince1970
+        let logMessage = "🔄 [\(timestamp)] [UpdateService] \(message)"
+        print(logMessage)
+        logCallback?(logMessage)
+    }
+    
+    /// Initialize Sparkle updater
+    static func initializeUpdater() {
+        guard updater == nil else { 
+            log("Updater already initialized, skipping...")
+            return 
+        }
+        
+        log("🔧 Initializing Sparkle updater...")
+        
+        // Create the updater controller
+        updaterController = SPUStandardUpdaterController(updaterDelegate: nil, userDriverDelegate: nil)
+        updater = updaterController?.updater
+        
+        if let updater = updater {
+            log("✅ Updater controller created successfully")
+            
+            // Configure updater
+            updater.automaticallyChecksForUpdates = true
+            updater.automaticallyDownloadsUpdates = true
+            
+            // Set update check interval (24 hours)
+            updater.updateCheckInterval = 24 * 60 * 60
+            
+            log("✅ Updater configured - Auto checks: \(updater.automaticallyChecksForUpdates), Auto downloads: \(updater.automaticallyDownloadsUpdates)")
+            log("✅ Update check interval: \(updater.updateCheckInterval) seconds (24 hours)")
+            
+            // Log current version
+            let currentVersion = getCurrentVersion()
+            log("📋 Current app version: \(currentVersion)")
+            
+            // Log feed URL
+            if let feedURL = updater.feedURL {
+                log("🔗 Feed URL: \(feedURL)")
+            } else {
+                log("⚠️ No feed URL configured")
+            }
+        } else {
+            log("❌ Failed to create updater controller")
+        }
+        
+        log("✅ Sparkle updater initialization completed")
+    }
+    
+    /// Check for updates using Sparkle
     static func checkForUpdates() async -> UpdateInfo? {
+        guard let updaterController = updaterController else {
+            log("❌ Updater not initialized")
+            return nil
+        }
+        
+        log("🔍 Starting manual update check via Sparkle...")
+        
+        // Log current state
+        if let updater = updater {
+            log("📋 Current version: \(getCurrentVersion())")
+            log("🔗 Feed URL: \(updater.feedURL?.absoluteString ?? "Not configured")")
+            log("⏰ Last update check: \(updater.lastUpdateCheckDate?.description ?? "Never")")
+            log("🔄 Update check interval: \(updater.updateCheckInterval) seconds")
+        }
+        
+        // Use the standard Sparkle check for updates
+        // Sparkle handles the UI automatically, so we don't need to return UpdateInfo
+        log("🚀 Triggering Sparkle update check...")
+        updaterController.checkForUpdates(nil)
+        
+        log("✅ Update check triggered - Sparkle will handle the UI")
+        
+        // Return nil since Sparkle handles everything automatically
+        return nil
+    }
+    
+    /// Install update automatically
+    static func installUpdate() async -> Bool {
+        guard let updaterController = updaterController else {
+            print("❌ [UpdateService] Updater not initialized")
+            return false
+        }
+        
+        print("🔧 [UpdateService] Installing update...")
+        
+        // Sparkle handles installation automatically
+        updaterController.checkForUpdates(nil)
+        return true
+    }
+    
+    /// Show update window
+    static func showUpdateWindow() {
+        guard let updaterController = updaterController else {
+            print("❌ [UpdateService] Updater controller not initialized")
+            return
+        }
+        
+        print("📝 [UpdateService] Showing update window...")
+        updaterController.checkForUpdates(nil)
+    }
+    
+    // MARK: - Legacy GitHub API (Fallback)
+    
+    /// Legacy method for checking updates via GitHub API (fallback)
+    static func checkForUpdatesLegacy() async -> UpdateInfo? {
         let currentVersion = getCurrentVersion()
-        print("📝 [UpdateService] Starting update check...")
+        print("📝 [UpdateService] Starting legacy update check...")
         print("📝 [UpdateService] Current version: \(currentVersion)")
         
         let urlString = "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest"
@@ -70,103 +185,7 @@ class UpdateService {
         }
     }
     
-    /// Downloads the update file
-    static func downloadUpdate(from urlString: String) async -> URL? {
-        guard let url = URL(string: urlString) else {
-            print("❌ Invalid download URL")
-            return nil
-        }
-        
-        let documentsPath = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-        let fileName = url.lastPathComponent
-        let destinationURL = documentsPath.appendingPathComponent(fileName)
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                print("❌ Failed to download update: \(response)")
-                return nil
-            }
-            
-            try data.write(to: destinationURL)
-            print("✅ Update downloaded to: \(destinationURL.path)")
-            return destinationURL
-            
-        } catch {
-            print("❌ Error downloading update: \(error)")
-            return nil
-        }
-    }
-    
-    /// Installs the downloaded update using proper macOS installation method
-    static func installUpdate(from fileURL: URL) async -> Bool {
-        print("🔍 [UpdateService] Starting update installation...")
-        print("🔍 [UpdateService] File URL: \(fileURL.path)")
-        
-        do {
-            // Check if file exists
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                print("❌ [UpdateService] DMG file does not exist: \(fileURL.path)")
-                return false
-            }
-            
-            print("✅ [UpdateService] DMG file exists")
-            
-            // Use NSWorkspace to open the DMG file
-            // This will trigger the standard macOS installation process
-            let success = NSWorkspace.shared.open(fileURL)
-            
-            if success {
-                print("✅ [UpdateService] Successfully opened DMG file with NSWorkspace")
-                
-                // Wait a bit for the DMG to mount and user to see the installation dialog
-                try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-                
-                // Show a helpful message to the user
-                await MainActor.run {
-                    showInstallationInstructions()
-                }
-                
-                // Wait a bit more before exiting
-                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                
-                // Exit the current app to allow installation
-                await MainActor.run {
-                    print("🔍 [UpdateService] Exiting application for installation...")
-                    NSApplication.shared.terminate(nil)
-                }
-                
-                return true
-            } else {
-                print("❌ [UpdateService] Failed to open DMG file with NSWorkspace")
-                return false
-            }
-            
-        } catch {
-            print("❌ [UpdateService] Error installing update: \(error)")
-            return false
-        }
-    }
-    
-    /// Shows installation instructions to the user
-    private static func showInstallationInstructions() {
-        let alert = NSAlert()
-        alert.messageText = "Installation Instructions"
-        alert.informativeText = """
-        The DMG file has been opened. To complete the installation:
-        
-        1. Drag MacSSH to your Applications folder
-        2. Replace the existing version if prompted
-        3. Launch MacSSH from Applications
-        
-        This app will now close to allow the installation.
-        """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
+    // MARK: - Utility Methods
     
     /// Compares two version strings
     private static func compareVersions(_ version1: String, _ version2: String) -> Int {
@@ -188,21 +207,11 @@ class UpdateService {
     
     /// Gets current app version
     static func getCurrentVersion() -> String {
-        // Try to read version directly from Info.plist
-        if let path = Bundle.main.path(forResource: "Info", ofType: "plist"),
-           let plist = NSDictionary(contentsOfFile: path),
-           let version = plist["CFBundleShortVersionString"] as? String {
-            print("🔍 [UpdateService] Version from Info.plist: \(version)")
-            return version
-        }
-        
-        // Fallback to Bundle.main.infoDictionary
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
             print("🔍 [UpdateService] Version from Bundle.main: \(version)")
             return version
         }
         
-        // Final fallback
         print("🔍 [UpdateService] Using fallback version: 1.0.0")
         return "1.0.0"
     }
@@ -212,5 +221,15 @@ class UpdateService {
         let urlString = "https://github.com/\(repositoryOwner)/\(repositoryName)/releases"
         guard let url = URL(string: urlString) else { return }
         NSWorkspace.shared.open(url)
+    }
+}
+
+// MARK: - UpdateInfo Extension for Sparkle
+
+extension UpdateInfo {
+    init?(from sparkleUpdateInfo: Any) {
+        // For now, we'll use the legacy GitHub API
+        // Sparkle 2.7.1 handles updates automatically through its UI
+        return nil
     }
 }

@@ -6,22 +6,24 @@
 //
 
 import SwiftUI
+import Sparkle
 
 @main
 struct MacSSHApp: App {
     @StateObject private var viewModel = ProfileViewModel()
+    
+    init() {
+        // Initialize Sparkle updater on app launch
+        UpdateService.initializeUpdater()
+    }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
                 .onAppear {
-                    // Check for updates automatically on app launch
-                    Task {
-                        // Wait a bit for the app to fully load
-                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                        await viewModel.checkForUpdates()
-                    }
+                    // Sparkle handles automatic update checks internally
+                    // No need to manually check for updates
                 }
         }
         

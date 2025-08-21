@@ -2,11 +2,9 @@ import SwiftUI
 
 struct UpdateView: View {
     let updateInfo: UpdateInfo
-    @State private var isDownloading = false
-    @State private var downloadProgress: Double = 0.0
+    @State private var isInstalling = false
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var showInstallationAlert = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -73,13 +71,13 @@ struct UpdateView: View {
                 }
             }
             
-            // Download progress
-            if isDownloading {
+            // Installation progress
+            if isInstalling {
                 VStack(spacing: 8) {
-                    ProgressView(value: downloadProgress)
-                        .progressViewStyle(LinearProgressViewStyle())
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
                     
-                    Text("Downloading update... \(Int(downloadProgress * 100))%")
+                    Text("Installing update...")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -91,89 +89,63 @@ struct UpdateView: View {
                     dismiss()
                 }
                 .buttonStyle(.bordered)
+                .disabled(isInstalling)
                 
                 Spacer()
                 
-                Button("Download & Install") {
-                    downloadAndInstall()
+                Button("Install Update") {
+                    installUpdate()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isDownloading)
+                .disabled(isInstalling)
                 
                 Button("View on GitHub") {
                     UpdateService.openGitHubReleases()
                 }
                 .buttonStyle(.bordered)
+                .disabled(isInstalling)
             }
         }
         .padding(24)
         .frame(width: 500)
-        .alert("Download Error", isPresented: $showError) {
+        .alert("Installation Error", isPresented: $showError) {
             Button("OK") { }
         } message: {
             Text(errorMessage)
         }
-        .alert("Installation Instructions", isPresented: $showInstallationAlert) {
-            Button("OK") {
-                // App will close automatically after this
-            }
-        } message: {
-            Text("""
-            The DMG file has been opened. To complete the installation:
-            
-            1. Drag MacSSH to your Applications folder
-            2. Replace the existing version if prompted
-            3. Launch MacSSH from Applications
-            
-            This app will now close to allow the installation.
-            """)
-        }
     }
     
-    private func downloadAndInstall() {
-        isDownloading = true
-        downloadProgress = 0.0
+    private func installUpdate() {
+        isInstalling = true
         
         Task {
             do {
-                // Simulate download progress
-                for i in 1...10 {
-                    try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+                // Initialize Sparkle updater
+                UpdateService.initializeUpdater()
+                
+                // Try automatic installation first
+                let success = await UpdateService.installUpdate()
+                
+                if success {
+                    // Update installed successfully, app will restart automatically
                     await MainActor.run {
-                        downloadProgress = Double(i) / 10.0
+                        isInstalling = false
+                        dismiss()
                     }
-                }
-                
-                // Download the update
-                guard let downloadedURL = await UpdateService.downloadUpdate(from: updateInfo.downloadUrl) else {
+                } else {
+                    // Fallback to manual installation
                     await MainActor.run {
-                        errorMessage = "Failed to download the update. Please check your internet connection and try again."
-                        showError = true
-                        isDownloading = false
-                    }
-                    return
-                }
-                
-                // Install the update
-                let success = await UpdateService.installUpdate(from: downloadedURL)
-                
-                await MainActor.run {
-                    isDownloading = false
-                    
-                    if success {
-                        // Show installation instructions before closing
-                        showInstallationAlert = true
-                    } else {
-                        errorMessage = "Failed to open the installer. Please install the update manually by opening the downloaded DMG file."
+                        isInstalling = false
+                        errorMessage = "Automatic installation failed. Please download and install the update manually from GitHub."
                         showError = true
                     }
                 }
                 
             } catch {
                 await MainActor.run {
+                    isInstalling = false
                     errorMessage = "An error occurred: \(error.localizedDescription)"
                     showError = true
-                    isDownloading = false
                 }
             }
         }

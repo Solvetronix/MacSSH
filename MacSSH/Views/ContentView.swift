@@ -32,11 +32,7 @@ struct ContentView: View {
         .sheet(isPresented: $viewModel.showingPermissionsManager) {
             PermissionsManagerView()
         }
-        .sheet(isPresented: $viewModel.showingUpdateView) {
-            if let updateInfo = viewModel.updateInfo {
-                UpdateView(updateInfo: updateInfo)
-            }
-        }
+        // Sparkle handles update UI automatically - no need for custom sheet
         .alert("Permissions Required", isPresented: $viewModel.showingPermissionsWarning) {
             Button("Open Permissions Manager") {
                 viewModel.showingPermissionsManager = true

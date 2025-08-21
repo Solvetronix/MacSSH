@@ -303,6 +303,24 @@ MacSSH/
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## 📚 Documentation
+
+### Developer Documentation
+- **[📋 Instructions Catalog](INSTRUCTIONS_CATALOG.md)** - Complete catalog of all instructions and documentation
+- **[🚀 Quick Version Fix](docs/QUICK_VERSION_FIX.md)** - Quick fix for application version problem
+- **[🔧 Version Management](docs/VERSION_MANAGEMENT_GUIDE.md)** - Detailed guide for version management
+- **[⚡ Automatic Updates](docs/AUTOMATIC_UPDATE_GUIDE.md)** - Automatic update system
+- **[🔧 Sparkle Setup](docs/SPARKLE_SETUP.md)** - Sparkle Framework setup
+- **[🚀 GitHub Release Guide](docs/GITHUB_RELEASE_GUIDE.md)** - Creating releases with GitHub CLI (⚠️ CRITICAL: version management)
+
+### Release Documentation
+- **[📦 Release Notes](docs/releases/)** - Release notes
+- **[🎯 Release Instructions](docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md)** - Release creation instructions
+
+### Troubleshooting
+- **[🔐 Permissions Fix](PERMISSIONS_FIX.md)** - macOS permissions troubleshooting
+- **[⚡ Update System](UPDATE_SYSTEM.md)** - Update system information
+
 ## Support
 
 If you have questions or suggestions, create an Issue in the repository. 

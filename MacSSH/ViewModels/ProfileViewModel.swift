@@ -11,8 +11,7 @@ class ProfileViewModel: ObservableObject {
     @Published var showingPermissionsManager = false
     
     // Update properties
-    @Published var showingUpdateView = false
-    @Published var updateInfo: UpdateInfo?
+    // Sparkle handles update UI automatically - no need for these properties
     @Published var isCheckingForUpdates = false
     
     // SFTP properties
@@ -43,6 +42,13 @@ class ProfileViewModel: ObservableObject {
     init() {
         loadProfiles()
         checkPermissionsOnStartup()
+        
+        // Set up update service logging
+        UpdateService.logCallback = { [weak self] message in
+            DispatchQueue.main.async {
+                self?.connectionLog.append(message)
+            }
+        }
     }
     
     /// Создает копию ProfileViewModel для файлового менеджера
@@ -561,87 +567,99 @@ class ProfileViewModel: ObservableObject {
     
     /// Check for available updates
     func checkForUpdates() async {
-        print("📝 [ProfileViewModel] Starting update check...")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] [ProfileViewModel] Starting update check...")
+        
+        await MainActor.run {
+            connectionLog.append("🔄 [\(timestamp)] [ProfileViewModel] Starting update check...")
+        }
+        
+        // Initialize Sparkle updater if not already done
+        UpdateService.initializeUpdater()
         
         // Check if we've already checked recently (within 1 hour)
         let lastCheckKey = "LastUpdateCheck"
         let lastCheck = UserDefaults.standard.object(forKey: lastCheckKey) as? Date ?? Date.distantPast
         let timeSinceLastCheck = Date().timeIntervalSince(lastCheck)
         
+        await MainActor.run {
+            connectionLog.append("⏰ [\(timestamp)] [ProfileViewModel] Last check: \(lastCheck), Time since: \(timeSinceLastCheck) seconds")
+        }
+        
         // Only check if it's been more than 1 hour since last check
         if timeSinceLastCheck < 3600 { // 1 hour in seconds
-            print("📝 [ProfileViewModel] Skipping update check - checked recently")
+            print("📝 [\(timestamp)] [ProfileViewModel] Skipping update check - checked recently")
+            await MainActor.run {
+                connectionLog.append("⏭️ [\(timestamp)] [ProfileViewModel] Skipping update check - checked recently (\(timeSinceLastCheck) seconds ago)")
+            }
             return
         }
         
         await MainActor.run {
             isCheckingForUpdates = true
-            connectionLog.append("[blue]Checking for updates...")
+            connectionLog.append("🔍 [\(timestamp)] [ProfileViewModel] Using Sparkle update system...")
         }
         
-        if let update = await UpdateService.checkForUpdates() {
-            print("📝 [ProfileViewModel] Update found: \(update.version)")
-            
-            // Save the check time
-            UserDefaults.standard.set(Date(), forKey: lastCheckKey)
-            
-            if update.isNewer {
-                await MainActor.run {
-                    updateInfo = update
-                    showingUpdateView = true
-                    connectionLog.append("[green]✅ Update available: v\(update.version)")
-                }
-            } else {
-                await MainActor.run {
-                    connectionLog.append("[yellow]ℹ️ You already have the latest version (v\(update.version))")
-                }
-            }
-        } else {
-            await MainActor.run {
-                connectionLog.append("[red]❌ Failed to check for updates")
-            }
-        }
+        // Use only Sparkle for updates
+        print("📝 [\(timestamp)] [ProfileViewModel] Using Sparkle update system")
+        await UpdateService.checkForUpdates()
         
         await MainActor.run {
+            connectionLog.append("✅ [\(timestamp)] [ProfileViewModel] Sparkle update system activated")
             isCheckingForUpdates = false
         }
     }
     
     /// Force check for updates (ignores time restrictions)
     func forceCheckForUpdates() async {
-        print("📝 [ProfileViewModel] Force checking for updates...")
+        let timestamp = Date().timeIntervalSince1970
+        print("📝 [\(timestamp)] [ProfileViewModel] Force checking for updates...")
+        
+        await MainActor.run {
+            connectionLog.append("🚀 [\(timestamp)] [ProfileViewModel] Force checking for updates (ignoring time restrictions)...")
+        }
+        
+        // Initialize Sparkle updater if not already done
+        UpdateService.initializeUpdater()
         
         await MainActor.run {
             isCheckingForUpdates = true
-            connectionLog.append("[blue]Checking for updates...")
+            connectionLog.append("🔍 [\(timestamp)] [ProfileViewModel] Using Sparkle update system...")
         }
         
-        if let update = await UpdateService.checkForUpdates() {
-            print("📝 [ProfileViewModel] Update found: \(update.version)")
-            
-            // Save the check time
-            UserDefaults.standard.set(Date(), forKey: "LastUpdateCheck")
-            
-            if update.isNewer {
-                await MainActor.run {
-                    updateInfo = update
-                    showingUpdateView = true
-                    connectionLog.append("[green]✅ Update available: v\(update.version)")
-                }
-            } else {
-                await MainActor.run {
-                    connectionLog.append("[yellow]ℹ️ You already have the latest version (v\(update.version))")
-                }
-            }
-        } else {
-            await MainActor.run {
-                connectionLog.append("[red]❌ Failed to check for updates")
-            }
-        }
+        // Use only Sparkle for updates
+        print("📝 [\(timestamp)] [ProfileViewModel] Using Sparkle update system")
+        await UpdateService.checkForUpdates()
         
         await MainActor.run {
+            connectionLog.append("✅ [\(timestamp)] [ProfileViewModel] Sparkle update system activated")
             isCheckingForUpdates = false
         }
+    }
+    
+    /// Install update automatically
+    func installUpdate() async {
+        print("📝 [ProfileViewModel] Installing update...")
+        
+        await MainActor.run {
+            connectionLog.append("[blue]Installing update...")
+        }
+        
+        let success = await UpdateService.installUpdate()
+        
+        await MainActor.run {
+            if success {
+                connectionLog.append("[green]✅ Update installed successfully")
+                // App will restart automatically
+            } else {
+                connectionLog.append("[red]❌ Failed to install update")
+            }
+        }
+    }
+    
+    /// Show update window
+    func showUpdateWindow() {
+        UpdateService.showUpdateWindow()
     }
     
     /// Get current app version

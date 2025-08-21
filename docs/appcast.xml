@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>MacSSH Updates</title>
+        <description>Most recent updates to MacSSH</description>
+        <language>en</language>
+        
+        <item>
+            <title>MacSSH 1.8.4</title>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.4</h2>
+                <ul>
+                    <li>Complete GitHub CLI integration</li>
+                    <li>Automated release scripts</li>
+                    <li>Sparkle compatibility</li>
+                    <li>Digital signature support</li>
+                    <li>Enhanced developer experience</li>
+                </ul>
+            ]]></description>
+            <pubDate>Wed, 21 Aug 2025 22:11:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.4/MacSSH-1.8.4.dmg"
+                       sparkle:version="1.8.4"
+                       sparkle:os="macos"
+                       length="9602336"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+        
+        <item>
+            <title>MacSSH 1.8.2</title>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.2</h2>
+                <ul>
+                    <li>Fixed automatic update system</li>
+                    <li>Improved DMG handling</li>
+                    <li>Better user experience during installation</li>
+                    <li>Automatic update checks on launch</li>
+                    <li>Smart update frequency control</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 21 Aug 2025 12:00:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.2/MacSSH-1.8.2.dmg"
+                       sparkle:version="1.8.2"
+                       sparkle:os="macos"
+                       length="1152000"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+        
+        <item>
+            <title>MacSSH 1.8.1</title>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.1</h2>
+                <ul>
+                    <li>Fixed critical update system issues</li>
+                    <li>Improved installation process</li>
+                    <li>Better error handling</li>
+                    <li>Enhanced user feedback</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 20 Aug 2025 12:00:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.1/MacSSH-1.8.1.dmg"
+                       sparkle:version="1.8.1"
+                       sparkle:os="macos"
+                       length="1150000"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+        
+        <item>
+            <title>MacSSH 1.8.0</title>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.0</h2>
+                <ul>
+                    <li>Multiple file browser windows support</li>
+                    <li>Independent state management for each window</li>
+                    <li>Improved window title accuracy</li>
+                    <li>No more conflicts between different profiles</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 19 Aug 2025 12:00:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.0/MacSSH-1.8.0.dmg"
+                       sparkle:version="1.8.0"
+                       sparkle:os="macos"
+                       length="1148000"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+    </channel>
+</rss>
