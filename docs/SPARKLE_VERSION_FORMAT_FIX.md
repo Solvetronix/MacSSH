@@ -11,18 +11,29 @@ The application was showing "You're up to date!" even when a newer version was a
 
 ## Root Cause
 
-The issue was with the **incorrect format of `sparkle:version` in appcast.xml**.
+The issue was with the **incorrect format of `sparkle:version` in appcast.xml**. Sparkle uses `CFBundleVersion` (numeric) for version comparison, not `CFBundleShortVersionString` (string).
 
 **Wrong format (old):**
 ```xml
 <enclosure url="..." sparkle:version="1.8.6" .../>
 ```
 
-**Correct format (new):**
+**Also wrong (string version):**
 ```xml
 <item>
     <title>MacSSH 1.8.6</title>
     <sparkle:version>1.8.6</sparkle:version>
+    <description>...</description>
+    <enclosure url="..." .../>
+</item>
+```
+
+**Correct format (new):**
+```xml
+<item>
+    <title>MacSSH 1.8.6</title>
+    <sparkle:version>186</sparkle:version>
+    <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
     <description>...</description>
     <enclosure url="..." .../>
 </item>
@@ -53,7 +64,8 @@ According to the [official Sparkle documentation](https://sparkle-project.org/do
 ```xml
 <item>
     <title>MacSSH 1.8.6</title>
-    <sparkle:version>1.8.6</sparkle:version>
+    <sparkle:version>186</sparkle:version>
+    <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
     <description>...</description>
     <enclosure url="..." .../>
 </item>
@@ -76,9 +88,14 @@ After applying this fix:
 
 When creating new releases:
 
-1. **Always use the correct format** for `sparkle:version` as a top-level element
-2. **Follow the official Sparkle documentation** for appcast.xml structure
-3. **Test update detection** after publishing new versions
+1. **Always use numeric `sparkle:version`** that matches `CFBundleVersion` (e.g., 186 for version 1.8.5)
+2. **Use `sparkle:shortVersionString`** for human-readable version (e.g., 1.8.5)
+3. **Follow the official Sparkle documentation** for appcast.xml structure
+4. **Test update detection** after publishing new versions
+
+### Version Mapping
+- Version 1.8.5 → `sparkle:version` = 185, `sparkle:shortVersionString` = 1.8.5
+- Version 1.8.6 → `sparkle:version` = 186, `sparkle:shortVersionString` = 1.8.6
 
 ## Related Files
 
