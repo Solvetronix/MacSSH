@@ -9,9 +9,9 @@
     <key>CFBundleIdentifier</key>
     <string>solvetronix.macssh</string>
     	<key>CFBundleVersion</key>
-	<string>1.8.2</string>
+	<string>1.8.3</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.8.2</string>
+	<string>1.8.3</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSPrincipalClass</key>
@@ -20,5 +20,24 @@
     <string>Copyright © 2024 Dmitry Borisenko</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.developer-tools</string>
+    
+    <!-- Sparkle Framework Configuration -->
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml</string>
+    
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    
+    <key>SUEnableAutomaticDownloads</key>
+    <true/>
+    
+    <key>SUCheckInterval</key>
+    <integer>86400</integer>
+    
+    <key>SUEnableSystemProfiling</key>
+    <false/>
+    
+    <key>SUEnableLogging</key>
+    <true/>
 </dict>
 </plist> 
