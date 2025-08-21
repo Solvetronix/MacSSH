@@ -17,41 +17,52 @@ struct MacSSHApp: App {
                 .environmentObject(viewModel)
         }
         
+        // Окно файлового менеджера
         WindowGroup("File Browser", id: "fileBrowser") {
-            FileBrowserWindowContent(viewModel: viewModel)
+            FileBrowserWindowContent()
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 800, height: 600)
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         .handlesExternalEvents(matching: Set(arrayLiteral: "fileBrowser"))
+        .commands {
+            CommandGroup(replacing: .newItem) { }
+        }
     }
 }
 
 struct FileBrowserWindowContent: View {
-    @ObservedObject var viewModel: ProfileViewModel
+    @StateObject private var fileBrowserViewModel = ProfileViewModel()
+    @StateObject private var windowManager = WindowManager.shared
     
     var body: some View {
-        let timestamp = Date().timeIntervalSince1970
-        print("🕐 [\(timestamp)] FileBrowserWindow: Evaluating condition")
-        print("🕐 [\(timestamp)] FileBrowserWindow: viewModel.fileBrowserProfile: \(viewModel.fileBrowserProfile?.name ?? "nil")")
-        
-        if viewModel.fileBrowserProfile != nil {
-            print("🕐 [\(timestamp)] FileBrowserWindow: Rendering FileBrowserView")
-            return AnyView(FileBrowserView(viewModel: viewModel))
-        } else {
-            print("🕐 [\(timestamp)] FileBrowserWindow: Rendering 'No profile selected'")
-            return AnyView(VStack {
-                Text("No profile selected")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
-                Text("Please select a profile and click 'Open File Browser'")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        Group {
+            if let profile = windowManager.currentProfile {
+                FileBrowserView(viewModel: fileBrowserViewModel)
+                    .onAppear {
+                        let timestamp = Date().timeIntervalSince1970
+                        print("🕐 [\(timestamp)] FileBrowserWindow: Profile loaded: \(profile.name)")
+                        
+                        // Устанавливаем профиль и загружаем файлы
+                        fileBrowserViewModel.fileBrowserProfile = profile
+                        Task {
+                            await fileBrowserViewModel.openFileBrowser(for: profile)
+                        }
+                    }
+            } else {
+                VStack {
+                    Text("No profile selected")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("Please select a profile and click 'Open File Browser'")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity))
         }
     }
 }

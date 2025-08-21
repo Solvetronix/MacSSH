@@ -45,6 +45,13 @@ class ProfileViewModel: ObservableObject {
         checkPermissionsOnStartup()
     }
     
+    /// Создает копию ProfileViewModel для файлового менеджера
+    func createFileBrowserCopy() -> ProfileViewModel {
+        let copy = ProfileViewModel()
+        copy.profiles = self.profiles
+        return copy
+    }
+    
     deinit {
         // Останавливаем отслеживание всех файлов при закрытии приложения
         VSCodeService.stopWatchingAllFiles()
@@ -271,6 +278,15 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - SFTP Operations
     
+    /// Reset file browser state when switching profiles
+    func resetFileBrowserState() {
+        self.currentDirectory = "/"
+        self.remoteFiles.removeAll()
+        self.fileBrowserError = nil
+        self.selectedFileID = nil
+        self.connectionLog.removeAll()
+    }
+    
     /// Открыть файловый менеджер в отдельном окне
     func openFileBrowserWindow(for profile: Profile) {
         self.fileBrowserProfile = profile
@@ -282,7 +298,7 @@ class ProfileViewModel: ObservableObject {
         let timestamp = Date().timeIntervalSince1970
         print("📝 [\(timestamp)] ProfileViewModel: openFileBrowser STARTED")
         print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
-        print("📝 [\(timestamp)] ProfileViewModel: Current thread: \(Thread.isMainThread ? "Main" : "Background")")
+        print("📝 [\(timestamp)] ProfileViewModel: Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
         print("📝 [\(timestamp)] ProfileViewModel: Profile keyType: \(profile.keyType)")
         print("📝 [\(timestamp)] ProfileViewModel: Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
         print("📝 [\(timestamp)] ProfileViewModel: Profile username: \(profile.username)")
@@ -294,10 +310,8 @@ class ProfileViewModel: ObservableObject {
             print("📝 [\(timestamp)] ProfileViewModel: Setting UI state")
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
-            // By default, open root directory only if this is the first opening
-            if self.currentDirectory == "." || self.currentDirectory.isEmpty {
-                self.currentDirectory = "/"
-            }
+            // Reset to root directory for new profile
+            self.currentDirectory = "/"
             self.connectionLog.removeAll()
             self.connectionLog.append("[blue]Opening file browser for \(profile.host)...")
             print("📝 [\(timestamp)] ProfileViewModel: UI state set successfully")
@@ -346,7 +360,7 @@ class ProfileViewModel: ObservableObject {
         print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
         print("📝 [\(timestamp)] ProfileViewModel: Path: \(path)")
         print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
-        print("📝 [\(timestamp)] ProfileViewModel: Thread: \(Thread.isMainThread ? "Main" : "Background")")
+        print("📝 [\(timestamp)] ProfileViewModel: Thread: \(Thread.current.isMainThread ? "Main" : "Background")")
         print("📝 [\(timestamp)] ProfileViewModel: Stack trace:")
         Thread.callStackSymbols.prefix(10).forEach { symbol in
             print("📝 [\(timestamp)]   \(symbol)")

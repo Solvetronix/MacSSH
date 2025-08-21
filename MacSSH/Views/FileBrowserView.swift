@@ -27,6 +27,14 @@ struct FileBrowserView: View {
             }
         }
         .frame(minWidth: 600, minHeight: 400)
+        .onAppear {
+            // Ensure files are loaded for the current profile
+            if let profile = profile, viewModel.remoteFiles.isEmpty {
+                Task {
+                    await viewModel.openFileBrowser(for: profile)
+                }
+            }
+        }
     }
 }
 
@@ -113,6 +121,10 @@ struct FileBrowserHeader: View {
         }
         .onChange(of: viewModel.currentDirectory) { _ in
             // Keep the input in sync when navigation happens elsewhere
+            self.pathInput = viewModel.currentDirectory
+        }
+        .onChange(of: viewModel.fileBrowserProfile) { _ in
+            // Reset path input when profile changes
             self.pathInput = viewModel.currentDirectory
         }
     }

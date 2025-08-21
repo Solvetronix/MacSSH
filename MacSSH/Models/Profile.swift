@@ -7,7 +7,7 @@ enum SSHKeyType: String, Codable, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
-struct Profile: Identifiable, Codable {
+struct Profile: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
     var host: String
