@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import Sparkle
 
-class UpdateService {
+class UpdateService: NSObject, SPUUpdaterDelegate {
     private static let repositoryOwner = "Solvetronix"
     private static let repositoryName = "MacSSH"
     
@@ -10,6 +10,14 @@ class UpdateService {
     
     private static var updater: SPUUpdater?
     private static var updaterController: SPUStandardUpdaterController?
+    private static var updateServiceDelegate: UpdateService?
+    
+    // MARK: - SPUUpdaterDelegate
+    
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Providing feed URL dynamically")
+        return "https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml"
+    }
     
     // MARK: - Logging
     
@@ -31,8 +39,9 @@ class UpdateService {
         
         log("🔧 Initializing Sparkle updater...")
         
-        // Create the updater controller
-        updaterController = SPUStandardUpdaterController(updaterDelegate: nil, userDriverDelegate: nil)
+        // Create the updater controller with our delegate
+        updateServiceDelegate = UpdateService()
+        updaterController = SPUStandardUpdaterController(updaterDelegate: updateServiceDelegate, userDriverDelegate: nil)
         updater = updaterController?.updater
         
         if let updater = updater {
@@ -56,26 +65,7 @@ class UpdateService {
             if let feedURL = updater.feedURL {
                 log("🔗 Feed URL: \(feedURL)")
             } else {
-                log("⚠️ No feed URL configured - this is a problem!")
-                log("🔧 Trying to manually set feed URL...")
-                
-                // Try to manually set the feed URL
-                let appcastURL = URL(string: "https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml")
-                if let url = appcastURL {
-                    log("🔧 Setting feed URL to: \(url)")
-                    
-                    // In Sparkle 2.x, we need to set the feed URL programmatically
-                    // because it doesn't always read from Info.plist correctly
-                    updater.setFeedURL(url)
-                    log("✅ Feed URL set programmatically")
-                    
-                    // Verify it was set
-                    if let newFeedURL = updater.feedURL {
-                        log("✅ Feed URL now configured: \(newFeedURL)")
-                    } else {
-                        log("❌ Failed to set feed URL programmatically")
-                    }
-                }
+                log("⚠️ No feed URL configured - will be provided by delegate")
             }
             
             // Verify Info.plist has the correct URL
@@ -109,28 +99,9 @@ class UpdateService {
             log("⏰ Last update check: \(updater.lastUpdateCheckDate?.description ?? "Never")")
             log("🔄 Update check interval: \(updater.updateCheckInterval) seconds")
             
-            // Additional diagnostics and fix
+            // Additional diagnostics
             if updater.feedURL == nil {
-                log("🔧 Checking Info.plist for SUFeedURL...")
-                if let infoPlistPath = Bundle.main.path(forResource: "Info", ofType: "plist"),
-                   let infoPlist = NSDictionary(contentsOfFile: infoPlistPath),
-                   let feedURL = infoPlist["SUFeedURL"] as? String {
-                    log("📋 Found SUFeedURL in Info.plist: \(feedURL)")
-                    
-                    // Try to set it programmatically
-                    if let url = URL(string: feedURL) {
-                        log("🔧 Setting feed URL programmatically...")
-                        updater.setFeedURL(url)
-                        
-                        if let newFeedURL = updater.feedURL {
-                            log("✅ Feed URL now configured: \(newFeedURL)")
-                        } else {
-                            log("❌ Failed to set feed URL programmatically")
-                        }
-                    }
-                } else {
-                    log("❌ SUFeedURL not found in Info.plist!")
-                }
+                log("🔧 Feed URL will be provided by delegate when needed")
             }
         }
         
