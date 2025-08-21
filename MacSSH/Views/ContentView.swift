@@ -98,7 +98,7 @@ struct ConnectionListView: View {
                     Menu {
                         Button("Check for Updates") {
                             Task {
-                                await viewModel.checkForUpdates()
+                                await viewModel.forceCheckForUpdates()
                             }
                         }
                         .disabled(viewModel.isCheckingForUpdates)

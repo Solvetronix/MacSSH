@@ -4,7 +4,6 @@ import AppKit
 class UpdateService {
     private static let repositoryOwner = "Solvetronix" // Replace with your GitHub username
     private static let repositoryName = "MacSSH" // Replace with your repository name
-    // Removed cached version - will read dynamically
     
     /// Checks for available updates from GitHub
     static func checkForUpdates() async -> UpdateInfo? {
@@ -51,12 +50,8 @@ class UpdateService {
             let releaseVersion = release.tagName.replacingOccurrences(of: "v", with: "")
             let isNewer = compareVersions(releaseVersion, currentVersion) > 0
             
-            // Check if this is actually a newer version
-            let alwaysShowUpdate = false // MODIFIED: Disabled for normal operation
-            
             print("📝 [UpdateService] Release version: \(releaseVersion)")
             print("📝 [UpdateService] Is newer: \(isNewer)")
-            print("📝 [UpdateService] Always show update (testing): \(alwaysShowUpdate)")
             
             let dateFormatter = ISO8601DateFormatter()
             let publishedDate = dateFormatter.date(from: release.publishedAt) ?? Date()
@@ -65,7 +60,7 @@ class UpdateService {
                 version: releaseVersion,
                 downloadUrl: dmgAsset.browserDownloadUrl,
                 releaseNotes: release.body,
-                isNewer: isNewer, // FIXED: Use actual version comparison
+                isNewer: isNewer,
                 publishedAt: publishedDate
             )
             
@@ -105,7 +100,7 @@ class UpdateService {
         }
     }
     
-    /// Installs the downloaded update
+    /// Installs the downloaded update using proper macOS installation method
     static func installUpdate(from fileURL: URL) async -> Bool {
         print("🔍 [UpdateService] Starting update installation...")
         print("🔍 [UpdateService] File URL: \(fileURL.path)")
@@ -119,113 +114,35 @@ class UpdateService {
             
             print("✅ [UpdateService] DMG file exists")
             
-            // Mount the .dmg file
-            let mountProcess = Process()
-            mountProcess.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-            mountProcess.arguments = ["attach", fileURL.path, "-nobrowse"]
+            // Use NSWorkspace to open the DMG file
+            // This will trigger the standard macOS installation process
+            let success = NSWorkspace.shared.open(fileURL)
             
-            let mountPipe = Pipe()
-            mountProcess.standardOutput = mountPipe
-            mountProcess.standardError = mountPipe
-            
-            try mountProcess.run()
-            mountProcess.waitUntilExit()
-            
-            let mountOutput = String(data: mountPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            print("🔍 [UpdateService] Mount output: \(mountOutput)")
-            print("🔍 [UpdateService] Mount exit code: \(mountProcess.terminationStatus)")
-            
-            guard mountProcess.terminationStatus == 0 else {
-                print("❌ [UpdateService] Failed to mount DMG")
-                return false
-            }
-            
-            // Extract volume path from output
-            let lines = mountOutput.components(separatedBy: .newlines)
-            var volumePath: String?
-            
-            for line in lines {
-                if line.contains("/Volumes/") && line.contains("MacSSH") {
-                    let components = line.components(separatedBy: .whitespaces)
-                    for component in components {
-                        if component.hasPrefix("/Volumes/") {
-                            volumePath = component
-                            break
-                        }
-                    }
-                    break
+            if success {
+                print("✅ [UpdateService] Successfully opened DMG file with NSWorkspace")
+                
+                // Wait a bit for the DMG to mount and user to see the installation dialog
+                try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+                
+                // Show a helpful message to the user
+                await MainActor.run {
+                    showInstallationInstructions()
                 }
-            }
-            
-            guard let volumePath = volumePath else {
-                print("❌ [UpdateService] Could not find mounted volume")
-                return false
-            }
-            
-            print("🔍 [UpdateService] Found volume: \(volumePath)")
-            
-            // Copy the new app to Applications
-            let sourceAppPath = "\(volumePath)/MacSSH.app"
-            let destAppPath = "/Applications/MacSSH.app"
-            
-            // Check if source app exists
-            guard FileManager.default.fileExists(atPath: sourceAppPath) else {
-                print("❌ [UpdateService] Source app does not exist: \(sourceAppPath)")
-                return false
-            }
-            
-            print("✅ [UpdateService] Source app exists")
-            
-            // Remove old app first (only if it exists)
-            if FileManager.default.fileExists(atPath: destAppPath) {
-                let removeProcess = Process()
-                removeProcess.executableURL = URL(fileURLWithPath: "/bin/rm")
-                removeProcess.arguments = ["-rf", destAppPath]
                 
-                try removeProcess.run()
-                removeProcess.waitUntilExit()
+                // Wait a bit more before exiting
+                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                 
-                print("🔍 [UpdateService] Removed old app, exit code: \(removeProcess.terminationStatus)")
+                // Exit the current app to allow installation
+                await MainActor.run {
+                    print("🔍 [UpdateService] Exiting application for installation...")
+                    NSApplication.shared.terminate(nil)
+                }
+                
+                return true
             } else {
-                print("🔍 [UpdateService] No old app to remove")
-            }
-            
-            // Copy new app
-            let copyProcess = Process()
-            copyProcess.executableURL = URL(fileURLWithPath: "/bin/cp")
-            copyProcess.arguments = ["-R", sourceAppPath, destAppPath]
-            
-            try copyProcess.run()
-            copyProcess.waitUntilExit()
-            
-            print("🔍 [UpdateService] Copy process exit code: \(copyProcess.terminationStatus)")
-            
-            // Verify copy was successful
-            guard FileManager.default.fileExists(atPath: destAppPath) else {
-                print("❌ [UpdateService] Failed to copy app to Applications")
+                print("❌ [UpdateService] Failed to open DMG file with NSWorkspace")
                 return false
             }
-            
-            print("✅ [UpdateService] Successfully copied new app")
-            
-            // Unmount the volume
-            let unmountProcess = Process()
-            unmountProcess.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-            unmountProcess.arguments = ["detach", volumePath]
-            
-            try unmountProcess.run()
-            unmountProcess.waitUntilExit()
-            
-            print("🔍 [UpdateService] Unmounted volume, exit code: \(unmountProcess.terminationStatus)")
-            
-            // Wait a bit for file system to settle
-            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-            
-            // Restart the application
-            print("🔍 [UpdateService] Restarting application...")
-            await restartApplication()
-            
-            return true
             
         } catch {
             print("❌ [UpdateService] Error installing update: \(error)")
@@ -233,63 +150,22 @@ class UpdateService {
         }
     }
     
-    /// Restarts the current application
-    private static func restartApplication() async {
-        print("🔍 [UpdateService] Preparing to restart application...")
+    /// Shows installation instructions to the user
+    private static func showInstallationInstructions() {
+        let alert = NSAlert()
+        alert.messageText = "Installation Instructions"
+        alert.informativeText = """
+        The DMG file has been opened. To complete the installation:
         
-        // Check if the new app exists in Applications
-        let newAppPath = "/Applications/MacSSH.app"
-        guard FileManager.default.fileExists(atPath: newAppPath) else {
-            print("❌ [UpdateService] New app does not exist at: \(newAppPath)")
-            return
-        }
+        1. Drag MacSSH to your Applications folder
+        2. Replace the existing version if prompted
+        3. Launch MacSSH from Applications
         
-        print("✅ [UpdateService] New app exists at: \(newAppPath)")
-        
-        // Create a script to restart the app
-        let script = """
-        #!/bin/bash
-        echo "Starting MacSSH restart script..."
-        sleep 2
-        echo "Opening MacSSH from Applications..."
-        open "/Applications/MacSSH.app"
-        echo "MacSSH restart script completed"
+        This app will now close to allow the installation.
         """
-        
-        let tempScriptURL = FileManager.default.temporaryDirectory.appendingPathComponent("restart_app.sh")
-        
-        do {
-            try script.write(to: tempScriptURL, atomically: true, encoding: .utf8)
-            print("🔍 [UpdateService] Created restart script at: \(tempScriptURL.path)")
-            
-            // Make script executable
-            let chmodProcess = Process()
-            chmodProcess.executableURL = URL(fileURLWithPath: "/bin/chmod")
-            chmodProcess.arguments = ["+x", tempScriptURL.path]
-            try chmodProcess.run()
-            chmodProcess.waitUntilExit()
-            
-            print("🔍 [UpdateService] Made script executable, exit code: \(chmodProcess.terminationStatus)")
-            
-            // Run the restart script
-            let restartProcess = Process()
-            restartProcess.executableURL = tempScriptURL
-            try restartProcess.run()
-            
-            print("✅ [UpdateService] Restart script executed")
-            
-            // Wait a bit before exiting
-            try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-            
-            // Exit the current app
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("🔍 [UpdateService] Exiting application...")
-                NSApplication.shared.terminate(nil)
-            }
-            
-        } catch {
-            print("❌ [UpdateService] Error creating restart script: \(error)")
-        }
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
     
     /// Compares two version strings

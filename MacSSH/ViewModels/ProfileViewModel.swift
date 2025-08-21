@@ -563,6 +563,17 @@ class ProfileViewModel: ObservableObject {
     func checkForUpdates() async {
         print("📝 [ProfileViewModel] Starting update check...")
         
+        // Check if we've already checked recently (within 1 hour)
+        let lastCheckKey = "LastUpdateCheck"
+        let lastCheck = UserDefaults.standard.object(forKey: lastCheckKey) as? Date ?? Date.distantPast
+        let timeSinceLastCheck = Date().timeIntervalSince(lastCheck)
+        
+        // Only check if it's been more than 1 hour since last check
+        if timeSinceLastCheck < 3600 { // 1 hour in seconds
+            print("📝 [ProfileViewModel] Skipping update check - checked recently")
+            return
+        }
+        
         await MainActor.run {
             isCheckingForUpdates = true
             connectionLog.append("[blue]Checking for updates...")
@@ -570,6 +581,46 @@ class ProfileViewModel: ObservableObject {
         
         if let update = await UpdateService.checkForUpdates() {
             print("📝 [ProfileViewModel] Update found: \(update.version)")
+            
+            // Save the check time
+            UserDefaults.standard.set(Date(), forKey: lastCheckKey)
+            
+            if update.isNewer {
+                await MainActor.run {
+                    updateInfo = update
+                    showingUpdateView = true
+                    connectionLog.append("[green]✅ Update available: v\(update.version)")
+                }
+            } else {
+                await MainActor.run {
+                    connectionLog.append("[yellow]ℹ️ You already have the latest version (v\(update.version))")
+                }
+            }
+        } else {
+            await MainActor.run {
+                connectionLog.append("[red]❌ Failed to check for updates")
+            }
+        }
+        
+        await MainActor.run {
+            isCheckingForUpdates = false
+        }
+    }
+    
+    /// Force check for updates (ignores time restrictions)
+    func forceCheckForUpdates() async {
+        print("📝 [ProfileViewModel] Force checking for updates...")
+        
+        await MainActor.run {
+            isCheckingForUpdates = true
+            connectionLog.append("[blue]Checking for updates...")
+        }
+        
+        if let update = await UpdateService.checkForUpdates() {
+            print("📝 [ProfileViewModel] Update found: \(update.version)")
+            
+            // Save the check time
+            UserDefaults.standard.set(Date(), forKey: "LastUpdateCheck")
             
             if update.isNewer {
                 await MainActor.run {

@@ -15,6 +15,14 @@ struct MacSSHApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
+                .onAppear {
+                    // Check for updates automatically on app launch
+                    Task {
+                        // Wait a bit for the app to fully load
+                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                        await viewModel.checkForUpdates()
+                    }
+                }
         }
         
         // Окно файлового менеджера

@@ -6,6 +6,7 @@ struct UpdateView: View {
     @State private var downloadProgress: Double = 0.0
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showInstallationAlert = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -112,6 +113,21 @@ struct UpdateView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert("Installation Instructions", isPresented: $showInstallationAlert) {
+            Button("OK") {
+                // App will close automatically after this
+            }
+        } message: {
+            Text("""
+            The DMG file has been opened. To complete the installation:
+            
+            1. Drag MacSSH to your Applications folder
+            2. Replace the existing version if prompted
+            3. Launch MacSSH from Applications
+            
+            This app will now close to allow the installation.
+            """)
+        }
     }
     
     private func downloadAndInstall() {
@@ -131,7 +147,7 @@ struct UpdateView: View {
                 // Download the update
                 guard let downloadedURL = await UpdateService.downloadUpdate(from: updateInfo.downloadUrl) else {
                     await MainActor.run {
-                        errorMessage = "Failed to download the update. Please try again."
+                        errorMessage = "Failed to download the update. Please check your internet connection and try again."
                         showError = true
                         isDownloading = false
                     }
@@ -145,9 +161,10 @@ struct UpdateView: View {
                     isDownloading = false
                     
                     if success {
-                        dismiss()
+                        // Show installation instructions before closing
+                        showInstallationAlert = true
                     } else {
-                        errorMessage = "Failed to install the update. Please install it manually."
+                        errorMessage = "Failed to open the installer. Please install the update manually by opening the downloaded DMG file."
                         showError = true
                     }
                 }
