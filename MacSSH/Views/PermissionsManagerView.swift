@@ -11,7 +11,7 @@ struct PermissionsManagerView: View {
             // Заголовок
             HStack {
                 Text("SSH Tools Manager")
-                    .font(.title2)
+                    .font(.headline)
                     .fontWeight(.bold)
                 
                 Spacer()
@@ -20,13 +20,14 @@ struct PermissionsManagerView: View {
                     dismiss()
                 }
                 .buttonStyle(.plain)
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(.secondary)
-                .frame(width: 30, height: 30)
+                .frame(width: 24, height: 24)
                 .background(Color.gray.opacity(0.1))
                 .clipShape(Circle())
             }
-            .padding()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(Color.gray.opacity(0.05))
             .onAppear {
                 // Автоматически проверяем инструменты при открытии
@@ -42,14 +43,15 @@ struct PermissionsManagerView: View {
             
             // Основной контент
             ScrollView {
-                VStack(spacing: 16) {
-                                        // Заголовок
+                VStack(spacing: 8) {
+                    // Заголовок
                     Text("SSH Tools Status")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundColor(.primary)
                     
                     // Статус SSH инструментов
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
                         if permissionsCheck.isEmpty {
                             Text("Loading tools status...")
                                 .foregroundColor(.secondary)
@@ -61,9 +63,9 @@ struct PermissionsManagerView: View {
                                         installPackage(from: line)
                                     }) {
                                         Text(line)
-                                            .font(.system(.caption, design: .monospaced))
+                                            .font(.system(size: 11, design: .monospaced))
                                             .foregroundColor(.orange)
-                                            .padding(.vertical, 1)
+                                            .padding(.vertical, 0.5)
                                     }
                                     .buttonStyle(.plain)
                                 } else if line.contains("⚠️") && line.contains("Grant Full Disk Access") {
@@ -72,37 +74,40 @@ struct PermissionsManagerView: View {
                                         PermissionsService.requestFullDiskAccess()
                                     }) {
                                         Text(line)
-                                            .font(.system(.caption, design: .monospaced))
+                                            .font(.system(size: 11, design: .monospaced))
                                             .foregroundColor(.orange)
-                                            .padding(.vertical, 1)
+                                            .padding(.vertical, 0.5)
                                     }
                                     .buttonStyle(.plain)
                                 } else {
                                     Text(line)
-                                        .font(.system(.caption, design: .monospaced))
+                                        .font(.system(size: 11, design: .monospaced))
                                         .foregroundColor(line.contains("❌") ? .red : 
                                                        line.contains("✅") ? .green : 
                                                        line.contains("⚠️") ? .orange : 
                                                        line.contains("===") ? .blue : .primary)
-                                        .padding(.vertical, 1)
+                                        .padding(.vertical, 0.5)
                                 }
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
                     .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
+                    .cornerRadius(6)
                 }
-                .padding()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
             
             // Кнопки внизу - всегда видимые
-            HStack {
+            HStack(spacing: 8) {
                 Button("Check Tools") {
                     permissionsCheck = SSHService.checkAllPermissions()
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 
                 Button("Force Check Permissions") {
                     let hasAccess = PermissionsService.forceCheckPermissions()
@@ -119,11 +124,13 @@ struct PermissionsManagerView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 
                 Button("Show Instructions") {
                     showingInstructions = true
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 
                 Button("Request Full Disk Access") {
                     PermissionsService.requestFullDiskAccess()
@@ -133,12 +140,14 @@ struct PermissionsManagerView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .disabled(PermissionsService.forceCheckPermissions())
                 
                 Button("Close") {
                     dismiss()
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
                 
                 Spacer()
                 
@@ -147,10 +156,11 @@ struct PermissionsManagerView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
-            .padding()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(Color.gray.opacity(0.05))
         }
-        .frame(width: 550, height: 600)
+        .frame(width: 480, height: 450)
         .background(Color.white)
         .onKeyPress(.escape) {
             dismiss()

@@ -138,25 +138,8 @@ struct ConnectionListView: View {
         }, message: {
             Text("This action cannot be undone.")
         })
-        .alert("About MacSSH", isPresented: $showingAboutDialog) {
-            Button("OK") { }
-        } message: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("MacSSH Terminal")
-                    .font(.headline)
-                Text("Version \(viewModel.getCurrentVersion())")
-                    .font(.subheadline)
-                Text("SSH connection manager with file browser and VS Code integration")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text("")
-                Text("Looking for developers to help improve this app!")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-                Text("Visit GitHub to contribute")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
+        .sheet(isPresented: $showingAboutDialog) {
+            AboutView(viewModel: viewModel)
         }
     }
 }
@@ -452,6 +435,102 @@ struct HoverableIcon: View {
         }
         .onHover { hovering in
             isHovered = hovering
+        }
+    }
+}
+
+struct AboutView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: ProfileViewModel
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Header
+            HStack {
+                Text("About MacSSH")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Button("✕") {
+                    dismiss()
+                }
+                .buttonStyle(.plain)
+                .font(.title2)
+                .foregroundColor(.secondary)
+                .frame(width: 30, height: 30)
+                .background(Color.gray.opacity(0.1))
+                .clipShape(Circle())
+            }
+            .padding()
+            .background(Color.gray.opacity(0.05))
+            
+            // Content
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("MacSSH Terminal")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("Version \(viewModel.getCurrentVersion())")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Professional SSH connection manager for macOS")
+                        .font(.body)
+                        .fontWeight(.medium)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        FeatureRow(icon: "lock.shield", text: "Secure SSH connections with password and key authentication")
+                        FeatureRow(icon: "folder", text: "Integrated file browser with SFTP support")
+                        FeatureRow(icon: "chevron.left.forwardslash.chevron.right", text: "VS Code integration for remote development")
+                        FeatureRow(icon: "arrow.clockwise", text: "Automatic updates via Sparkle")
+                        FeatureRow(icon: "list.bullet.clipboard", text: "Centralized logging system")
+                    }
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Looking for developers to help improve this app!")
+                        .font(.body)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                    
+                    Text("Visit GitHub to contribute and report issues")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            
+            Spacer()
+        }
+        .frame(width: 480, height: 400)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.blue)
+                .frame(width: 16)
+            
+            Text(text)
+                .font(.body)
+                .foregroundColor(.primary)
+            
+            Spacer()
         }
     }
 }
