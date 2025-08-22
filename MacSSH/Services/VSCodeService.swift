@@ -18,23 +18,29 @@ class VSCodeService {
         print("=== VSCodeService: checkVSCodeAvailability STARTED ===")
         
         let possiblePaths = [
-            "/usr/local/bin/code",
-            "/opt/homebrew/bin/code",
-            "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
-            "/Applications/Cursor.app/Contents/Resources/app/bin/code"
+            ("/usr/local/bin/code", "Homebrew (Intel)"),
+            ("/opt/homebrew/bin/code", "Homebrew (Apple Silicon)"),
+            ("/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code", "VS Code"),
+            ("/Applications/Cursor.app/Contents/Resources/app/bin/code", "Cursor")
         ]
         
+        var foundEditors: [String] = []
+        
         print("=== VSCodeService: Checking possible paths ===")
-        for path in possiblePaths {
+        for (path, name) in possiblePaths {
             let exists = FileManager.default.fileExists(atPath: path)
-            print("Path: \(path) - Exists: \(exists)")
+            print("Path: \(path) (\(name)) - Exists: \(exists)")
             if exists {
-                print("=== VSCodeService: Found VS Code/Cursor at \(path) ===")
-                return true
+                foundEditors.append(name)
             }
         }
         
-        print("=== VSCodeService: No VS Code found in paths, checking with which ===")
+        if !foundEditors.isEmpty {
+            print("=== VSCodeService: Found editors: \(foundEditors.joined(separator: ", ")) ===")
+            return true
+        }
+        
+        print("=== VSCodeService: No editors found in paths, checking with which ===")
         // Проверяем через which
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
@@ -48,7 +54,13 @@ class VSCodeService {
             try process.run()
             process.waitUntilExit()
             let result = process.terminationStatus == 0
-            print("=== VSCodeService: which command result: \(result) ===")
+            if result {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                print("=== VSCodeService: Found code command at: \(output) ===")
+            } else {
+                print("=== VSCodeService: which command result: false ===")
+            }
             return result
         } catch {
             print("=== VSCodeService: which command failed: \(error.localizedDescription) ===")

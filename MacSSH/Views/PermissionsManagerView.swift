@@ -1,10 +1,27 @@
 import SwiftUI
 import AppKit
 
+// Структура для отслеживания статуса каждой проверки
+struct CheckItem: Identifiable {
+    let id = UUID()
+    let name: String
+    let category: String
+    var status: CheckStatus = .pending
+    var details: String = ""
+    
+    enum CheckStatus {
+        case pending
+        case checking
+        case success
+        case failed
+    }
+}
+
 struct PermissionsManagerView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var permissionsCheck: [String] = []
+    @State private var checkItems: [CheckItem] = []
     @State private var showingInstructions = false
+    @State private var isChecking = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -30,72 +47,45 @@ struct PermissionsManagerView: View {
             .padding(.vertical, 8)
             .background(Color.gray.opacity(0.05))
             .onAppear {
-                // Автоматически проверяем инструменты при открытии
-                permissionsCheck = SSHService.checkAllPermissions()
-                
-                // Если Full Disk Access не предоставлен, показываем предупреждение
-                if !PermissionsService.forceCheckPermissions() {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        PermissionsService.requestFullDiskAccess()
-                    }
+                // Автоматически проверяем инструменты при открытии асинхронно
+                Task {
+                    await performInitialCheck()
                 }
             }
             
             // Основной контент
             ScrollView {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     // Заголовок
                     Text("SSH Tools Status")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                     
-                    // Статус SSH инструментов
-                    VStack(alignment: .leading, spacing: 6) {
-                        if permissionsCheck.isEmpty {
-                            Text("Loading tools status...")
-                                .foregroundColor(.secondary)
-                        } else {
-                            ForEach(permissionsCheck, id: \.self) { line in
-                                if line.contains("⚠️") && line.contains("Install") {
-                                    // Кликабельные строки для установки
-                                    Button(action: {
-                                        installPackage(from: line)
-                                    }) {
-                                        Text(line)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(.orange)
-                                            .padding(.vertical, 0.5)
-                                    }
-                                    .buttonStyle(.plain)
-                                } else if line.contains("⚠️") && line.contains("Grant Full Disk Access") {
-                                    // Кликабельная строка для запроса Full Disk Access
-                                    Button(action: {
-                                        PermissionsService.requestFullDiskAccess()
-                                    }) {
-                                        Text(line)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(.orange)
-                                            .padding(.vertical, 0.5)
-                                    }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    Text(line)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(line.contains("❌") ? .red : 
-                                                       line.contains("✅") ? .green : 
-                                                       line.contains("⚠️") ? .orange : 
-                                                       line.contains("===") ? .blue : .primary)
-                                        .padding(.vertical, 0.5)
-                                }
-                            }
+                    // Проверки по категориям
+                    if checkItems.isEmpty && !isChecking {
+                        Text("Click 'Check Tools' to start verification")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 12))
+                    } else {
+                        // System Permissions
+                        let systemItems = checkItems.filter { $0.category == "System Permissions" }
+                        if !systemItems.isEmpty {
+                            CategorySection(title: "System Permissions", items: systemItems)
+                        }
+                        
+                        // SSH Tools
+                        let sshItems = checkItems.filter { $0.category == "SSH Tools" }
+                        if !sshItems.isEmpty {
+                            CategorySection(title: "Required SSH Tools", items: sshItems)
+                        }
+                        
+                        // Actions Needed
+                        let actionItems = checkItems.filter { $0.category == "Actions" && $0.status == .failed }
+                        if !actionItems.isEmpty {
+                            CategorySection(title: "Actions Needed", items: actionItems)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(6)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -104,27 +94,22 @@ struct PermissionsManagerView: View {
             // Кнопки внизу - всегда видимые
             HStack(spacing: 8) {
                 Button("Check Tools") {
-                    permissionsCheck = SSHService.checkAllPermissions()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                
-                Button("Force Check Permissions") {
-                    let hasAccess = PermissionsService.forceCheckPermissions()
-                    if hasAccess {
-                        permissionsCheck = SSHService.checkAllPermissions()
-                    } else {
-                        // Показываем предупреждение
-                        let alert = NSAlert()
-                        alert.messageText = "Permissions Check"
-                        alert.informativeText = "Full Disk Access is still not granted. Please check System Settings."
-                        alert.alertStyle = .warning
-                        alert.addButton(withTitle: "OK")
-                        alert.runModal()
+                    Task {
+                        await performCheck()
                     }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .disabled(isChecking)
+                
+                Button("Force Check Permissions") {
+                    Task {
+                        await performForceCheck()
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isChecking)
                 
                 Button("Show Instructions") {
                     showingInstructions = true
@@ -133,15 +118,13 @@ struct PermissionsManagerView: View {
                 .controlSize(.small)
                 
                 Button("Request Full Disk Access") {
-                    PermissionsService.requestFullDiskAccess()
-                    // Обновляем статус после запроса
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        permissionsCheck = SSHService.checkAllPermissions()
+                    Task {
+                        await performRequestAccess()
                     }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(PermissionsService.forceCheckPermissions())
+                .disabled(PermissionsService.forceCheckPermissions() || isChecking)
                 
                 Button("Close") {
                     dismiss()
@@ -167,7 +150,7 @@ struct PermissionsManagerView: View {
             return .handled
         }
         .sheet(isPresented: $showingInstructions) {
-            DetailedInstructionsView(permissionsCheck: permissionsCheck)
+            DetailedInstructionsView(checkItems: checkItems)
         }
     }
     
@@ -240,9 +223,286 @@ struct PermissionsManagerView: View {
             }
         }
     }
+    
+    // MARK: - Async Methods
+    
+    private func performInitialCheck() async {
+        await initializeCheckItems()
+        await performAllChecks()
+    }
+    
+    private func initializeCheckItems() async {
+        await MainActor.run {
+            checkItems = [
+                // System Permissions
+                CheckItem(name: "Full Disk Access", category: "System Permissions"),
+                
+                // SSH Tools
+                CheckItem(name: "ssh-keyscan", category: "SSH Tools"),
+                CheckItem(name: "ssh", category: "SSH Tools"),
+                CheckItem(name: "sftp", category: "SSH Tools"),
+                CheckItem(name: "scp", category: "SSH Tools"),
+                CheckItem(name: "sshpass", category: "SSH Tools"),
+                CheckItem(name: "VS Code/Cursor", category: "SSH Tools")
+            ]
+            isChecking = true
+        }
+    }
+    
+    private func performAllChecks() async {
+        // Проверяем каждый элемент по очереди
+        await checkFullDiskAccess()
+        await checkSSHKeyscan()
+        await checkSSH()
+        await checkSFTP()
+        await checkSCP()
+        await checkSSHPass()
+        await checkVSCode()
+        
+        await MainActor.run {
+            isChecking = false
+        }
+    }
+    
+    private func checkFullDiskAccess() async {
+        await updateItemStatus(name: "Full Disk Access", category: "System Permissions", status: .checking)
+        
+        let hasAccess = PermissionsService.forceCheckPermissions()
+        
+        await updateItemStatus(
+            name: "Full Disk Access", 
+            category: "System Permissions", 
+            status: hasAccess ? .success : .failed,
+            details: hasAccess ? "Granted" : "Not granted"
+        )
+        
+        // Небольшая задержка для визуального эффекта
+        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 секунды
+    }
+    
+    private func checkSSHKeyscan() async {
+        await updateItemStatus(name: "ssh-keyscan", category: "SSH Tools", status: .checking)
+        
+        let available = SSHService.checkSSHKeyscanAvailability()
+        
+        await updateItemStatus(
+            name: "ssh-keyscan", 
+            category: "SSH Tools", 
+            status: available ? .success : .failed,
+            details: available ? "Available" : "Not found"
+        )
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    private func checkSSH() async {
+        await updateItemStatus(name: "ssh", category: "SSH Tools", status: .checking)
+        
+        let available = SSHService.checkSSHAvailability()
+        
+        await updateItemStatus(
+            name: "ssh", 
+            category: "SSH Tools", 
+            status: available ? .success : .failed,
+            details: available ? "Available" : "Not found"
+        )
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    private func checkSFTP() async {
+        await updateItemStatus(name: "sftp", category: "SSH Tools", status: .checking)
+        
+        let available = FileManager.default.fileExists(atPath: "/usr/bin/sftp")
+        
+        await updateItemStatus(
+            name: "sftp", 
+            category: "SSH Tools", 
+            status: available ? .success : .failed,
+            details: available ? "Available" : "Not found"
+        )
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    private func checkSCP() async {
+        await updateItemStatus(name: "scp", category: "SSH Tools", status: .checking)
+        
+        let available = FileManager.default.fileExists(atPath: "/usr/bin/scp")
+        
+        await updateItemStatus(
+            name: "scp", 
+            category: "SSH Tools", 
+            status: available ? .success : .failed,
+            details: available ? "Available" : "Not found"
+        )
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    private func checkSSHPass() async {
+        await updateItemStatus(name: "sshpass", category: "SSH Tools", status: .checking)
+        
+        let available = SSHService.checkSSHPassAvailability()
+        
+        await updateItemStatus(
+            name: "sshpass", 
+            category: "SSH Tools", 
+            status: available ? .success : .failed,
+            details: available ? "Available" : "Not found"
+        )
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    private func checkVSCode() async {
+        await updateItemStatus(name: "VS Code/Cursor", category: "SSH Tools", status: .checking)
+        
+        let available = VSCodeService.checkVSCodeAvailability()
+        
+        await updateItemStatus(
+            name: "VS Code/Cursor", 
+            category: "SSH Tools", 
+            status: available ? .success : .failed,
+            details: available ? "Available" : "Not found"
+        )
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
+    }
+    
+    private func updateItemStatus(name: String, category: String, status: CheckItem.CheckStatus, details: String = "") async {
+        await MainActor.run {
+            if let index = checkItems.firstIndex(where: { $0.name == name && $0.category == category }) {
+                checkItems[index].status = status
+                if !details.isEmpty {
+                    checkItems[index].details = details
+                }
+            }
+        }
+    }
+    
+    private func performCheck() async {
+        await initializeCheckItems()
+        await performAllChecks()
+    }
+    
+    private func performForceCheck() async {
+        await MainActor.run {
+            isChecking = true
+        }
+        
+        let hasAccess = PermissionsService.forceCheckPermissions()
+        
+        if hasAccess {
+            await performAllChecks()
+        } else {
+            await MainActor.run {
+                isChecking = false
+                // Показываем предупреждение
+                let alert = NSAlert()
+                alert.messageText = "Permissions Check"
+                alert.informativeText = "Full Disk Access is still not granted. Please check System Settings."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }
+    }
+    
+    private func performRequestAccess() async {
+        await MainActor.run {
+            isChecking = true
+        }
+        
+        PermissionsService.requestFullDiskAccess()
+        
+        // Ждем немного и обновляем статус
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 секунда
+        
+        await performAllChecks()
+    }
 }
 
+// Компонент для отображения категории проверок
+struct CategorySection: View {
+    let title: String
+    let items: [CheckItem]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Заголовок категории
+            Text("=== \(title) ===")
+                .font(.system(size: 11, design: .monospaced))
+                .fontWeight(.medium)
+                .foregroundColor(.blue)
+            
+            // Элементы проверки
+            ForEach(items) { item in
+                CheckItemRow(item: item)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(6)
+    }
+}
 
+// Компонент для отображения отдельного элемента проверки
+struct CheckItemRow: View {
+    let item: CheckItem
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            // Иконка статуса
+            statusIcon
+            
+            // Название и детали
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(item.name): \(item.details)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(statusColor)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 1)
+    }
+    
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch item.status {
+        case .pending:
+            Image(systemName: "circle")
+                .foregroundColor(.gray)
+                .font(.system(size: 10))
+        case .checking:
+            ProgressView()
+                .scaleEffect(0.6)
+                .frame(width: 12, height: 12)
+        case .success:
+            Text("✅")
+                .font(.system(size: 10))
+        case .failed:
+            Text("❌")
+                .font(.system(size: 10))
+        }
+    }
+    
+    private var statusColor: Color {
+        switch item.status {
+        case .pending:
+            return .gray
+        case .checking:
+            return .blue
+        case .success:
+            return .green
+        case .failed:
+            return .red
+        }
+    }
+}
 
 struct InstructionStep: View {
     let number: String
@@ -268,7 +528,7 @@ struct InstructionStep: View {
 }
 
 struct DetailedInstructionsView: View {
-    let permissionsCheck: [String]
+    let checkItems: [CheckItem]
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -297,20 +557,22 @@ struct DetailedInstructionsView: View {
             // Основной контент с прокруткой
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    if !permissionsCheck.isEmpty {
+                    if !checkItems.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Current Status:")
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             
-                            ForEach(permissionsCheck, id: \.self) { line in
-                                Text(line)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(line.contains("❌") ? .red : 
-                                                   line.contains("✅") ? .green : 
-                                                   line.contains("⚠️") ? .orange : 
-                                                   line.contains("===") ? .blue : .primary)
-                                    .padding(.vertical, 1)
+                            // System Permissions
+                            let systemItems = checkItems.filter { $0.category == "System Permissions" }
+                            if !systemItems.isEmpty {
+                                CategorySection(title: "System Permissions", items: systemItems)
+                            }
+                            
+                            // SSH Tools
+                            let sshItems = checkItems.filter { $0.category == "SSH Tools" }
+                            if !sshItems.isEmpty {
+                                CategorySection(title: "Required SSH Tools", items: sshItems)
                             }
                         }
                         .padding()

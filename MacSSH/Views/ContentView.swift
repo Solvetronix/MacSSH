@@ -22,15 +22,23 @@ struct ContentView: View {
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showingAddProfile) {
             ProfileFormView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedProfile) { profile in
             ProfileFormView(viewModel: viewModel, editingProfile: profile)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingPermissionsManager) {
             PermissionsManagerView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $viewModel.showingPermissionsManager) {
             PermissionsManagerView()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         // Sparkle handles update UI automatically - no need for custom sheet
         .alert("Permissions Required", isPresented: $viewModel.showingPermissionsWarning) {
@@ -140,6 +148,8 @@ struct ConnectionListView: View {
         })
         .sheet(isPresented: $showingAboutDialog) {
             AboutView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }

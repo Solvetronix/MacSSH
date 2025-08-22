@@ -335,6 +335,18 @@ class SSHService {
         return results
     }
     
+    /// Асинхронная проверка всех необходимых разрешений и команд
+    static func checkAllPermissionsAsync() async -> [String] {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let results = checkAllPermissions()
+                DispatchQueue.main.async {
+                    continuation.resume(returning: results)
+                }
+            }
+        }
+    }
+    
 
     
     static func connectToServer(_ profile: Profile) async throws -> [String] {

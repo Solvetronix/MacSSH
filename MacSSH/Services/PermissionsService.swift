@@ -119,9 +119,7 @@ class PermissionsService {
             results.append("⚠️ Full Disk Access is required for SSH operations")
         }
         
-        // Проверяем VS Code/Cursor
-        let hasVSCode = VSCodeService.checkVSCodeAvailability()
-        results.append(hasVSCode ? "✅ VS Code/Cursor: Available" : "❌ VS Code/Cursor: Not found")
+        // VS Code/Cursor проверяется в SSH Tools section
         
         return results
     }

@@ -105,6 +105,8 @@ struct ToolsInfoView: View {
         }
         .sheet(isPresented: $showingPermissionsCheck) {
             PermissionsCheckView(permissionsCheck: permissionsCheck)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }

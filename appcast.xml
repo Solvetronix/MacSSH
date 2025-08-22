@@ -6,6 +6,34 @@
         <language>en</language>
         
         <item>
+            <title>MacSSH 1.8.7</title>
+            <sparkle:version>187</sparkle:version>
+            <sparkle:shortVersionString>1.8.7</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.7</h2>
+                <ul>
+                    <li>Individual SSH Tools Status Check with progress indicators</li>
+                    <li>Checklist-style progress interface with real-time status updates</li>
+                    <li>Sequential verification of tools with visual feedback</li>
+                    <li>Compact modal design for SSH Tools Manager</li>
+                    <li>Centralized logging system across all application components</li>
+                    <li>Enhanced file manager logging integration</li>
+                    <li>Improved error handling and diagnostics</li>
+                    <li>Reduced log padding for more compact display</li>
+                    <li>Professional log interface with modern design</li>
+                    <li>Better visual feedback for all operations</li>
+                    <li>Enhanced About dialog with application information</li>
+                </ul>
+            ]]></description>
+            <pubDate>Thu, 22 Aug 2025 22:22:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.7/MacSSH-1.8.7.dmg"
+                       sparkle:os="macos"
+                       length="9800423"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+        
+        <item>
             <title>MacSSH 1.8.6</title>
             <sparkle:version>186</sparkle:version>
             <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
