@@ -49,7 +49,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
     
     private static func log(_ message: String) {
         let timestamp = Date().timeIntervalSince1970
-        let logMessage = "🔄 [\(timestamp)] [UpdateService] \(message)"
+        let logMessage = "🔄 [\(timestamp)] \(message)"
         print(logMessage)
         logCallback?(logMessage)
     }

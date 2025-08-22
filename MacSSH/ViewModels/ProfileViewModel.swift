@@ -45,7 +45,9 @@ class ProfileViewModel: ObservableObject {
         
         // Set up update service logging
         UpdateService.logCallback = { message in
-            LoggingService.shared.info(message, source: "UpdateService")
+            // Remove the [UpdateService] prefix since LoggingService will add it
+            let cleanMessage = message.replacingOccurrences(of: "\\[UpdateService\\] ", with: "", options: .regularExpression)
+            LoggingService.shared.info(cleanMessage, source: "UpdateService")
         }
     }
     
