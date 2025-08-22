@@ -31,12 +31,14 @@
 - **`docs/releases/RELEASE_NOTES_1.8.1.md`** - Release notes for 1.8.1
 - **`docs/releases/RELEASE_NOTES_1.8.2.md`** - Release notes for 1.8.2
 - **`docs/releases/RELEASE_NOTES_1.8.3.md`** - 🆕 Release notes for 1.8.3 with automatic updates
+- **`docs/releases/RELEASE_NOTES_1.8.7.md`** - 🆕 Release notes for 1.8.7 with enhanced UI and logging system
 
 #### GitHub Descriptions
 - **`docs/releases/GITHUB_RELEASE_DESCRIPTION.md`** - General description for GitHub releases
 - **`docs/releases/GITHUB_RELEASE_DESCRIPTION_1.8.1.md`** - Description for GitHub release 1.8.1
 - **`docs/releases/GITHUB_RELEASE_DESCRIPTION_1.8.2.md`** - Description for GitHub release 1.8.2
 - **`docs/releases/GITHUB_RELEASE_DESCRIPTION_1.8.3.md`** - 🆕 Description for GitHub release 1.8.3 with automatic updates
+- **`docs/releases/GITHUB_RELEASE_DESCRIPTION_1.8.7.md`** - 🆕 Description for GitHub release 1.8.7 with enhanced UI and logging system
 
 ## 🎯 Instruction Categories
 
