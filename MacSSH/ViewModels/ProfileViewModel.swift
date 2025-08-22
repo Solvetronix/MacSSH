@@ -36,6 +36,8 @@ class ProfileViewModel: ObservableObject {
     @Published var fileBrowserProfile: Profile?
     @Published var selectedFileID: RemoteFile.ID?
     
+
+    
     private let userDefaults = UserDefaults.standard
     private let profilesKey = "savedSSHProfiles"
     
@@ -229,6 +231,11 @@ class ProfileViewModel: ObservableObject {
         await MainActor.run {
             self.isConnecting = false
         }
+    }
+    
+    @MainActor
+    func openProfessionalTerminal(for profile: Profile) {
+        WindowManager.shared.openTerminalWindow(for: profile)
     }
     
 

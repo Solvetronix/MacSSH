@@ -44,6 +44,10 @@ struct SFTPResult {
 
 class SSHService {
     static func checkSSHPassAvailability() -> Bool {
+        return getSSHPassPath() != nil
+    }
+    
+    static func getSSHPassPath() -> String? {
         // Проверяем напрямую в известных местах установки
         let possiblePaths = [
             "/usr/bin/sshpass",
@@ -53,7 +57,7 @@ class SSHService {
         
         for path in possiblePaths {
             if FileManager.default.fileExists(atPath: path) {
-                return true
+                return path
             }
         }
         
@@ -69,10 +73,21 @@ class SSHService {
         do {
             try process.run()
             process.waitUntilExit()
-            return process.terminationStatus == 0
+            
+            if process.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let output = String(data: data, encoding: .utf8) {
+                    let path = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !path.isEmpty {
+                        return path
+                    }
+                }
+            }
         } catch {
-            return false
+            // Игнорируем ошибки
         }
+        
+        return nil
     }
     
     static func checkSSHKeyscanAvailability() -> Bool {
@@ -241,22 +256,7 @@ class SSHService {
     
 
     
-    private static func getSSHPassPath() -> String? {
-        // Проверяем напрямую в известных местах установки
-        let possiblePaths = [
-            "/opt/homebrew/bin/sshpass",
-            "/usr/local/bin/sshpass",
-            "/usr/bin/sshpass"
-        ]
 
-        for path in possiblePaths {
-            if FileManager.default.fileExists(atPath: path) {
-                return path
-            }
-        }
-        
-        return nil
-    }
     
         private static func checkSSHFSAvailability() -> Bool {
         // Проверяем напрямую в известных местах установки

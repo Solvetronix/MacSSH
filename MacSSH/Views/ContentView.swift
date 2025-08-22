@@ -40,6 +40,7 @@ struct ContentView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+
         // Sparkle handles update UI automatically - no need for custom sheet
         .alert("Permissions Required", isPresented: $viewModel.showingPermissionsWarning) {
             Button("Open Permissions Manager") {
@@ -91,7 +92,7 @@ struct ConnectionListView: View {
                         profileToDelete: $profileToDelete
                     )
                 }
-                .width(160)
+                .width(200)
             }
             .frame(minHeight: 200)
         }
@@ -241,6 +242,14 @@ struct ConnectionActionsCell: View {
                 Task { await viewModel.testConnection(profile) }
             }) {
                 HoverableIcon(systemName: "network", help: "Test Connection & Open Terminal")
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(viewModel.isConnecting)
+            
+            Button(action: {
+                viewModel.openProfessionalTerminal(for: profile)
+            }) {
+                HoverableIcon(systemName: "terminal", help: "Open Professional Terminal")
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isConnecting)
