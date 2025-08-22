@@ -44,10 +44,8 @@ class ProfileViewModel: ObservableObject {
         checkPermissionsOnStartup()
         
         // Set up update service logging
-        UpdateService.logCallback = { [weak self] message in
-            DispatchQueue.main.async {
-                self?.connectionLog.append(message)
-            }
+        UpdateService.logCallback = { message in
+            LoggingService.shared.info(message, source: "UpdateService")
         }
     }
     
@@ -136,8 +134,8 @@ class ProfileViewModel: ObservableObject {
         await MainActor.run {
             self.isConnecting = true
             self.connectionError = nil
-            self.connectionLog.removeAll()
-            self.connectionLog.append("[blue]Connecting to \(profile.host)...")
+            LoggingService.shared.clear()
+            LoggingService.shared.info("Connecting to \(profile.host)...", source: "SSH")
         }
         
         do {

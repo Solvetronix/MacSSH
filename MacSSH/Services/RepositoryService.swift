@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import AppKit
+import SwiftUI
 
 enum SSHConnectionError: Error {
     case connectionFailed(String)
@@ -339,6 +340,7 @@ class SSHService {
     static func connectToServer(_ profile: Profile) async throws -> [String] {
         var debugLogs: [String] = []
         
+        LoggingService.shared.info("Testing connection to \(profile.host):\(profile.port)...", source: "SSHService")
         debugLogs.append("[blue]Testing connection to \(profile.host):\(profile.port)...")
         
         // Проверяем Full Disk Access
@@ -361,6 +363,7 @@ class SSHService {
         testProcess.executableURL = URL(fileURLWithPath: "/usr/bin/ssh-keyscan")
         testProcess.arguments = ["-p", "\(profile.port)", profile.host]
         
+        LoggingService.shared.info("Running ssh-keyscan...", source: "SSHService")
         debugLogs.append("[blue]Running ssh-keyscan...")
         
         do {
@@ -376,10 +379,12 @@ class SSHService {
             }
             
             if testProcess.terminationStatus != 0 {
+                LoggingService.shared.error("Cannot reach host \(profile.host):\(profile.port)", source: "SSHService")
                 debugLogs.append("[red]❌ Cannot reach host \(profile.host):\(profile.port)")
                 throw SSHConnectionError.connectionFailed("Cannot reach host \(profile.host):\(profile.port)")
             }
             
+            LoggingService.shared.success("Host is reachable", source: "SSHService")
             debugLogs.append("[green]✅ Host is reachable")
         } catch {
             debugLogs.append("[red]❌ Failed to test connection: \(error.localizedDescription)")
@@ -396,6 +401,7 @@ class SSHService {
     static func openTerminal(for profile: Profile) async throws -> [String] {
         var debugLogs: [String] = []
         
+        LoggingService.shared.info("Starting terminal opening process...", source: "SSHService")
         debugLogs.append("[blue]Starting terminal opening process...")
         
         // Проверяем Full Disk Access
@@ -535,6 +541,7 @@ class SSHService {
     /// Get list of files and folders in specified directory
     static func listDirectory(_ profile: Profile, path: String = ".") async throws -> SFTPResult {
         let timestamp = Date().timeIntervalSince1970
+        LoggingService.shared.info("Listing directory: \(path) for \(profile.name) (\(profile.host))", source: "FileManager")
         print("📝 [\(timestamp)] RepositoryService: listDirectory STARTED")
         print("📝 [\(timestamp)] Profile: \(profile.name), Host: \(profile.host)")
         print("📝 [\(timestamp)] Path: \(path)")
@@ -594,14 +601,17 @@ class SSHService {
             
             if process.terminationStatus == 0 {
                 files = parseSFTPListOutput(output, basePath: path)
+                LoggingService.shared.success("Successfully listed \(files.count) items in \(path)", source: "FileManager")
                 debugLogs.append("[green][\(timestamp)] ✅ Successfully listed \(files.count) items")
             } else {
+                LoggingService.shared.error("SFTP command failed with exit code \(process.terminationStatus): \(output)", source: "FileManager")
                 debugLogs.append("[red][\(timestamp)] ❌ SFTP command failed with exit code \(process.terminationStatus)")
                 debugLogs.append("[red][\(timestamp)] ❌ SFTP error output: \(output)")
                 throw SSHConnectionError.sftpError("Failed to list directory (exit code \(process.terminationStatus)): \(output)")
             }
             
         } catch {
+            LoggingService.shared.error("SFTP process error: \(error.localizedDescription)", source: "FileManager")
             print("📝 [\(timestamp)] RepositoryService: SFTP process ERROR")
             print("📝 [\(timestamp)] Error type: \(type(of: error))")
             print("📝 [\(timestamp)] Error description: \(error.localizedDescription)")
@@ -623,6 +633,7 @@ class SSHService {
     static func openFileInFinder(_ profile: Profile, remotePath: String) async throws -> [String] {
         var debugLogs: [String] = []
         
+        LoggingService.shared.info("Opening file in Finder: \(remotePath)", source: "FileManager")
         debugLogs.append("[blue]Opening file in Finder: \(remotePath)")
         
         // Создаем временную директорию для скачивания
@@ -662,6 +673,7 @@ class SSHService {
             }
             
             if process.terminationStatus == 0 {
+                LoggingService.shared.success("File downloaded successfully: \(remotePath)", source: "FileManager")
                 debugLogs.append("[green]✅ File downloaded successfully")
                 
                 // Открываем файл в Finder
@@ -672,13 +684,16 @@ class SSHService {
                 try openProcess.run()
                 openProcess.waitUntilExit()
                 
+                LoggingService.shared.success("File opened in Finder: \(remotePath)", source: "FileManager")
                 debugLogs.append("[green]✅ File opened in Finder")
             } else {
+                LoggingService.shared.error("SCP download failed: \(output)", source: "FileManager")
                 debugLogs.append("[red]❌ SCP download failed")
                 throw SSHConnectionError.sftpError("Failed to download file: \(output)")
             }
             
         } catch {
+            LoggingService.shared.error("SCP error: \(error.localizedDescription)", source: "FileManager")
             debugLogs.append("[red]❌ SCP error: \(error.localizedDescription)")
             throw SSHConnectionError.sftpError("SCP error: \(error.localizedDescription)")
         }
@@ -688,6 +703,7 @@ class SSHService {
     
     /// Монтировать удаленную директорию в Finder
     static func mountDirectoryInFinder(_ profile: Profile, remotePath: String) async throws -> [String] {
+        LoggingService.shared.info("Mounting directory in Finder: \(remotePath) for \(profile.name) (\(profile.host))", source: "FileManager")
         print("=== ENTERING mountDirectoryInFinder FUNCTION ===")
         print("Profile: \(profile.name), Host: \(profile.host)")
         print("Remote path: \(remotePath)")
@@ -755,6 +771,7 @@ class SSHService {
             }
             
             if process.terminationStatus == 0 {
+                LoggingService.shared.success("Directory mounted successfully: \(remotePath)", source: "FileManager")
                 debugLogs.append("[green]✅ Directory mounted successfully")
                 
                 // Открываем в Finder
@@ -765,6 +782,7 @@ class SSHService {
                 try openProcess.run()
                 openProcess.waitUntilExit()
                 
+                LoggingService.shared.success("Directory opened in Finder: \(remotePath)", source: "FileManager")
                 debugLogs.append("[green]✅ Directory opened in Finder")
             } else {
                 debugLogs.append("[red]❌ SSHFS mount failed")
@@ -785,6 +803,7 @@ class SSHService {
     private static func openDirectoryViaSFTP(_ profile: Profile, remotePath: String) async throws -> [String] {
         var debugLogs: [String] = []
         
+        LoggingService.shared.info("Opening directory via SFTP fallback: \(remotePath)", source: "FileManager")
         debugLogs.append("[blue]=== STARTING SFTP FALLBACK ===")
         debugLogs.append("[blue]Opening directory via SFTP: \(remotePath)")
         print("=== STARTING SFTP FALLBACK ===")
@@ -1254,8 +1273,10 @@ class SSHService {
     
     static func testConnection(_ profile: Profile) async throws -> (success: Bool, logs: [String]) {
         // Тестирование SSH подключения без открытия терминала
+        LoggingService.shared.info("Testing connection to \(profile.host):\(profile.port)...", source: "SSHService")
         do {
             let logs = try await connectToServer(profile)
+            LoggingService.shared.success("Connection test successful for \(profile.host)", source: "SSHService")
             return (true, logs)
         } catch {
             var errorLogs = ["[red]❌ Connection test failed"]

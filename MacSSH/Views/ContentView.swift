@@ -279,9 +279,10 @@ struct LogView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            LogToolbar(viewModel: viewModel, showCopyAlert: $showCopyAlert)
-            LogContent(viewModel: viewModel)
+            LogToolbar(showCopyAlert: $showCopyAlert)
+            LogContent()
         }
+        .background(Color(NSColor.controlBackgroundColor))
         .alert("Connection Error", isPresented: .constant(viewModel.connectionError != nil)) {
             Button("OK") {
                 viewModel.connectionError = nil
@@ -291,20 +292,17 @@ struct LogView: View {
                 ScrollView { Text(error).textSelection(.enabled) }
             }
         }
-        .onReceive(viewModel.objectWillChange) { _ in
-            print("DEBUG: ViewModel changed, log count: \(viewModel.connectionLog.count)")
-        }
     }
 }
 
 struct LogToolbar: View {
-    @ObservedObject var viewModel: ProfileViewModel
+    @ObservedObject var loggingService = LoggingService.shared
     @Binding var showCopyAlert: Bool
     
     var body: some View {
         HStack {
             Button(action: {
-                let logText = viewModel.connectionLog.joined(separator: "\n")
+                let logText = loggingService.getLogsAsText()
                 #if os(macOS)
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(logText, forType: .string)
@@ -320,12 +318,18 @@ struct LogToolbar: View {
                 Button("OK", role: .cancel) {}
             }
             Button(action: {
-                viewModel.connectionLog.removeAll()
+                loggingService.clear()
             }) {
                 Image(systemName: "trash")
             }
             .help("Clear operation log")
-            .disabled(viewModel.isConnecting)
+            
+            Spacer()
+            
+            // Log count indicator
+            Text("\(loggingService.logs.count) logs")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .padding(.horizontal)
         .padding(.top, 8)
@@ -335,49 +339,78 @@ struct LogToolbar: View {
 }
 
 struct LogContent: View {
-    @ObservedObject var viewModel: ProfileViewModel
+    @ObservedObject var loggingService = LoggingService.shared
     
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
-                    ForEach(viewModel.connectionLog.indices, id: \.self) { idx in
-                        LogMessageView(message: viewModel.connectionLog[idx])
-                            .id(idx)
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(loggingService.logs) { log in
+                        LogMessageView(log: log)
+                            .id(log.id)
                     }
                 }
-                .padding(.bottom)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 12)
             }
-            .background(Color(NSColor.textBackgroundColor))
-            .onChange(of: viewModel.connectionLog.count) { _, newCount in
-                print("DEBUG: Log count changed to \(newCount)")
-                if let last = viewModel.connectionLog.indices.last {
-                    withAnimation { proxy.scrollTo(last, anchor: .bottom) }
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(NSColor.textBackgroundColor))
+            )
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+            .onChange(of: loggingService.logs.count) { _, newCount in
+                if let last = loggingService.logs.last {
+                    withAnimation(.easeInOut(duration: 0.3)) { 
+                        proxy.scrollTo(last.id, anchor: .bottom) 
+                    }
                 }
-            }
-            .onAppear {
-                print("DEBUG: LogContent appeared, log count: \(viewModel.connectionLog.count)")
             }
         }
         .frame(minHeight: 120, maxHeight: .infinity)
-        .padding(.bottom)
     }
 }
 
 struct LogMessageView: View {
-    let message: String
+    let log: LogMessage
     
     var body: some View {
-        let color: Color = getMessageColor(message)
-        let cleanMsg = cleanMessage(message)
-        
-        return Text(cleanMsg)
-            .font(.system(size: 13, design: .monospaced))
-            .foregroundColor(color)
-            .textSelection(.enabled)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
+        HStack(alignment: .top, spacing: 8) {
+            // Timestamp
+            Text(log.formattedTimestamp)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.secondary)
+                .frame(width: 60, alignment: .leading)
+            
+            // Message content with type prefix
+            HStack(alignment: .top, spacing: 4) {
+                Text(log.level.icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(log.level.color)
+                    .frame(width: 20, alignment: .leading)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(log.displayMessage)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Source information
+                    Text("[\(log.source)]")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                        .opacity(0.7)
+                }
+            }
+        }
+        .padding(.vertical, 3)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(log.id.hashValue % 2 == 0 ? Color.clear : Color.gray.opacity(0.03))
+        )
     }
     
     private func getMessageColor(_ message: String) -> Color {
@@ -391,17 +424,18 @@ struct LogMessageView: View {
             return .green
         } else if message.contains("❌") {
             return .red
+        } else if message.contains("ERROR") || message.contains("error") {
+            return .red
+        } else if message.contains("WARNING") || message.contains("warning") {
+            return .orange
+        } else if message.contains("INFO") || message.contains("info") {
+            return .blue
         } else {
             return .primary
         }
     }
     
-    private func cleanMessage(_ message: String) -> String {
-        return message
-            .replacingOccurrences(of: "[green]", with: "")
-            .replacingOccurrences(of: "[yellow]", with: "")
-            .replacingOccurrences(of: "[blue]", with: "")
-    }
+
 }
 
 struct HoverableIcon: View {
