@@ -55,16 +55,23 @@ jobs:
           brew install create-dmg
           brew install xmlstarlet
 
-      - name: Update version in project.pbxproj and Info.plist
+      - name: Create temporary version files for build
         run: |
-          # Update project.pbxproj
-          sed -i '' "s/MARKETING_VERSION = ${{ steps.current-version.outputs.current_version }}/MARKETING_VERSION = ${{ steps.current-version.outputs.new_version }}/g" $XCODE_PROJECT/project.pbxproj
-          sed -i '' "s/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.current_build }}/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.new_build }}/g" $XCODE_PROJECT/project.pbxproj
+          # Create temporary copies with updated versions for build only
+          cp $XCODE_PROJECT/project.pbxproj $XCODE_PROJECT/project.pbxproj.tmp
+          cp MacSSH/Info.plist MacSSH/Info.plist.tmp
           
-          # Update Info.plist
-          # Get current version from Info.plist
+          # Update temporary project.pbxproj
+          sed -i '' "s/MARKETING_VERSION = ${{ steps.current-version.outputs.current_version }}/MARKETING_VERSION = ${{ steps.current-version.outputs.new_version }}/g" $XCODE_PROJECT/project.pbxproj.tmp
+          sed -i '' "s/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.current_build }}/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.new_build }}/g" $XCODE_PROJECT/project.pbxproj.tmp
+          
+          # Update temporary Info.plist
           CURRENT_INFO_VERSION=$(grep -A 1 'CFBundleShortVersionString' MacSSH/Info.plist | tail -1 | sed 's/.*<string>\([^<]*\)<\/string>.*/\1/')
-          sed -i '' "s/<string>$CURRENT_INFO_VERSION<\/string>/<string>${{ steps.current-version.outputs.new_version }}<\/string>/g" MacSSH/Info.plist
+          sed -i '' "s/<string>$CURRENT_INFO_VERSION<\/string>/<string>${{ steps.current-version.outputs.new_version }}<\/string>/g" MacSSH/Info.plist.tmp
+          
+          # Replace original files with updated versions for build
+          mv $XCODE_PROJECT/project.pbxproj.tmp $XCODE_PROJECT/project.pbxproj
+          mv MacSSH/Info.plist.tmp MacSSH/Info.plist
 
       - name: Build application
         run: |
@@ -99,23 +106,23 @@ jobs:
           gh release create "${{ steps.current-version.outputs.tag }}" --title "MacSSH ${{ steps.current-version.outputs.new_version }} - Automatic Release" --notes-file RELEASE_NOTES.md --draft "$DMG_NAME"
           gh release edit "${{ steps.current-version.outputs.tag }}" --draft=false
 
-      - name: Update appcast.xml
+      - name: Prepare appcast info
         run: |
           DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
-          chmod +x update_appcast.sh
-          ./update_appcast.sh "${{ steps.current-version.outputs.new_version }}" "${{ steps.current-version.outputs.new_build }}" "$DMG_NAME"
+          echo "📦 DMG created: $DMG_NAME"
+          echo "🔗 GitHub release: https://github.com/Solvetronix/MacSSH/releases/tag/v${{ steps.current-version.outputs.new_version }}"
 
 
 
 
 
-      - name: Commit and push changes
+      - name: Show manual steps info
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add $XCODE_PROJECT/project.pbxproj MacSSH/Info.plist appcast.xml
-          git commit -m "Automatic release ${{ steps.current-version.outputs.new_version }} - Update version and appcast"
-          git push origin main
+          echo "✅ Release ${{ steps.current-version.outputs.new_version }} created successfully!"
+          echo "📝 Manual steps to complete:"
+          echo "1. Update version in project.pbxproj to ${{ steps.current-version.outputs.new_version }}"
+          echo "2. Update appcast.xml locally"
+          echo "3. Commit and push changes"
 
       - name: Deployment summary
         run: |

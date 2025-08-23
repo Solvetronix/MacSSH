@@ -21,6 +21,7 @@
 ### 🚀 Automatic Deployment System
 
 #### Main Instructions
+- **`docs/NO_CONFLICT_DEPLOY_GUIDE.md`** - 🆕 **РЕШЕНИЕ КОНФЛИКТОВ** - Новый конфликт-свободный автодеплой
 - **`docs/QUICK_START_DEPLOY.md`** - 🆕 Quick start guide (5-minute setup)
 - **`docs/AUTOMATIC_DEPLOY_GUIDE.md`** - 🆕 Complete guide for automatic deployment with GitHub Actions
 - **`docs/GITHUB_SECRETS_SETUP.md`** - 🆕 Setup guide for GitHub Secrets (certificates, keys)
@@ -31,6 +32,7 @@
 #### Configuration Files
 - **`.github/workflows/auto-deploy.yml`** - 🆕 GitHub Actions workflow for automatic deployment
 - **`.github/CODEOWNERS`** - 🆕 Code ownership configuration for pull request reviews
+- **`update_version_locally.sh`** - 🆕 Script for local version updates after auto-deploy
 
 #### Configuration Files
 - **`docs/appcast.xml`** - RSS feed for Sparkle automatic updates
