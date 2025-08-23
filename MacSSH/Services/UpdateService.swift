@@ -229,7 +229,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         // Use the standard Sparkle check for updates
         // Sparkle handles the UI automatically, so we don't need to return UpdateInfo
         log("🚀 Triggering Sparkle update check...")
-        await updaterController.checkForUpdates(nil)
+        updaterController.checkForUpdates(nil)
         
         log("✅ Update check triggered - Sparkle will handle the UI")
         
@@ -261,7 +261,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         
         // Use the standard Sparkle check for updates
         log("🚀 Triggering forced Sparkle update check...")
-        await updaterController.checkForUpdates(nil)
+        updaterController.checkForUpdates(nil)
         
         log("✅ Forced update check triggered - Sparkle will handle the UI")
         
@@ -292,7 +292,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         print("🔧 [UpdateService] Installing update...")
         
         // Sparkle handles installation automatically
-        await updaterController.checkForUpdates(nil)
+        updaterController.checkForUpdates(nil)
         return true
     }
     
@@ -304,7 +304,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         }
         
         print("📝 [UpdateService] Showing update window...")
-        await updaterController.checkForUpdates(nil)
+        updaterController.checkForUpdates(nil)
     }
     
     // MARK: - Legacy GitHub API (Fallback)
