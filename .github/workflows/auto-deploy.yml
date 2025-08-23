@@ -75,9 +75,9 @@ jobs:
           COMMIT_MESSAGES=$(git log --oneline --no-merges $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
           RELEASE_NOTES="# MacSSH ${{ steps.current-version.outputs.new_version }} Release Notes"$'\n'$'\n'"## What's New"$'\n'
           while IFS= read -r line; do
-            if [[ $line =~ ^[a-f0-9]+\ \(feat\|fix\|docs\|style\|refactor\|test\|chore\)\(\([^)]*\)\)\?:\ \(.+\)$ ]]; then
-              TYPE="${BASH_REMATCH[1]}"
-              MESSAGE="${BASH_REMATCH[3]}"
+            if [[ $line =~ ^[a-f0-9]+\ \(feat\|fix\|docs\|style\|refactor\|test\|chore\) ]]; then
+              TYPE=$(echo "$line" | sed 's/.*(\(feat\|fix\|docs\|style\|refactor\|test\|chore\)).*/\1/')
+              MESSAGE=$(echo "$line" | sed 's/.*: \(.*\)/\1/')
               case $TYPE in
                 "feat") RELEASE_NOTES+="- ✨ $MESSAGE"$'\n' ;;
                 "fix") RELEASE_NOTES+="- 🐛 $MESSAGE"$'\n' ;;
