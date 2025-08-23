@@ -21,19 +21,15 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
     
     // MARK: - Additional Delegate Methods for Update Button Fix
     
-    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationInvocation: @escaping () -> Void) {
-        UpdateService.log("🔧 SPUUpdaterDelegate: Will install update on quit")
-    }
-    
     func updater(_ updater: SPUUpdater, didFinishLoading appcast: SUAppcast) {
         UpdateService.log("🔧 SPUUpdaterDelegate: Finished loading appcast with \(appcast.items.count) items")
         for item in appcast.items {
-            UpdateService.log("   - Found item: \(item.title) version \(item.displayVersionString ?? "unknown")")
+            UpdateService.log("   - Found item: \(item.title) version \(item.displayVersionString)")
         }
     }
     
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        UpdateService.log("🔧 SPUUpdaterDelegate: Found valid update: \(item.title) version \(item.displayVersionString ?? "unknown")")
+        UpdateService.log("🔧 SPUUpdaterDelegate: Found valid update: \(item.title) version \(item.displayVersionString)")
     }
     
     func updater(_ updater: SPUUpdater, didNotFindUpdate error: Error?) {
@@ -233,7 +229,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         // Use the standard Sparkle check for updates
         // Sparkle handles the UI automatically, so we don't need to return UpdateInfo
         log("🚀 Triggering Sparkle update check...")
-        updaterController.checkForUpdates(nil)
+        await updaterController.checkForUpdates(nil)
         
         log("✅ Update check triggered - Sparkle will handle the UI")
         
@@ -251,7 +247,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         log("🚀 Force checking for updates (ignoring time restrictions)...")
         
         // Reset last update check to force immediate check
-        if let updater = updater {
+        if updater != nil {
             // This might help with the "You're up to date" issue
             log("🔧 Resetting last update check date to force immediate check...")
             
@@ -265,7 +261,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         
         // Use the standard Sparkle check for updates
         log("🚀 Triggering forced Sparkle update check...")
-        updaterController.checkForUpdates(nil)
+        await updaterController.checkForUpdates(nil)
         
         log("✅ Forced update check triggered - Sparkle will handle the UI")
         
@@ -296,7 +292,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         print("🔧 [UpdateService] Installing update...")
         
         // Sparkle handles installation automatically
-        updaterController.checkForUpdates(nil)
+        await updaterController.checkForUpdates(nil)
         return true
     }
     
@@ -308,7 +304,7 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         }
         
         print("📝 [UpdateService] Showing update window...")
-        updaterController.checkForUpdates(nil)
+        await updaterController.checkForUpdates(nil)
     }
     
     // MARK: - Legacy GitHub API (Fallback)
