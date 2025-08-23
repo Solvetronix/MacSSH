@@ -21,10 +21,10 @@ class SwiftTermService: ObservableObject {
         self.isConnected = false
         self.connectionStatus = "Подключение..."
         
-        // Проверяем разрешения
-        if !PermissionsService.forceCheckPermissions() {
-            throw SSHConnectionError.permissionDenied("Full Disk Access не предоставлен")
-        }
+        // Проверяем разрешения (убираем строгую проверку для SwiftTerm)
+        // if !PermissionsService.forceCheckPermissions() {
+        //     throw SSHConnectionError.permissionDenied("Full Disk Access не предоставлен")
+        // }
         
         // Строим SSH команду
         let sshCommand = try buildSSHCommand(for: profile)
@@ -76,6 +76,16 @@ class SwiftTermService: ObservableObject {
                     
                     // Запускаем процесс
                     try process.run()
+                    
+                    // Если используется пароль, отправляем его автоматически
+                    if profile.keyType == .password, let password = profile.password, !password.isEmpty {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            let passwordData = (password + "\n").data(using: .utf8) ?? Data()
+                            if let inputPipe = process.standardInput as? Pipe {
+                                inputPipe.fileHandleForWriting.write(passwordData)
+                            }
+                        }
+                    }
                     
                     DispatchQueue.main.async {
                         self.terminalView = terminal
@@ -154,8 +164,8 @@ class SwiftTermService: ObservableObject {
             command = "ssh"
         }
         
-        // Добавляем опции для автоматического принятия fingerprint'а
-        command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -t"
+        // Добавляем опции для автоматического принятия fingerprint'а и интерактивности
+        command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=password,keyboard-interactive -t -t"
         
         // Добавляем порт если не стандартный
         if profile.port != 22 {

@@ -92,7 +92,10 @@ struct ProfessionalTerminalView: View {
         }
         .onDisappear {
             // Отключаемся при исчезновении view
-            terminalService.disconnect()
+            // Используем задержку чтобы избежать проблем при закрытии приложения
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                terminalService.disconnect()
+            }
         }
         .alert("Connection Error", isPresented: $showingError) {
             Button("OK") {
