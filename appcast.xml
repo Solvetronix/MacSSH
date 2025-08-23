@@ -72,8 +72,7 @@
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.8/MacSSH-1.8.8.dmg"
                        sparkle:os="macos"
                        length="1782579"
-                       type="application/octet-stream"
-                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+                       type="application/octet-stream"/>
         </item>
         
         <item>
@@ -100,8 +99,7 @@
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.7/MacSSH-1.8.7.dmg"
                        sparkle:os="macos"
                        length="9800423"
-                       type="application/octet-stream"
-                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+                       type="application/octet-stream"/>
         </item>
         
         <item>
@@ -122,8 +120,7 @@
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.6/MacSSH-1.8.6.dmg"
                        sparkle:os="macos"
                        length="9658151"
-                       type="application/octet-stream"
-                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+                       type="application/octet-stream"/>
         </item>
     </channel>
 </rss>
