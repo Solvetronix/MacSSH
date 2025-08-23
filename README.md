@@ -324,3 +324,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Support
 
 If you have questions or suggestions, create an Issue in the repository. 
+# Test Automatic Release System
