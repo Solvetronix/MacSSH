@@ -24,7 +24,7 @@
 ### 📦 Releases and Versions
 
 #### Release Instructions
-- **`docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md`** - Instructions for creating release 1.8.0
+- **`docs/RELEASE_INSTRUCTIONS.md`** - 🆕 **GLOBAL** release instructions for ALL versions
 
 #### Release Notes
 - **`docs/releases/RELEASE_NOTES_1.8.0.md`** - Release notes for 1.8.0
@@ -43,20 +43,21 @@
 ## 🎯 Instruction Categories
 
 ### 🚀 Development and Setup
-1. **`docs/SPARKLE_XCODE_SETUP.md`** - 🆕 Adding Sparkle to Xcode project
-2. **`docs/SPARKLE_SETUP.md`** - Setting up automatic updates
-3. **`docs/AUTOMATIC_UPDATE_GUIDE.md`** - Complete update guide
-4. **`docs/VERSION_MANAGEMENT_GUIDE.md`** - 🆕 Xcode Project Version Management
-5. **`docs/QUICK_VERSION_FIX.md`** - 🆕 Quick Fix for Application Version Problem
-6. **`docs/SPARKLE_UPDATE_BUTTON_FIX.md`** - 🆕 Solution for Sparkle not showing update button despite newer version available
-7. **`docs/SPARKLE_VERSION_FORMAT_FIX.md`** - 🆕 Fix for incorrect sparkle:version format in appcast.xml
-8. **`docs/CRITICAL_APPCAST_UPDATE.md`** - 🆕 CRITICAL: Never forget to push appcast.xml after release
-7. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
+1. **`docs/CODE_SIGNING_GUIDE.md`** - 🆕 **CRITICAL** Code signing with Apple Developer ID (prevents Gatekeeper warnings)
+2. **`docs/SPARKLE_XCODE_SETUP.md`** - 🆕 Adding Sparkle to Xcode project
+3. **`docs/SPARKLE_SETUP.md`** - Setting up automatic updates
+4. **`docs/AUTOMATIC_UPDATE_GUIDE.md`** - Complete update guide
+5. **`docs/VERSION_MANAGEMENT_GUIDE.md`** - 🆕 Xcode Project Version Management
+6. **`docs/QUICK_VERSION_FIX.md`** - 🆕 Quick Fix for Application Version Problem
+7. **`docs/SPARKLE_UPDATE_BUTTON_FIX.md`** - 🆕 Solution for Sparkle not showing update button despite newer version available
+8. **`docs/SPARKLE_VERSION_FORMAT_FIX.md`** - 🆕 Fix for incorrect sparkle:version format in appcast.xml
+9. **`docs/CRITICAL_APPCAST_UPDATE.md`** - 🆕 CRITICAL: Never forget to push appcast.xml after release
+10. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
 
 ### 📋 Release Management
-1. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI for Sparkle updates (⚠️ CRITICAL: version management)
-2. **`docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md`** - How to create releases
-3. **`docs/releases/RELEASE_NOTES_*.md`** - Version notes
+1. **`docs/RELEASE_INSTRUCTIONS.md`** - 🆕 **GLOBAL** release instructions for ALL versions
+2. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI for Sparkle updates (⚠️ CRITICAL: version management)
+3. **`docs/releases/RELEASE_NOTES_*.md`** - Version-specific release notes
 4. **`docs/releases/GITHUB_RELEASE_DESCRIPTION*.md`** - GitHub descriptions
 
 ### 📖 General Documentation
@@ -78,7 +79,7 @@
 6. **Use `docs/SPARKLE_VERSION_FORMAT_FIX.md` for fixing appcast.xml version format issues**
 7. **Use `docs/CRITICAL_APPCAST_UPDATE.md` for the most common mistake that breaks updates**
 8. **Use `docs/GITHUB_RELEASE_GUIDE.md` for creating releases with GitHub CLI (⚠️ CRITICAL: version management)**
-7. Use `docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md` for creating new releases
+7. Use `docs/RELEASE_INSTRUCTIONS.md` for creating ALL releases (global instruction with DMG cleanup requirements)
 
 ### For Users
 1. Review `README.md` for basic information

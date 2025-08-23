@@ -315,7 +315,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ### Release Documentation
 - **[📦 Release Notes](docs/releases/)** - Release notes
-- **[🎯 Release Instructions](docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md)** - Release creation instructions
+- **[🎯 Release Instructions](docs/RELEASE_INSTRUCTIONS.md)** - Global release instructions for all versions
 
 ### Troubleshooting
 - **[🔐 Permissions Fix](PERMISSIONS_FIX.md)** - macOS permissions troubleshooting

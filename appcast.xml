@@ -6,6 +6,56 @@
         <language>en</language>
         
         <item>
+            <title>MacSSH 1.8.8 - Professional Code Signed Release</title>
+            <sparkle:version>188</sparkle:version>
+            <sparkle:shortVersionString>1.8.8</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.8</h2>
+                <h3>🎉 Major Update: Code Signing Implementation</h3>
+                <p>This release introduces <strong>Apple Developer ID code signing</strong>, eliminating Gatekeeper warnings and providing a professional installation experience.</p>
+                
+                <h3>✅ What's New</h3>
+                <h4>🔐 Code Signing</h4>
+                <ul>
+                    <li>Apple Developer ID signature implemented</li>
+                    <li>No more "unidentified developer" warnings</li>
+                    <li>Professional installation experience</li>
+                    <li>Automatic updates work seamlessly</li>
+                </ul>
+                
+                <h4>🧹 Clean Installation</h4>
+                <ul>
+                    <li>Removed all debug symbols and technical files</li>
+                    <li>Optimized DMG size (1.7MB)</li>
+                    <li>Professional installer appearance</li>
+                    <li>Meets commercial application standards</li>
+                </ul>
+                
+                <h4>📋 Process Improvements</h4>
+                <ul>
+                    <li>Global release instructions for all versions</li>
+                    <li>Proper git workflow with dev/main branches</li>
+                    <li>Comprehensive code signing guide</li>
+                    <li>Automated build and signing process</li>
+                </ul>
+                
+                <h3>🔐 Security Benefits</h3>
+                <ul>
+                    <li><strong>Verified Developer</strong>: Apple has verified the developer identity</li>
+                    <li><strong>No Security Warnings</strong>: macOS will not show security warnings</li>
+                    <li><strong>Trusted Installation</strong>: Users can install with confidence</li>
+                    <li><strong>Automatic Updates</strong>: Signed apps can update automatically</li>
+                </ul>
+            ]]></description>
+            <pubDate>Fri, 23 Aug 2025 17:47:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.8/MacSSH-1.8.8.dmg"
+                       sparkle:os="macos"
+                       length="1782579"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+        
+        <item>
             <title>MacSSH 1.8.7</title>
             <sparkle:version>187</sparkle:version>
             <sparkle:shortVersionString>1.8.7</sparkle:shortVersionString>
