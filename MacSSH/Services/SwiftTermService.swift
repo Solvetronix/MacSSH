@@ -167,20 +167,7 @@ class SwiftTermService: ObservableObject {
     }
     
     private func buildSSHCommand(for profile: Profile) throws -> String {
-        var command = ""
-        
-        // Если используется пароль, проверяем наличие sshpass
-        if profile.keyType == .password, let password = profile.password, !password.isEmpty {
-            if !SSHService.checkSSHPassAvailability() {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен")
-            }
-            guard let sshpassPath = SSHService.getSSHPassPath() else {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не найден в системе")
-            }
-            command = "\(sshpassPath) -p '\(password)' ssh"
-        } else {
-            command = "ssh"
-        }
+        var command = "ssh"
         
         // Добавляем опции для автоматического принятия fingerprint'а и интерактивности
         command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=password,keyboard-interactive -t -t"
