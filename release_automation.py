@@ -158,21 +158,77 @@ class MacSSHReleaseAutomation:
         
         dmg_name = f"MacSSH-{self.new_version}.dmg"
         
-        # Запускаем update_appcast.sh
-        self.run_command(f"./update_appcast.sh {self.new_version} {self.new_build} {dmg_name}")
+        # Проверяем существование DMG файла
+        if not os.path.exists(dmg_name):
+            self.log(f"❌ Error: DMG файл {dmg_name} не найден", "ERROR")
+            return
+        
+        # Получаем размер DMG файла
+        dmg_size = os.path.getsize(dmg_name)
+        
+        # Получаем текущую дату
+        from datetime import datetime
+        current_date = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+        
+        tag = f"v{self.new_version}"
+        
+        # Создаем новый элемент для appcast.xml
+        new_item = f'''        <item>
+            <title>MacSSH {self.new_version} - Release</title>
+            <sparkle:version>{self.new_build}</sparkle:version>
+            <sparkle:shortVersionString>{self.new_version}</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in MacSSH {self.new_version}</h2>
+                <ul>
+                    <li>🚀 Local build release</li>
+                    <li>🔧 Improved build process</li>
+                    <li>📦 DMG package creation</li>
+                    <li>⚡ Fast deployment pipeline</li>
+                </ul>
+            ]]></description>
+            <pubDate>{current_date}</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/{tag}/{dmg_name}"
+                       sparkle:os="macos"
+                       length="{dmg_size}"
+                       type="application/octet-stream"/>
+        </item>'''
+        
+        # Создаем новый appcast.xml файл
+        appcast_content = f'''<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+
+    <channel>
+        <title>MacSSH Updates</title>
+        <description>Most recent updates to MacSSH</description>
+        <language>en</language>
+        
+{new_item}
+    </channel>
+</rss>'''
+        
+        # Записываем новый файл
+        with open("appcast.xml", "w", encoding="utf-8") as f:
+            f.write(appcast_content)
         
         self.log("appcast.xml обновлен")
     
     def local_build(self):
         """Локальная сборка проекта"""
         self.log("Начинаю локальную сборку...")
+        print("🔄 Сборка в процессе... (это может занять несколько минут)")
         
-        # Очистка и сборка
-        self.run_command(
-            "xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Release clean build"
+        # Очистка и сборка с подавлением вывода
+        result = self.run_command(
+            "xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Release clean build",
+            capture_output=True
         )
         
-        self.log("Локальная сборка завершена успешно")
+        if result.returncode == 0:
+            self.log("✅ Локальная сборка завершена успешно")
+        else:
+            self.log("❌ Ошибка сборки", "ERROR")
+            self.log(f"Ошибка: {result.stderr}", "ERROR")
+            sys.exit(1)
     
     def create_dmg(self):
         """Создание DMG файла"""
