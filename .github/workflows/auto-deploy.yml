@@ -69,23 +69,23 @@ jobs:
           BUILD_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "MacSSH.app" -type d | head -1)
           create-dmg --volname "MacSSH Installer" --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "MacSSH.app" 200 190 --hide-extension "MacSSH.app" --app-drop-link 600 185 "$DMG_NAME" "$BUILD_PATH/.."
 
-                        - name: Generate release notes
-                    id: release-notes
-                    run: |
-                      RELEASE_NOTES="# MacSSH ${{ steps.current-version.outputs.new_version }} Release Notes"$'\n'$'\n'"## What's New"$'\n'
-                      RELEASE_NOTES+="- 🚀 Automatic release with GitHub Actions"$'\n'
-                      RELEASE_NOTES+="- 🔧 Improved build process"$'\n'
-                      RELEASE_NOTES+="- 📦 DMG package creation"$'\n'
-                      RELEASE_NOTES+=$'\n'$'\n'"## Technical Details"$'\n'"- Version: ${{ steps.current-version.outputs.new_version }}"$'\n'"- Build: ${{ steps.current-version.outputs.new_build }}"$'\n'"- Release Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"$'\n'$'\n'"## System Requirements"$'\n'"- macOS 14.0 or later"
-                      echo "$RELEASE_NOTES" > RELEASE_NOTES.md
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          RELEASE_NOTES="# MacSSH ${{ steps.current-version.outputs.new_version }} Release Notes"$'\n'$'\n'"## What's New"$'\n'
+          RELEASE_NOTES+="- 🚀 Automatic release with GitHub Actions"$'\n'
+          RELEASE_NOTES+="- 🔧 Improved build process"$'\n'
+          RELEASE_NOTES+="- 📦 DMG package creation"$'\n'
+          RELEASE_NOTES+=$'\n'$'\n'"## Technical Details"$'\n'"- Version: ${{ steps.current-version.outputs.new_version }}"$'\n'"- Build: ${{ steps.current-version.outputs.new_build }}"$'\n'"- Release Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"$'\n'$'\n'"## System Requirements"$'\n'"- macOS 14.0 or later"
+          echo "$RELEASE_NOTES" > RELEASE_NOTES.md
 
-                        - name: Create GitHub release
-                    env:
-                      GH_TOKEN: ${{ github.token }}
-                    run: |
-                      DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
-                      gh release create "${{ steps.current-version.outputs.tag }}" --title "MacSSH ${{ steps.current-version.outputs.new_version }} - Automatic Release" --notes-file RELEASE_NOTES.md --draft "$DMG_NAME"
-                      gh release edit "${{ steps.current-version.outputs.tag }}" --draft=false
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          gh release create "${{ steps.current-version.outputs.tag }}" --title "MacSSH ${{ steps.current-version.outputs.new_version }} - Automatic Release" --notes-file RELEASE_NOTES.md --draft "$DMG_NAME"
+          gh release edit "${{ steps.current-version.outputs.tag }}" --draft=false
 
       - name: Commit and push changes
         run: |
