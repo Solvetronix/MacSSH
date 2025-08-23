@@ -6,6 +6,31 @@
         <language>en</language>
         
         <item>
+            <title>MacSSH 1.8.3</title>
+            <sparkle:version>183</sparkle:version>
+            <sparkle:shortVersionString>1.8.3</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.3</h2>
+                <ul>
+                    <li>Professional automatic update system with Sparkle framework</li>
+                    <li>Background download and installation</li>
+                    <li>Automatic app restart after update</li>
+                    <li>Professional update UI with progress indicators</li>
+                    <li>Digital signature verification for security</li>
+                    <li>Enhanced SSH connection management</li>
+                    <li>Improved file browser functionality</li>
+                    <li>Better error handling and user feedback</li>
+                </ul>
+            ]]></description>
+            <pubDate>Thu, 22 Aug 2025 17:30:00 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.3/MacSSH-1.8.3.dmg"
+                       sparkle:os="macos"
+                       length="1100000"
+                       type="application/octet-stream"
+                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+        </item>
+        
+        <item>
             <title>MacSSH 1.8.7</title>
             <sparkle:version>187</sparkle:version>
             <sparkle:shortVersionString>1.8.7</sparkle:shortVersionString>
