@@ -212,6 +212,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				0A89A4E52E57AC3800747E24 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				0A89A8432E59403B00747E24 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A3B4FBD2DFF5F8400CC5B2C /* Products */;
@@ -613,6 +614,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.7.1;
+			};
+		};
+		0A89A8432E59403B00747E24 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

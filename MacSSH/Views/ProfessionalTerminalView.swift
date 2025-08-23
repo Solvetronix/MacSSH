@@ -1,9 +1,10 @@
 import SwiftUI
 import AppKit
+import SwiftTerm
 
 struct ProfessionalTerminalView: View {
     let profile: Profile
-    @ObservedObject var terminalService: EmbeddedTerminalService
+    @ObservedObject var terminalService: SwiftTermService
     @State private var commandHistory: [String] = [] // Локальная история команд для текущей сессии
     @State private var currentCommandIndex: Int = 0 // Будет обновляться при добавлении команд
     @State private var showingError: Bool = false
@@ -31,6 +32,12 @@ struct ProfessionalTerminalView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
+                
+                if terminalService.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .padding(.leading, 8)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -38,81 +45,54 @@ struct ProfessionalTerminalView: View {
             
             Divider()
             
-            // Основная область терминала
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        // Вывод терминала (очищаем от лишних символов)
-                        Text(terminalService.output
-                            .replacingOccurrences(of: "xioneer@XioneerCloud:~$ ", with: "")
-                            .replacingOccurrences(of: "\u{1B}[?2004h", with: "") // Убираем escape-код
-                            .replacingOccurrences(of: "\u{1B}]0;", with: "") // Убираем начало escape-кода заголовка
-                        )
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundColor(Color(red: 0.9, green: 0.9, blue: 0.9))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .id("output")
-                        
-                        // Текущая командная строка с промптом
-                        if terminalService.isConnected {
-                            TerminalCommandLineView(
-                                profile: profile,
-                                commandHistory: $commandHistory, // Локальная история команд
-                                currentCommandIndex: $currentCommandIndex,
-                                onCommandSubmit: { command in
-                                    LoggingService.shared.debug("Command submitted from ProfessionalTerminalView: '\(command)'", source: "ProfessionalTerminalView")
-                                    LoggingService.shared.debug("Current history count: \(commandHistory.count)", source: "ProfessionalTerminalView")
-                                    terminalService.sendCommand(command)
-                                }
-                            )
-                            .id("commandline")
-                            
-                            // Небольшой отступ под командной строкой
-                            Spacer()
-                                .frame(height: 8)
-                        }
-                    }
+            // SwiftTerm терминал
+            if terminalService.isConnected, let _ = terminalService.getTerminalView() {
+                SwiftTerminalView(terminalService: terminalService)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if terminalService.isLoading {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    
+                    Text("Подключение к \(profile.host)...")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Text(terminalService.connectionStatus)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.secondary)
                 }
-                .onChange(of: terminalService.output) {
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        proxy.scrollTo("commandline", anchor: .bottom)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.controlBackgroundColor))
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Терминал не подключен")
+                        .font(.system(.title2, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Button("Подключиться") {
+                        connectToSSH()
                     }
+                    .buttonStyle(.borderedProminent)
                 }
-                .onChange(of: terminalService.isConnected) { isConnected in
-                    if isConnected {
-                        // Автоматическая прокрутка вниз при подключении
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo("commandline", anchor: .bottom)
-                            }
-                        }
-                    }
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.controlBackgroundColor))
             }
-            .background(terminalBackground)
         }
-        .frame(minWidth: 700, minHeight: 500)
+        .frame(minWidth: 800, minHeight: 600)
         .onAppear {
-            // Добавляем небольшую задержку перед подключением для стабильности
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            // Подключаемся при появлении view
+            if !terminalService.isConnected && !terminalService.isLoading {
                 connectToSSH()
             }
         }
         .onDisappear {
-            // Безопасное отключение с защитой от краша
-            LoggingService.shared.debug("ProfessionalTerminalView onDisappear called", source: "ProfessionalTerminalView")
-            
-            // Сначала очищаем историю команд
-            commandHistory.removeAll()
-            currentCommandIndex = 0
-            
-            // Затем отключаем сервис
-            DispatchQueue.main.async {
-                terminalService.disconnect()
-            }
+            // Отключаемся при исчезновении view
+            terminalService.disconnect()
         }
         .alert("Connection Error", isPresented: $showingError) {
             Button("OK") {
@@ -192,6 +172,32 @@ struct TerminalCommandLineView: View {
     }
 }
 
+struct SwiftTerminalView: NSViewRepresentable {
+    let terminalService: SwiftTermService
+    
+    func makeNSView(context: Context) -> TerminalView {
+        // Получаем терминал из сервиса или создаем новый
+        if let terminal = terminalService.getTerminalView() {
+            return terminal
+        } else {
+            let terminal = TerminalView()
+            terminal.configureNativeColors()
+            terminal.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+            return terminal
+        }
+    }
+    
+    func updateNSView(_ nsView: TerminalView, context: Context) {
+        // Обновляем терминал при изменении сервиса
+        if let terminal = terminalService.getTerminalView() {
+            // Если терминал изменился, обновляем ссылку
+            if terminal != nsView {
+                // В реальном приложении здесь нужно будет обновить view
+            }
+        }
+    }
+}
+
 #Preview {
     ProfessionalTerminalView(
         profile: Profile(
@@ -200,8 +206,9 @@ struct TerminalCommandLineView: View {
             port: 22,
             username: "user",
             password: "password",
+            privateKeyPath: nil,
             keyType: .password
         ),
-        terminalService: EmbeddedTerminalService()
+        terminalService: SwiftTermService()
     )
 }

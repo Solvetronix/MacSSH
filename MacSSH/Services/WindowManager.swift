@@ -8,7 +8,7 @@ class WindowManager: ObservableObject {
     @Published var currentProfile: Profile?
     private var terminalWindows: [String: NSWindow] = [:]
     private var windowDelegates: [String: TerminalWindowDelegate] = [:]
-    private var terminalServices: [String: EmbeddedTerminalService] = [:]
+    private var terminalServices: [String: SwiftTermService] = [:]
     
     private init() {}
     
@@ -27,7 +27,7 @@ class WindowManager: ObservableObject {
         }
         
         // Создаем сервис терминала
-        let terminalService = EmbeddedTerminalService()
+        let terminalService = SwiftTermService()
         terminalServices[windowId] = terminalService
         
         // Создаем новое окно
