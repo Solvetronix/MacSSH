@@ -1,165 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+
     <channel>
         <title>MacSSH Updates</title>
         <description>Most recent updates to MacSSH</description>
         <language>en</language>
-                                                                    
+        
         <item>
-            <title>MacSSH 1.8.14 - Automatic Release</title>
-            <sparkle:version>194</sparkle:version>
-            <sparkle:shortVersionString>1.8.14</sparkle:shortVersionString>
+            <title>MacSSH 1.8.26 - Release</title>
+            <sparkle:version>206</sparkle:version>
+            <sparkle:shortVersionString>1.8.26</sparkle:shortVersionString>
             <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.14</h2>
+                <h2>What's New in MacSSH 1.8.26</h2>
                 <ul>
-                    <li>🚀 Automatic release with GitHub Actions</li>
+                    <li>🚀 Local build release</li>
                     <li>🔧 Improved build process</li>
                     <li>📦 DMG package creation</li>
-                    <li>⚡ Faster deployment pipeline</li>
+                    <li>⚡ Fast deployment pipeline</li>
                 </ul>
             ]]></description>
-            <pubDate>Sat, 23 Aug 2025 22:10:57 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.14/MacSSH-1.8.14.dmg"
+            <pubDate>Sat, 23 Aug 2025 23:02:37 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.26/MacSSH-1.8.26.dmg"
                        sparkle:os="macos"
-                       length=""
-                       type="application/octet-stream"/>
-        </item>
-                    
-        <item>
-            <title>MacSSH 1.8.13 - Automatic Release</title>
-            <sparkle:version>193</sparkle:version>
-            <sparkle:shortVersionString>1.8.13</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.13</h2>
-                <ul>
-                    <li>🚀 Automatic release with GitHub Actions</li>
-                    <li>🔧 Improved build process</li>
-                    <li>📦 DMG package creation</li>
-                    <li>⚡ Faster deployment pipeline</li>
-                </ul>
-            ]]></description>
-            <pubDate>Sat, 23 Aug 2025 19:57:01 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.13/MacSSH-1.8.13.dmg"
-                       sparkle:os="macos"
-                       length="17646245"
-                       type="application/octet-stream"/>
-        </item>
-        
-        <item>
-            <title>MacSSH 1.8.9 - Automatic Release</title>
-            <sparkle:version>189</sparkle:version>
-            <sparkle:shortVersionString>1.8.9</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.9</h2>
-                <ul>
-                    <li>🚀 Automatic release with GitHub Actions</li>
-                    <li>🔧 Improved build process</li>
-                    <li>📦 DMG package creation</li>
-                    <li>⚡ Faster deployment pipeline</li>
-                    <li>🤖 Fully automated CI/CD workflow</li>
-                </ul>
-            ]]></description>
-            <pubDate>Fri, 23 Aug 2025 19:17:00 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.9/MacSSH-1.8.9.dmg"
-                       sparkle:os="macos"
-                       length="17646045"
-                       type="application/octet-stream"/>
-        </item>
-        
-        <item>
-            <title>MacSSH 1.8.8 - Professional Code Signed Release</title>
-            <sparkle:version>188</sparkle:version>
-            <sparkle:shortVersionString>1.8.8</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.8</h2>
-                <h3>🎉 Major Update: Code Signing Implementation</h3>
-                <p>This release introduces <strong>Apple Developer ID code signing</strong>, eliminating Gatekeeper warnings and providing a professional installation experience.</p>
-                
-                <h3>✅ What's New</h3>
-                <h4>🔐 Code Signing</h4>
-                <ul>
-                    <li>Apple Developer ID signature implemented</li>
-                    <li>No more "unidentified developer" warnings</li>
-                    <li>Professional installation experience</li>
-                    <li>Automatic updates work seamlessly</li>
-                </ul>
-                
-                <h4>🧹 Clean Installation</h4>
-                <ul>
-                    <li>Removed all debug symbols and technical files</li>
-                    <li>Optimized DMG size (1.7MB)</li>
-                    <li>Professional installer appearance</li>
-                    <li>Meets commercial application standards</li>
-                </ul>
-                
-                <h4>📋 Process Improvements</h4>
-                <ul>
-                    <li>Global release instructions for all versions</li>
-                    <li>Proper git workflow with dev/main branches</li>
-                    <li>Comprehensive code signing guide</li>
-                    <li>Automated build and signing process</li>
-                </ul>
-                
-                <h3>🔐 Security Benefits</h3>
-                <ul>
-                    <li><strong>Verified Developer</strong>: Apple has verified the developer identity</li>
-                    <li><strong>No Security Warnings</strong>: macOS will not show security warnings</li>
-                    <li><strong>Trusted Installation</strong>: Users can install with confidence</li>
-                    <li><strong>Automatic Updates</strong>: Signed apps can update automatically</li>
-                </ul>
-            ]]></description>
-            <pubDate>Fri, 23 Aug 2025 17:47:00 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.8/MacSSH-1.8.8.dmg"
-                       sparkle:os="macos"
-                       length="1782579"
-                       type="application/octet-stream"/>
-        </item>
-        
-        <item>
-            <title>MacSSH 1.8.7</title>
-            <sparkle:version>187</sparkle:version>
-            <sparkle:shortVersionString>1.8.7</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.7</h2>
-                <ul>
-                    <li>Individual SSH Tools Status Check with progress indicators</li>
-                    <li>Checklist-style progress interface with real-time status updates</li>
-                    <li>Sequential verification of tools with visual feedback</li>
-                    <li>Compact modal design for SSH Tools Manager</li>
-                    <li>Centralized logging system across all application components</li>
-                    <li>Enhanced file manager logging integration</li>
-                    <li>Improved error handling and diagnostics</li>
-                    <li>Reduced log padding for more compact display</li>
-                    <li>Professional log interface with modern design</li>
-                    <li>Better visual feedback for all operations</li>
-                    <li>Enhanced About dialog with application information</li>
-                </ul>
-            ]]></description>
-            <pubDate>Thu, 22 Aug 2025 22:22:00 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.7/MacSSH-1.8.7.dmg"
-                       sparkle:os="macos"
-                       length="9800423"
-                       type="application/octet-stream"/>
-        </item>
-        
-        <item>
-            <title>MacSSH 1.8.6</title>
-            <sparkle:version>186</sparkle:version>
-            <sparkle:shortVersionString>1.8.6</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.6</h2>
-                <ul>
-                    <li>Fixed Sparkle update button issue</li>
-                    <li>Enhanced update detection system</li>
-                    <li>Improved logging and diagnostics</li>
-                    <li>Better error handling for update checks</li>
-                    <li>Resolved "You're up to date" problem</li>
-                </ul>
-            ]]></description>
-            <pubDate>Wed, 21 Aug 2025 22:55:00 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.6/MacSSH-1.8.6.dmg"
-                       sparkle:os="macos"
-                       length="9658151"
+                       length="6010746"
                        type="application/octet-stream"/>
         </item>
     </channel>
