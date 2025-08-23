@@ -55,10 +55,16 @@ jobs:
           brew install create-dmg
           brew install xmlstarlet
 
-      - name: Update version in project.pbxproj
+      - name: Update version in project.pbxproj and Info.plist
         run: |
+          # Update project.pbxproj
           sed -i '' "s/MARKETING_VERSION = ${{ steps.current-version.outputs.current_version }}/MARKETING_VERSION = ${{ steps.current-version.outputs.new_version }}/g" $XCODE_PROJECT/project.pbxproj
           sed -i '' "s/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.current_build }}/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.new_build }}/g" $XCODE_PROJECT/project.pbxproj
+          
+          # Update Info.plist
+          # Get current version from Info.plist
+          CURRENT_INFO_VERSION=$(grep -A 1 'CFBundleShortVersionString' MacSSH/Info.plist | tail -1 | sed 's/.*<string>\([^<]*\)<\/string>.*/\1/')
+          sed -i '' "s/<string>$CURRENT_INFO_VERSION<\/string>/<string>${{ steps.current-version.outputs.new_version }}<\/string>/g" MacSSH/Info.plist
 
       - name: Build application
         run: |
@@ -107,7 +113,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add $XCODE_PROJECT/project.pbxproj appcast.xml
+          git add $XCODE_PROJECT/project.pbxproj MacSSH/Info.plist appcast.xml
           git commit -m "Automatic release ${{ steps.current-version.outputs.new_version }} - Update version and appcast"
           git push origin main
 

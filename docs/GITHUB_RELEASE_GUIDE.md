@@ -103,9 +103,9 @@ ls -la MacSSH-*.dmg
 
 #### 1.3 Update Version Information
 
-**⚠️ CRITICAL**: Update version in `project.pbxproj` (NOT in Info.plist)!
+**⚠️ CRITICAL**: Update version in `project.pbxproj` AND `Info.plist`!
 
-**Why this is important**: Xcode uses `project.pbxproj` settings to override `Info.plist`. If you only update `Info.plist`, the app will still show the old version from `project.pbxproj`.
+**Why this is important**: Xcode uses `project.pbxproj` settings, but updating `Info.plist` ensures consistency across all version files.
 
 ```bash
 # Update MARKETING_VERSION (user-facing version)
@@ -114,12 +114,16 @@ sed -i '' 's/MARKETING_VERSION = 1\.8\.3;/MARKETING_VERSION = 1.8.4;/g' MacSSH.x
 # Update CURRENT_PROJECT_VERSION (build number)
 sed -i '' 's/CURRENT_PROJECT_VERSION = 183;/CURRENT_PROJECT_VERSION = 184;/g' MacSSH.xcodeproj/project.pbxproj
 
+# Update Info.plist for consistency
+sed -i '' 's/<string>1\.8\.3<\/string>/<string>1.8.4<\/string>/g' MacSSH/Info.plist
+
 # Verify changes
 grep -r "MARKETING_VERSION\|CURRENT_PROJECT_VERSION" MacSSH.xcodeproj/
+grep "CFBundleShortVersionString" MacSSH/Info.plist
 ```
 
 **❌ Common Mistake**: Only updating `Info.plist` - this will NOT work!
-**✅ Correct Way**: Update `project.pbxproj` - this is what Xcode actually uses.
+**✅ Correct Way**: Update `project.pbxproj` first, then `Info.plist` for consistency.
 
 #### 1.4 Prepare Release Notes
 ```bash

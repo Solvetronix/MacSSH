@@ -18,30 +18,16 @@ DMG_SIZE=$(stat -f%z "$DMG_NAME")
 CURRENT_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S +0000")
 TAG="v$VERSION"
 
-# Create new item content
-NEW_ITEM="        <item>
-            <title>MacSSH $VERSION - Automatic Release</title>
-            <sparkle:version>$BUILD</sparkle:version>
-            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in MacSSH $VERSION</h2>
-                <ul>
-                    <li>🚀 Automatic release with GitHub Actions</li>
-                    <li>🔧 Improved build process</li>
-                    <li>📦 DMG package creation</li>
-                    <li>⚡ Faster deployment pipeline</li>
-                </ul>
-            ]]></description>
-            <pubDate>$CURRENT_DATE</pubDate>
-            <enclosure url=\"https://github.com/Solvetronix/MacSSH/releases/download/$TAG/$DMG_NAME\"
-                       sparkle:os=\"macos\"
-                       length=\"$DMG_SIZE\"
-                       type=\"application/octet-stream\"/>
-        </item>"
+# Create new item content from template
+sed "s/VERSION_PLACEHOLDER/$VERSION/g; s/BUILD_PLACEHOLDER/$BUILD/g; s/DATE_PLACEHOLDER/$CURRENT_DATE/g; s/TAG_PLACEHOLDER/$TAG/g; s/DMG_PLACEHOLDER/$DMG_NAME/g; s/SIZE_PLACEHOLDER/$DMG_SIZE/g" appcast_template.xml > temp_item.xml
 
             # Insert new item after <language>en</language>
+            sed -i '' "/<language>en<\/language>/r temp_item.xml" appcast.xml
             sed -i '' "/<language>en<\/language>/a\\
-            $NEW_ITEM" appcast.xml
+            " appcast.xml
+            
+            # Clean up
+            rm temp_item.xml
 
             # Remove all placeholder signatures from existing items
             sed -i '' 's/sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"//g' appcast.xml

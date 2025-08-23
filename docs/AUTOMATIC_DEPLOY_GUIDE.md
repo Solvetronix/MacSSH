@@ -7,9 +7,9 @@ This guide explains how to set up automatic deployment for MacSSH using GitHub A
 ## ⚠️ CRITICAL WARNINGS
 
 ### 1. Version Management
-**The system automatically updates version in `project.pbxproj`, NOT in `Info.plist`!**
+**The system automatically updates version in `project.pbxproj` AND `Info.plist`!**
 
-This follows the critical requirement from the manual release guide. Xcode uses `project.pbxproj` settings to override `Info.plist`.
+This ensures consistency across all version files. Xcode uses `project.pbxproj` settings, but updating `Info.plist` prevents version mismatch issues.
 
 ### 2. Branch Protection
 **🚨 ALWAYS merge from `development` to `main` to trigger automatic deployment!**

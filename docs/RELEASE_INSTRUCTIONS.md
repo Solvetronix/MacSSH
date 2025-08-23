@@ -39,13 +39,24 @@ This is the **single, global release instruction** for all MacSSH versions. Foll
    ```
 
 #### Version Update
-1. Update version in `MacSSH/Info.plist`:
+1. Update version in `MacSSH.xcodeproj/project.pbxproj`:
+   ```bash
+   # Update MARKETING_VERSION
+   sed -i '' 's/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = X.Y.Z;/g' MacSSH.xcodeproj/project.pbxproj
+   
+   # Update CURRENT_PROJECT_VERSION (increment build number)
+   sed -i '' 's/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = BUILD_NUMBER;/g' MacSSH.xcodeproj/project.pbxproj
+   ```
+
+2. Update version in `MacSSH/Info.plist` (for consistency):
    ```xml
    <key>CFBundleVersion</key>
    <string>X.Y.Z</string>
    <key>CFBundleShortVersionString</key>
    <string>X.Y.Z</string>
    ```
+   
+   **Note**: Xcode uses `project.pbxproj` settings, but updating `Info.plist` ensures consistency.
 
 #### Build Configuration
 1. Set build configuration to **Release**

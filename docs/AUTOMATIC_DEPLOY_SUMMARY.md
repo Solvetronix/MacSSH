@@ -55,8 +55,9 @@ Version Increment → Build → DMG Creation → GitHub Release → Appcast Upda
 ### Automatic Version Management
 - Increments `MARKETING_VERSION` in `project.pbxproj`
 - Increments `CURRENT_PROJECT_VERSION` in `project.pbxproj`
+- Updates `CFBundleShortVersionString` and `CFBundleVersion` in `Info.plist`
 - Uses semantic versioning (1.8.8 → 1.8.9)
-- **Critical**: Updates `project.pbxproj`, NOT `Info.plist`
+- **Ensures consistency** across all version files
 
 ### Build Process
 - Xcode build with Release configuration
@@ -146,9 +147,10 @@ git push origin development
 ## 🚨 Critical Warnings
 
 ### Version Management
-- **ALWAYS update version in `project.pbxproj`, NOT in `Info.plist`**
-- Xcode uses `project.pbxproj` settings to override `Info.plist`
-- This is the most common mistake that causes version issues
+- **ALWAYS update version in `project.pbxproj` first**
+- **ALSO update `Info.plist` for consistency**
+- Xcode uses `project.pbxproj` settings, but `Info.plist` ensures consistency
+- This prevents version mismatch issues
 
 ### Branch Protection
 - **ALWAYS protect the main branch**
