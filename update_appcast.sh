@@ -39,8 +39,11 @@ NEW_ITEM="        <item>
                        type=\"application/octet-stream\"/>
         </item>"
 
-# Insert new item after <language>en</language>
-sed -i '' "/<language>en<\/language>/a\\
-$NEW_ITEM" appcast.xml
+            # Insert new item after <language>en</language>
+            sed -i '' "/<language>en<\/language>/a\\
+            $NEW_ITEM" appcast.xml
 
-echo "✅ Updated appcast.xml with version $VERSION"
+            # Remove all placeholder signatures from existing items
+            sed -i '' 's/sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"//g' appcast.xml
+
+            echo "✅ Updated appcast.xml with version $VERSION and removed placeholder signatures"
