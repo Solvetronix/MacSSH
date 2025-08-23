@@ -63,22 +63,72 @@ class SwiftTermService: ObservableObject {
                     process.standardOutput = outputPipe
                     process.standardError = outputPipe
                     
+                    // Настраиваем переменные окружения для терминала
+                    var environment = ProcessInfo.processInfo.environment
+                    environment["TERM"] = "xterm-256color"
+                    environment["COLUMNS"] = "80"
+                    environment["LINES"] = "24"
+                    process.environment = environment
+                    
                     // Обработка вывода процесса
-                    outputPipe.fileHandleForReading.readabilityHandler = { handle in
+                    outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                         let data = handle.availableData
                         if !data.isEmpty {
                             DispatchQueue.main.async {
                                 let bytes = Array(data)
                                 terminal.feed(byteArray: bytes[...])
+                                
+                                // Логируем весь вывод для отладки
+                                if let output = String(data: data, encoding: .utf8) {
+                                    LoggingService.shared.info("📥 SSH Output: '\(output.replacingOccurrences(of: "\n", with: "\\n"))'", source: "SwiftTermService")
+                                    
+                                    // Проверяем, нужно ли отправить пароль
+                                    if output.contains("password:") || output.contains("Password:") {
+                                        LoggingService.shared.warning("🔐 Password prompt detected!", source: "SwiftTermService")
+                                        
+                                        // Отправляем пароль если запрашивается
+                                        if let profile = self?.currentProfile,
+                                           profile.keyType == .password,
+                                           let password = profile.password,
+                                           !password.isEmpty {
+                                            LoggingService.shared.info("🔑 Sending password automatically...", source: "SwiftTermService")
+                                            
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                let passwordData = (password + "\n").data(using: .utf8) ?? Data()
+                                                if let inputPipe = process.standardInput as? Pipe {
+                                                    inputPipe.fileHandleForWriting.write(passwordData)
+                                                    LoggingService.shared.success("✅ Password sent to SSH process", source: "SwiftTermService")
+                                                } else {
+                                                    LoggingService.shared.error("❌ Failed to get input pipe for password", source: "SwiftTermService")
+                                                }
+                                            }
+                                        } else {
+                                            LoggingService.shared.error("❌ No password available in profile", source: "SwiftTermService")
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                     
                     // Запускаем процесс
                     try process.run()
+                    LoggingService.shared.success("🚀 SSH process started successfully", source: "SwiftTermService")
                     
-                    // Встроенный терминал сам обработает интерактивную авторизацию
-                    // Пароль будет отправлен автоматически при запросе сервера
+                    // Если используется парольная аутентификация, отправляем пароль сразу
+                    if profile.keyType == .password, let password = profile.password, !password.isEmpty {
+                        LoggingService.shared.info("🔑 Sending password immediately after connection...", source: "SwiftTermService")
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            let passwordData = (password + "\n").data(using: .utf8) ?? Data()
+                            if let inputPipe = process.standardInput as? Pipe {
+                                inputPipe.fileHandleForWriting.write(passwordData)
+                                LoggingService.shared.success("✅ Password sent to SSH process immediately", source: "SwiftTermService")
+                            } else {
+                                LoggingService.shared.error("❌ Failed to get input pipe for immediate password", source: "SwiftTermService")
+                            }
+                        }
+                    }
                     
                     DispatchQueue.main.async {
                         self.terminalView = terminal
@@ -114,11 +164,21 @@ class SwiftTermService: ObservableObject {
     }
     
     func sendData(_ data: [UInt8]) {
-        guard let process = sshProcess, isConnected else { return }
+        guard let process = sshProcess, isConnected else { 
+            LoggingService.shared.error("❌ Cannot send data - process not available or not connected", source: "SwiftTermService")
+            return 
+        }
         
         let data = Data(data)
         if let inputPipe = process.standardInput as? Pipe {
             inputPipe.fileHandleForWriting.write(data)
+            
+            // Логируем для отладки
+            if let text = String(data: data, encoding: .utf8) {
+                LoggingService.shared.info("📤 Sending to SSH: '\(text.replacingOccurrences(of: "\n", with: "\\n"))'", source: "SwiftTermService")
+            }
+        } else {
+            LoggingService.shared.error("❌ Failed to get input pipe for sending data", source: "SwiftTermService")
         }
     }
     
@@ -153,8 +213,19 @@ class SwiftTermService: ObservableObject {
     private func buildSSHCommand(for profile: Profile) throws -> String {
         var command = "/usr/bin/ssh"
         
-        // Добавляем опции для автоматического принятия fingerprint'а
-        command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        // Добавляем опции для принудительного создания псевдо-терминала и интерактивности
+        command += " -t -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        
+        // Принудительно включаем парольную аутентификацию
+        if profile.keyType == .password {
+            command += " -o PreferredAuthentications=password,keyboard-interactive"
+            command += " -o PubkeyAuthentication=no"
+            
+            // Используем sshpass для неинтерактивной отправки пароля
+            if let password = profile.password, !password.isEmpty {
+                command = "/opt/homebrew/bin/sshpass -p '\(password)' " + command
+            }
+        }
         
         // Добавляем порт если не стандартный
         if profile.port != 22 {

@@ -235,6 +235,13 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
     func send(source: TerminalView, data: ArraySlice<UInt8>) {
         // Отправляем данные от терминала в SSH процесс
         terminalService?.sendData(Array(data))
+        
+        // Логируем для отладки
+        if let text = String(data: Data(data), encoding: .utf8) {
+            LoggingService.shared.debug("🎯 Terminal input: '\(text.replacingOccurrences(of: "\n", with: "\\n"))'", source: "SwiftTerminalView")
+        } else {
+            LoggingService.shared.debug("🎯 Terminal input: [binary data, \(data.count) bytes]", source: "SwiftTerminalView")
+        }
     }
     
     func scrolled(source: TerminalView, position: Double) {
