@@ -21,6 +21,7 @@
 ### 🚀 Automatic Deployment System
 
 #### Main Instructions
+- **`RELEASE_AUTOMATION_GUIDE.md`** - 🆕 **ПОЛНАЯ АВТОМАТИЗАЦИЯ** - Инструкция по использованию Python скрипта для автоматических релизов
 - **`docs/SIGNATURE_ISSUE_FIX.md`** - 🆕 **ИСПРАВЛЕНИЕ ПОДПИСИ** - Решение ошибки "improperly signed" для автодеплоя
 - **`docs/NO_CONFLICT_DEPLOY_GUIDE.md`** - 🆕 **РЕШЕНИЕ КОНФЛИКТОВ** - Новый конфликт-свободный автодеплой
 - **`docs/QUICK_START_DEPLOY.md`** - 🆕 Quick start guide (5-minute setup)
@@ -34,6 +35,7 @@
 - **`.github/workflows/auto-deploy.yml`** - 🆕 GitHub Actions workflow for automatic deployment
 - **`.github/CODEOWNERS`** - 🆕 Code ownership configuration for pull request reviews
 - **`update_version_locally.sh`** - 🆕 Script for local version updates after auto-deploy
+- **`release_automation.py`** - 🆕 **ПОЛНАЯ АВТОМАТИЗАЦИЯ** - Python скрипт для автоматического создания релизов
 
 #### Configuration Files
 - **`docs/appcast.xml`** - RSS feed for Sparkle automatic updates
