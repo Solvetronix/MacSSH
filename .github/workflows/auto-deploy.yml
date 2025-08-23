@@ -1,0 +1,321 @@
+name: 🚀 Automatic Deploy - MacSSH
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
+
+env:
+  XCODE_PROJECT: MacSSH.xcodeproj
+  XCODE_SCHEME: MacSSH
+  XCODE_CONFIGURATION: Release
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: macos-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Get current version
+        id: current-version
+        run: |
+          # Extract current version from project.pbxproj
+          CURRENT_VERSION=$(grep 'MARKETING_VERSION = ' $XCODE_PROJECT/project.pbxproj | head -1 | sed 's/.*MARKETING_VERSION = \([^;]*\);.*/\1/')
+          CURRENT_BUILD=$(grep 'CURRENT_PROJECT_VERSION = ' $XCODE_PROJECT/project.pbxproj | head -1 | sed 's/.*CURRENT_PROJECT_VERSION = \([^;]*\);.*/\1/')
+          
+          echo "Current version: $CURRENT_VERSION"
+          echo "Current build: $CURRENT_BUILD"
+          
+          # Calculate new version (increment patch version)
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          NEW_PATCH=$((VERSION_PARTS[2] + 1))
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$NEW_PATCH"
+          NEW_BUILD=$((CURRENT_BUILD + 1))
+          
+          echo "New version: $NEW_VERSION"
+          echo "New build: $NEW_BUILD"
+          
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "current_build=$CURRENT_BUILD" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_build=$NEW_BUILD" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: 🔧 Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+
+      - name: 📦 Install dependencies
+        run: |
+          # Install create-dmg for DMG creation
+          brew install create-dmg
+          
+          # Install other required tools
+          brew install xmlstarlet
+
+      - name: 🔐 Setup signing (if available)
+        if: secrets.SIGNING_CERTIFICATE_BASE64
+        run: |
+          # Decode and install certificate
+          echo "${{ secrets.SIGNING_CERTIFICATE_BASE64 }}" | base64 -d > certificate.p12
+          
+          # Create keychain and import certificate
+          security create-keychain -p "temp" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "temp" build.keychain
+          security set-keychain-settings -t 3600 -l ~/Library/Keychains/build.keychain
+          security import certificate.p12 -k build.keychain -P "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "temp" build.keychain
+
+      - name: 🔄 Update version in project.pbxproj
+        run: |
+          echo "Updating version from ${{ steps.current-version.outputs.current_version }} to ${{ steps.current-version.outputs.new_version }}"
+          echo "Updating build from ${{ steps.current-version.outputs.current_build }} to ${{ steps.current-version.outputs.new_build }}"
+          
+          # Update MARKETING_VERSION
+          sed -i '' "s/MARKETING_VERSION = ${{ steps.current-version.outputs.current_version }}/MARKETING_VERSION = ${{ steps.current-version.outputs.new_version }}/g" $XCODE_PROJECT/project.pbxproj
+          
+          # Update CURRENT_PROJECT_VERSION
+          sed -i '' "s/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.current_build }}/CURRENT_PROJECT_VERSION = ${{ steps.current-version.outputs.new_build }}/g" $XCODE_PROJECT/project.pbxproj
+          
+          # Verify changes
+          echo "Updated versions:"
+          grep -r "MARKETING_VERSION\|CURRENT_PROJECT_VERSION" $XCODE_PROJECT/
+
+      - name: 🔨 Build application
+        run: |
+          echo "Building MacSSH ${{ steps.current-version.outputs.new_version }}..."
+          
+          # Clean previous builds
+          xcodebuild -project $XCODE_PROJECT -scheme $XCODE_SCHEME -configuration $XCODE_CONFIGURATION clean
+          
+          # Build application
+          xcodebuild -project $XCODE_PROJECT -scheme $XCODE_SCHEME -configuration $XCODE_CONFIGURATION build
+          
+          # Verify build location
+          BUILD_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "MacSSH.app" -type d | head -1)
+          echo "Build path: $BUILD_PATH"
+          
+          if [ ! -d "$BUILD_PATH" ]; then
+            echo "❌ Build failed - MacSSH.app not found"
+            exit 1
+          fi
+          
+          echo "✅ Build completed successfully"
+
+      - name: 📦 Create DMG package
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          BUILD_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "MacSSH.app" -type d | head -1)
+          
+          echo "Creating DMG: $DMG_NAME"
+          
+          create-dmg \
+            --volname "MacSSH Installer" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "MacSSH.app" 200 190 \
+            --hide-extension "MacSSH.app" \
+            --app-drop-link 600 185 \
+            "$DMG_NAME" \
+            "$BUILD_PATH/.."
+          
+          # Verify DMG was created
+          if [ ! -f "$DMG_NAME" ]; then
+            echo "❌ DMG creation failed"
+            exit 1
+          fi
+          
+          echo "✅ DMG created: $DMG_NAME"
+          ls -la "$DMG_NAME"
+
+      - name: 🔐 Sign DMG (if signing available)
+        if: secrets.SIGNING_CERTIFICATE_BASE64
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          
+          # Sign the DMG
+          codesign --force --sign "Developer ID Application" "$DMG_NAME"
+          
+          # Verify signature
+          codesign --verify --verbose "$DMG_NAME"
+          
+          echo "✅ DMG signed successfully"
+
+      - name: 📝 Generate release notes
+        id: release-notes
+        run: |
+          # Get commit messages since last release
+          COMMIT_MESSAGES=$(git log --oneline --no-merges $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
+          
+          # Generate release notes
+          RELEASE_NOTES="# MacSSH ${{ steps.current-version.outputs.new_version }} Release Notes"$'\n'$'\n'"## What's New"$'\n'
+          
+          # Parse conventional commits
+          while IFS= read -r line; do
+            if [[ $line =~ ^[a-f0-9]+\ \(feat\|fix\|docs\|style\|refactor\|test\|chore\)\(\([^)]*\)\)\?:\ \(.+\)$ ]]; then
+              TYPE="${BASH_REMATCH[1]}"
+              SCOPE="${BASH_REMATCH[2]}"
+              MESSAGE="${BASH_REMATCH[3]}"
+              
+              case $TYPE in
+                "feat")
+                  RELEASE_NOTES+="- ✨ $MESSAGE"$'\n'
+                  ;;
+                "fix")
+                  RELEASE_NOTES+="- 🐛 $MESSAGE"$'\n'
+                  ;;
+                "docs")
+                  RELEASE_NOTES+="- 📚 $MESSAGE"$'\n'
+                  ;;
+                "style")
+                  RELEASE_NOTES+="- 💄 $MESSAGE"$'\n'
+                  ;;
+                "refactor")
+                  RELEASE_NOTES+="- ♻️ $MESSAGE"$'\n'
+                  ;;
+                "test")
+                  RELEASE_NOTES+="- ✅ $MESSAGE"$'\n'
+                  ;;
+                "chore")
+                  RELEASE_NOTES+="- 🔧 $MESSAGE"$'\n'
+                  ;;
+              esac
+            fi
+          done <<< "$COMMIT_MESSAGES"
+          
+          RELEASE_NOTES+=$'\n'$'\n'"## Technical Details"$'\n'"- Version: ${{ steps.current-version.outputs.new_version }}"$'\n'"- Build: ${{ steps.current-version.outputs.new_build }}"$'\n'"- Release Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"$'\n'$'\n'"## System Requirements"$'\n'"- macOS 14.0 or later"
+          
+          echo "$RELEASE_NOTES" > RELEASE_NOTES.md
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "✅ Release notes generated"
+
+      - name: 🏷️ Create GitHub release
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          
+          echo "Creating GitHub release: ${{ steps.current-version.outputs.tag }}"
+          
+          # Create release
+          gh release create "${{ steps.current-version.outputs.tag }}" \
+            --title "MacSSH ${{ steps.current-version.outputs.new_version }} - Automatic Release" \
+            --notes-file RELEASE_NOTES.md \
+            --draft \
+            "$DMG_NAME"
+          
+          # Publish release
+          gh release edit "${{ steps.current-version.outputs.tag }}" --draft=false
+          
+          echo "✅ GitHub release created: ${{ steps.current-version.outputs.tag }}"
+
+      - name: 🔐 Generate Ed25519 signature (if key available)
+        if: secrets.SPARKLE_PRIVATE_KEY_BASE64
+        id: signature
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          
+          # Decode private key
+          echo "${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}" | base64 -d > sparkle_private_key.pem
+          
+          # Generate signature
+          SIGNATURE=$(sparkle_sign_update "$DMG_NAME" sparkle_private_key.pem)
+          
+          echo "signature=$SIGNATURE" >> $GITHUB_OUTPUT
+          echo "✅ Ed25519 signature generated"
+
+      - name: 📄 Update appcast.xml
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          DMG_SIZE=$(stat -f%z "$DMG_NAME")
+          CURRENT_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S +0000")
+          
+          # Create new appcast entry
+          NEW_ITEM="        <item>
+            <title>MacSSH ${{ steps.current-version.outputs.new_version }}</title>
+            <sparkle:version>${{ steps.current-version.outputs.new_build }}</sparkle:version>
+            <sparkle:shortVersionString>${{ steps.current-version.outputs.new_version }}</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in MacSSH ${{ steps.current-version.outputs.new_version }}</h2>
+                <ul>"
+          
+          # Add release notes to description
+          while IFS= read -r line; do
+            if [[ $line =~ ^-\ (.+)$ ]]; then
+              NEW_ITEM+="
+                    <li>${BASH_REMATCH[1]}</li>"
+            fi
+          done < RELEASE_NOTES.md
+          
+          NEW_ITEM+="
+                </ul>
+            ]]></description>
+            <pubDate>$CURRENT_DATE</pubDate>
+            <enclosure url=\"https://github.com/Solvetronix/MacSSH/releases/download/${{ steps.current-version.outputs.tag }}/$DMG_NAME\"
+                       sparkle:os=\"macos\"
+                       length=\"$DMG_SIZE\"
+                       type=\"application/octet-stream\""
+          
+          # Add signature if available
+          if [ "${{ steps.signature.outputs.signature }}" != "" ]; then
+            NEW_ITEM+="
+                       sparkle:edSignature=\"${{ steps.signature.outputs.signature }}\""
+          else
+            NEW_ITEM+="
+                       sparkle:edSignature=\"YOUR_ED_SIGNATURE_HERE\""
+          fi
+          
+          NEW_ITEM+="/>
+        </item>
+        
+"
+          
+          # Insert new item at the beginning of the channel (after the opening tag)
+          sed -i '' "/<channel>/a\\
+$NEW_ITEM" appcast.xml
+          
+          echo "✅ Appcast.xml updated with new release"
+
+      - name: 📤 Commit and push changes
+        run: |
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Add changes
+          git add $XCODE_PROJECT/project.pbxproj appcast.xml
+          
+          # Commit changes
+          git commit -m "🚀 Automatic release ${{ steps.current-version.outputs.new_version }} - Update version and appcast.xml"
+          
+          # Push changes
+          git push origin main
+          
+          echo "✅ Changes committed and pushed to main branch"
+
+      - name: ✅ Deployment summary
+        run: |
+          echo "🎉 Automatic deployment completed successfully!"
+          echo ""
+          echo "📋 Summary:"
+          echo "  Version: ${{ steps.current-version.outputs.new_version }}"
+          echo "  Build: ${{ steps.current-version.outputs.new_build }}"
+          echo "  Tag: ${{ steps.current-version.outputs.tag }}"
+          echo "  DMG: MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          echo ""
+          echo "🔗 Release URL: https://github.com/Solvetronix/MacSSH/releases/tag/${{ steps.current-version.outputs.tag }}"
+          echo "📄 Appcast URL: https://raw.githubusercontent.com/Solvetronix/MacSSH/main/appcast.xml"
+          echo ""
+          echo "✅ Sparkle automatic updates will now work for this release"
