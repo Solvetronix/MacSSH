@@ -142,7 +142,7 @@ class SwiftTermService: ObservableObject {
     }
     
     private func buildSSHCommand(for profile: Profile) throws -> String {
-        var command = "ssh"
+        var command = "/usr/bin/ssh"
         
         // Добавляем опции для автоматического принятия fingerprint'а
         command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
