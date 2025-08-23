@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		0A89A4E82E57AC9500747E24 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0A89A4E72E57AC9500747E24 /* Sparkle */; };
+		0A89A8472E5940D900747E24 /* termcast in Frameworks */ = {isa = PBXBuildFile; productRef = 0A89A8462E5940D900747E24 /* termcast */; };
+		0A89A8492E59415D00747E24 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 0A89A8482E59415D00747E24 /* SwiftTerm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +59,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				0A89A4E82E57AC9500747E24 /* Sparkle in Frameworks */,
+				0A89A8472E5940D900747E24 /* termcast in Frameworks */,
+				0A89A8492E59415D00747E24 /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -126,6 +130,8 @@
 			name = MacSSH;
 			packageProductDependencies = (
 				0A89A4E72E57AC9500747E24 /* Sparkle */,
+				0A89A8462E5940D900747E24 /* termcast */,
+				0A89A8482E59415D00747E24 /* SwiftTerm */,
 			);
 			productName = MacSSH;
 			productReference = 0A3B4FBC2DFF5F8400CC5B2C /* MacSSH.app */;
@@ -631,6 +637,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0A89A4E52E57AC3800747E24 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		0A89A8462E5940D900747E24 /* termcast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A89A8432E59403B00747E24 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = termcast;
+		};
+		0A89A8482E59415D00747E24 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A89A8432E59403B00747E24 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -9,7 +9,7 @@ class SwiftTermService: ObservableObject {
     @Published var connectionStatus: String = ""
     
     private var terminalView: TerminalView?
-    private var sshHost: LocalProcessTerminalSource?
+    private var sshHost: Process?
     private var currentProfile: Profile?
     private var isDisconnecting = false
     
@@ -34,8 +34,8 @@ class SwiftTermService: ObservableObject {
         let terminal = TerminalView()
         terminal.configureNativeColors()
         
-        // Создаем источник процесса для SSH
-        let source = LocalProcessTerminalSource()
+        // Создаем процесс SSH
+        let process = Process()
         
         // Запускаем SSH процесс
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -46,19 +46,21 @@ class SwiftTermService: ObservableObject {
                     let executable = components.0
                     let arguments = components.1
                     
-                    // Запускаем процесс через SwiftTerm
-                    source.startProcess(executable: executable, args: arguments, environment: [
+                    // Настраиваем процесс
+                    process.executableURL = URL(fileURLWithPath: executable)
+                    process.arguments = arguments
+                    process.environment = [
                         "TERM": "xterm-256color",
                         "COLUMNS": "80",
                         "LINES": "24"
-                    ])
+                    ]
                     
-                    // Подключаем терминал к источнику
-                    terminal.feed(byteArray: source)
+                    // Запускаем процесс
+                    try process.run()
                     
                     DispatchQueue.main.async {
                         self.terminalView = terminal
-                        self.sshHost = source
+                        self.sshHost = process
                         self.currentProfile = profile
                         self.isConnected = true
                         self.isLoading = false
@@ -81,10 +83,13 @@ class SwiftTermService: ObservableObject {
     
     @MainActor
     func sendCommand(_ command: String) {
-        guard let source = sshHost, isConnected else { return }
+        guard let process = sshHost, isConnected else { return }
         
         let commandData = (command + "\n").data(using: .utf8) ?? Data()
-        source.send(data: commandData)
+        // Отправляем команду в процесс через stdin
+        if let inputPipe = process.standardInput as? Pipe {
+            inputPipe.fileHandleForWriting.write(commandData)
+        }
     }
     
     func disconnect() {
@@ -98,7 +103,9 @@ class SwiftTermService: ObservableObject {
             self.connectionStatus = "Отключено"
             
             // Завершаем SSH процесс
-            self.sshHost?.terminate()
+            if let process = self.sshHost, process.isRunning {
+                process.terminate()
+            }
             
             // Очищаем ссылки
             self.terminalView = nil
