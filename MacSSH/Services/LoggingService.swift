@@ -75,6 +75,10 @@ class LoggingService: ObservableObject {
     func log(_ message: String, level: LogLevel = .info, source: String = "System") {
         guard isEnabled else { return }
         
+        // Выводим в системную консоль для отладки
+        let consoleMessage = "[\(level.rawValue)] [\(source)] \(message)"
+        print(consoleMessage)
+        
         DispatchQueue.main.async {
             let logMessage = LogMessage(
                 timestamp: Date(),

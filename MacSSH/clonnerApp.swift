@@ -15,6 +15,32 @@ struct MacSSHApp: App {
     init() {
         // Initialize Sparkle updater on app launch
         UpdateService.initializeUpdater()
+        
+        // Test logging
+        print("🔄 🚀 === APP STARTUP VERSION INFO ===")
+        print("🔄 📋 Bundle.main CFBundleShortVersionString: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
+        print("🔄 📋 Bundle.main CFBundleVersion: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")")
+        print("🔄 📋 Info.plist CFBundleShortVersionString: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
+        print("🔄 📋 Info.plist CFBundleVersion: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")")
+        print("🔄 📋 Info.plist SUFeedURL: \(Bundle.main.infoDictionary?["SUFeedURL"] as? String ?? "Unknown")")
+        print("🔄 🚀 === END VERSION INFO ===")
+        
+        // Test LoggingService
+        LoggingService.shared.info("🔄 🚀 === APP STARTUP VERSION INFO ===", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 📋 Bundle.main CFBundleShortVersionString: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 📋 Bundle.main CFBundleVersion: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 📋 Info.plist CFBundleShortVersionString: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 📋 Info.plist CFBundleVersion: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 📋 Info.plist SUFeedURL: \(Bundle.main.infoDictionary?["SUFeedURL"] as? String ?? "Unknown")", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 🚀 === END VERSION INFO ===", source: "MacSSHApp")
+        
+        // Test simple logging
+        print("🔄 🔧 Testing simple logging...")
+        LoggingService.shared.debug("🔄 🔧 Testing debug logging", source: "MacSSHApp")
+        LoggingService.shared.info("🔄 🔧 Testing info logging", source: "MacSSHApp")
+        LoggingService.shared.success("🔄 🔧 Testing success logging", source: "MacSSHApp")
+        LoggingService.shared.warning("🔄 🔧 Testing warning logging", source: "MacSSHApp")
+        LoggingService.shared.error("🔄 🔧 Testing error logging", source: "MacSSHApp")
     }
     
     var body: some Scene {
