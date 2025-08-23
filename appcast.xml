@@ -23,8 +23,7 @@
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.9/MacSSH-1.8.9.dmg"
                        sparkle:os="macos"
                        length="17646045"
-                       type="application/octet-stream"
-                       sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"/>
+                       type="application/octet-stream"/>
         </item>
         
         <item>

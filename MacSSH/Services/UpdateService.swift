@@ -43,6 +43,18 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         }
     }
     
+    // MARK: - Disable Signature Verification (for development/testing)
+    
+    func updater(_ updater: SPUUpdater, shouldAllowInstallingUpdate item: SUAppcastItem) -> Bool {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Allowing update installation without signature verification")
+        return true
+    }
+    
+    func updater(_ updater: SPUUpdater, shouldAllowInstallingUpdate item: SUAppcastItem, withImmediateInstallationInvocation immediateInstallationInvocation: @escaping () -> Void) -> Bool {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Allowing update installation without signature verification (immediate)")
+        return true
+    }
+    
     // MARK: - Logging
     
     static var logCallback: ((String) -> Void)?

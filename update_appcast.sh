@@ -36,8 +36,7 @@ NEW_ITEM="        <item>
             <enclosure url=\"https://github.com/Solvetronix/MacSSH/releases/download/$TAG/$DMG_NAME\"
                        sparkle:os=\"macos\"
                        length=\"$DMG_SIZE\"
-                       type=\"application/octet-stream\"
-                       sparkle:edSignature=\"YOUR_ED_SIGNATURE_HERE\"/>
+                       type=\"application/octet-stream\"/>
         </item>"
 
 # Insert new item after <language>en</language>

@@ -67,6 +67,7 @@
 8. **`docs/SPARKLE_VERSION_FORMAT_FIX.md`** - 🆕 Fix for incorrect sparkle:version format in appcast.xml
 9. **`docs/CRITICAL_APPCAST_UPDATE.md`** - 🆕 CRITICAL: Never forget to push appcast.xml after release
 10. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
+11. **`docs/SPARKLE_SIGNATURE_FIX.md`** - 🆕 Solution for Sparkle signature verification errors
 
 ### 🚀 Automatic Deployment
 11. **`docs/AUTOMATIC_DEPLOY_GUIDE.md`** - 🆕 Complete automatic deployment guide
