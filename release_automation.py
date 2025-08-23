@@ -5,7 +5,8 @@ MacSSH Release Automation Script
 1. Обновляет версии во всех файлах
 2. Локальная сборка
 3. Создание DMG
-4. Автодеплой на GitHub
+4. Создание GitHub Release
+5. Загрузка DMG в релиз
 """
 
 import os
@@ -179,25 +180,55 @@ class MacSSHReleaseAutomation:
         
         dmg_name = f"MacSSH-{self.new_version}.dmg"
         
-        # Находим путь к собранному приложению
+        # Находим путь к собранному приложению в Release конфигурации
         result = self.run_command(
-            "find ~/Library/Developer/Xcode/DerivedData -name 'MacSSH.app' -type d | head -1",
+            "find ~/Library/Developer/Xcode/DerivedData -name 'MacSSH.app' -path '*/Release/*' -type d | head -1",
             capture_output=True
         )
         
         if not result.stdout.strip():
-            self.log("Не найден MacSSH.app после сборки", "ERROR")
-            sys.exit(1)
+            # Пробуем найти в Products/Release
+            result = self.run_command(
+                "find ~/Library/Developer/Xcode/DerivedData -name 'MacSSH.app' -path '*/Products/Release/*' -type d | head -1",
+                capture_output=True
+            )
+            
+        if not result.stdout.strip():
+            self.log("Release версия не найдена, ищем любую версию...", "WARNING")
+            # Fallback: ищем любую версию
+            result = self.run_command(
+                "find ~/Library/Developer/Xcode/DerivedData -name 'MacSSH.app' -type d | head -1",
+                capture_output=True
+            )
+            
+            if not result.stdout.strip():
+                self.log("Не найден MacSSH.app после сборки", "ERROR")
+                sys.exit(1)
         
         app_path = Path(result.stdout.strip())
-        build_dir = app_path.parent
+        self.log(f"Найдено приложение: {app_path}")
         
-        # Создаем DMG
+        # Создаем временную папку только с приложением
+        temp_dir = Path(f"/tmp/MacSSH-{self.new_version}")
+        
+        # Удаляем папку если она существует
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        
+        temp_dir.mkdir(exist_ok=True)
+        
+        # Копируем только приложение
+        shutil.copytree(app_path, temp_dir / "MacSSH.app")
+        
+        # Создаем DMG только с приложением
         self.run_command(
             f"create-dmg --volname 'MacSSH Installer' --window-pos 200 120 --window-size 800 400 "
             f"--icon-size 100 --icon 'MacSSH.app' 200 190 --hide-extension 'MacSSH.app' "
-            f"--app-drop-link 600 185 '{dmg_name}' '{build_dir}'"
+            f"--app-drop-link 600 185 '{dmg_name}' '{temp_dir}'"
         )
+        
+        # Очищаем временную папку
+        shutil.rmtree(temp_dir)
         
         self.log(f"DMG файл создан: {dmg_name}")
         return dmg_name
@@ -212,17 +243,23 @@ class MacSSHReleaseAutomation:
         # Коммит
         self.run_command(f'git commit -m "Update version to {self.new_version} for release"')
         
-        # Отправка (запустит автодеплой)
+        # Отправка
         self.run_command("git push origin main")
         
-        self.log("Изменения отправлены, автодеплой запущен")
+        self.log("Изменения отправлены")
     
-    def wait_for_autodeploy(self):
-        """Ожидание завершения автодеплоя"""
-        self.log("Ожидаю завершения автодеплоя...")
-        self.log("Проверьте GitHub Actions: https://github.com/Solvetronix/MacSSH/actions")
-        self.log("Нажмите Enter когда автодеплой завершится...")
-        input()
+    def create_github_release(self):
+        """Создание GitHub Release"""
+        self.log("Создаю GitHub Release...")
+        
+        # Создаем релиз
+        self.run_command(
+            f'gh release create v{self.new_version} '
+            f'--title "MacSSH {self.new_version}" '
+            f'--notes "Release {self.new_version} (build {self.new_build})"'
+        )
+        
+        self.log(f"GitHub Release v{self.new_version} создан")
     
     def upload_dmg_to_release(self):
         """Загрузка DMG в GitHub Release"""
@@ -234,8 +271,8 @@ class MacSSHReleaseAutomation:
             self.log(f"DMG файл не найден: {dmg_name}", "ERROR")
             return
         
-        # Загружаем в последний релиз
-        self.run_command(f"gh release upload latest {dmg_name}")
+        # Загружаем в созданный релиз
+        self.run_command(f"gh release upload v{self.new_version} {dmg_name}")
         
         self.log(f"DMG загружен в релиз: {dmg_name}")
     
@@ -256,6 +293,7 @@ class MacSSHReleaseAutomation:
             print(f"   Текущая версия: {self.current_version} (build {self.current_build})")
             print(f"   Новая версия: {self.new_version} (build {self.new_build})")
             print(f"   DMG файл: MacSSH-{self.new_version}.dmg")
+            print(f"   GitHub Release: v{self.new_version}")
             
             confirm = input("\nПродолжить? (y/N): ").strip().lower()
             if confirm != 'y':
@@ -266,7 +304,6 @@ class MacSSHReleaseAutomation:
             self.log("\n📝 Шаг 1: Обновление версий")
             self.update_project_pbxproj()
             self.update_info_plist()
-            self.update_appcast_xml()
             
             # 4. Локальная сборка
             self.log("\n🔨 Шаг 2: Локальная сборка")
@@ -276,20 +313,25 @@ class MacSSHReleaseAutomation:
             self.log("\n📦 Шаг 3: Создание DMG")
             dmg_name = self.create_dmg()
             
-            # 6. Коммит и автодеплой
-            self.log("\n🚀 Шаг 4: Запуск автодеплоя")
+            # 6. Обновление appcast.xml
+            self.log("\n📝 Шаг 4: Обновление appcast.xml")
+            self.update_appcast_xml()
+            
+            # 7. Коммит и отправка
+            self.log("\n📤 Шаг 5: Отправка изменений")
             self.commit_and_push()
             
-            # 7. Ожидание автодеплоя
-            self.log("\n⏳ Шаг 5: Ожидание автодеплоя")
-            self.wait_for_autodeploy()
+            # 8. Создание GitHub Release
+            self.log("\n🏷️ Шаг 6: Создание GitHub Release")
+            self.create_github_release()
             
-            # 8. Загрузка DMG
-            self.log("\n📤 Шаг 6: Загрузка DMG в релиз")
+            # 9. Загрузка DMG
+            self.log("\n📤 Шаг 7: Загрузка DMG в релиз")
             self.upload_dmg_to_release()
             
             self.log("\n✅ Релиз успешно завершен!")
             self.log(f"🎉 Новая версия {self.new_version} доступна на GitHub")
+            self.log(f"🔗 Релиз: https://github.com/Solvetronix/MacSSH/releases/tag/v{self.new_version}")
             
         except KeyboardInterrupt:
             self.log("Процесс прерван пользователем", "WARNING")
@@ -310,8 +352,9 @@ MacSSH Release Automation Script
 1. Обновляет версии во всех файлах (project.pbxproj, Info.plist, appcast.xml)
 2. Выполняет локальную сборку проекта
 3. Создает DMG файл
-4. Запускает автодеплой на GitHub
-5. Загружает DMG в созданный релиз
+4. Отправляет изменения в Git
+5. Создает GitHub Release
+6. Загружает локальный DMG в релиз
 
 Требования:
 - Python 3.6+
