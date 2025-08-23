@@ -63,12 +63,19 @@ class SwiftTermService: ObservableObject {
                     process.standardOutput = outputPipe
                     process.standardError = outputPipe
                     
-                    // Настраиваем переменные окружения для терминала
-                    var environment = ProcessInfo.processInfo.environment
-                    environment["TERM"] = "xterm-256color"
-                    environment["COLUMNS"] = "80"
-                    environment["LINES"] = "24"
-                    process.environment = environment
+                            // Настраиваем переменные окружения для терминала
+        var environment = ProcessInfo.processInfo.environment
+        environment["TERM"] = "xterm-256color"
+        environment["COLUMNS"] = "80"
+        environment["LINES"] = "24"
+        
+        // Устанавливаем SSHPASS если используется парольная аутентификация
+        if profile.keyType == .password, let password = profile.password, !password.isEmpty {
+            environment["SSHPASS"] = password
+            LoggingService.shared.info("🔧 Set SSHPASS environment variable", source: "SwiftTermService")
+        }
+        
+        process.environment = environment
                     
                     // Обработка вывода процесса
                     outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -115,19 +122,9 @@ class SwiftTermService: ObservableObject {
                     try process.run()
                     LoggingService.shared.success("🚀 SSH process started successfully", source: "SwiftTermService")
                     
-                    // Если используется парольная аутентификация, отправляем пароль сразу
+                    // sshpass -e автоматически обрабатывает парольную аутентификацию
                     if profile.keyType == .password, let password = profile.password, !password.isEmpty {
-                        LoggingService.shared.info("🔑 Sending password immediately after connection...", source: "SwiftTermService")
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            let passwordData = (password + "\n").data(using: .utf8) ?? Data()
-                            if let inputPipe = process.standardInput as? Pipe {
-                                inputPipe.fileHandleForWriting.write(passwordData)
-                                LoggingService.shared.success("✅ Password sent to SSH process immediately", source: "SwiftTermService")
-                            } else {
-                                LoggingService.shared.error("❌ Failed to get input pipe for immediate password", source: "SwiftTermService")
-                            }
-                        }
+                        LoggingService.shared.success("✅ sshpass -e will handle password authentication automatically", source: "SwiftTermService")
                     }
                     
                     DispatchQueue.main.async {
@@ -223,7 +220,8 @@ class SwiftTermService: ObservableObject {
             
             // Используем sshpass для неинтерактивной отправки пароля
             if let password = profile.password, !password.isEmpty {
-                command = "/opt/homebrew/bin/sshpass -p '\(password)' " + command
+                // Попробуем через переменную окружения (более безопасно)
+                command = "/opt/homebrew/bin/sshpass -e " + command
             }
         }
         
