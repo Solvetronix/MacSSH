@@ -181,14 +181,15 @@ struct SwiftTerminalView: NSViewRepresentable {
     func makeNSView(context: Context) -> TerminalView {
         // Получаем терминал из сервиса или создаем новый
         if let terminal = terminalService.getTerminalView() {
+            context.coordinator.setupTerminal(terminal, service: terminalService)
             return terminal
         } else {
             let terminal = TerminalView()
             terminal.configureNativeColors()
             terminal.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
             
-            // Настраиваем делегат для обработки копирования
-            context.coordinator.setupTerminal(terminal)
+            // Настраиваем делегат для обработки ввода и копирования
+            context.coordinator.setupTerminal(terminal, service: terminalService)
             
             return terminal
         }
@@ -199,7 +200,7 @@ struct SwiftTerminalView: NSViewRepresentable {
         if let terminal = terminalService.getTerminalView() {
             // Если терминал изменился, обновляем ссылку
             if terminal != nsView {
-                // В реальном приложении здесь нужно будет обновить view
+                context.coordinator.setupTerminal(terminal, service: terminalService)
             }
         }
     }
@@ -209,10 +210,48 @@ struct SwiftTerminalView: NSViewRepresentable {
     }
     
     class Coordinator: NSObject {
-        func setupTerminal(_ terminal: TerminalView) {
-            // SwiftTerm автоматически поддерживает копирование через Cmd+C
-            // и контекстное меню
+        private weak var terminalService: SwiftTermService?
+        
+        func setupTerminal(_ terminal: TerminalView, service: SwiftTermService) {
+            self.terminalService = service
+            terminal.terminalDelegate = self
         }
+    }
+}
+
+extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
+    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+        // Обработка изменения размера терминала
+    }
+    
+    func setTerminalTitle(source: TerminalView, title: String) {
+        // Обработка изменения заголовка терминала
+    }
+    
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        // Обработка изменения текущей директории
+    }
+    
+    func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        // Отправляем данные от терминала в SSH процесс
+        terminalService?.sendData(Array(data))
+    }
+    
+    func scrolled(source: TerminalView, position: Double) {
+        // Обработка прокрутки
+    }
+    
+    func clipboardCopy(source: TerminalView, content: Data) {
+        // Автоматическое копирование в буфер обмена
+        if let text = String(data: content, encoding: .utf8) {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+        }
+    }
+    
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {
+        // Обработка изменения выделенного диапазона
     }
 }
 
