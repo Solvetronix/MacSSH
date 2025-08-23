@@ -56,7 +56,7 @@ jobs:
 
       - name: Build application
         run: |
-          xcodebuild -project $XCODE_PROJECT -scheme $XCODE_SCHEME -configuration $XCODE_CONFIGURATION clean build
+          xcodebuild -project $XCODE_PROJECT -scheme $XCODE_SCHEME -configuration $XCODE_CONFIGURATION clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
           BUILD_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "MacSSH.app" -type d | head -1)
           if [ ! -d "$BUILD_PATH" ]; then
             echo "Build failed - MacSSH.app not found"
