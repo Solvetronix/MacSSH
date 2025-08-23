@@ -55,16 +55,19 @@ class UpdateService: NSObject, SPUUpdaterDelegate {
         return true
     }
     
-    // MARK: - Additional Signature Verification Disabling
+    // MARK: - Additional Signature Verification Overrides
+    
+    func updater(_ updater: SPUUpdater, shouldAllowInstallingUpdate item: SUAppcastItem, withImmediateInstallationInvocation immediateInstallationInvocation: @escaping () -> Void, andInstallationInvocation installationInvocation: @escaping () -> Void) -> Bool {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Allowing update installation without signature verification (with installation)")
+        return true
+    }
     
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationInvocation: @escaping () -> Void) {
         UpdateService.log("🔧 SPUUpdaterDelegate: Will install update on quit (signature verification disabled)")
-        immediateInstallationInvocation()
     }
     
-    func updater(_ updater: SPUUpdater, shouldAllowInstallingUpdate item: SUAppcastItem, withImmediateInstallationInvocation immediateInstallationInvocation: @escaping () -> Void, reply: @escaping (Bool) -> Void) {
-        UpdateService.log("🔧 SPUUpdaterDelegate: Allowing update installation without signature verification (with reply)")
-        reply(true)
+    func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationInvocation: @escaping () -> Void, andInstallationInvocation installationInvocation: @escaping () -> Void) {
+        UpdateService.log("🔧 SPUUpdaterDelegate: Will install update on quit (signature verification disabled)")
     }
     
     // MARK: - Logging

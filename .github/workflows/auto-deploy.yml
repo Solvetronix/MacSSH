@@ -123,10 +123,6 @@ jobs:
           echo "1. Update version in project.pbxproj to ${{ steps.current-version.outputs.new_version }}"
           echo "2. Update appcast.xml locally"
           echo "3. Commit and push changes"
-          echo ""
-          echo "🔐 Note: Code signing is disabled for this build"
-          echo "   - Updates will work without signature verification"
-          echo "   - Users may see security warnings (normal for unsigned builds)"
 
       - name: Deployment summary
         run: |
