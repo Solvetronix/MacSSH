@@ -6,6 +6,26 @@
         <language>en</language>
                     
         <item>
+            <title>MacSSH 1.8.14 - Automatic Release</title>
+            <sparkle:version>194</sparkle:version>
+            <sparkle:shortVersionString>1.8.14</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in MacSSH 1.8.14</h2>
+                <ul>
+                    <li>🚀 Automatic release with GitHub Actions</li>
+                    <li>🔧 Improved build process</li>
+                    <li>📦 DMG package creation</li>
+                    <li>⚡ Faster deployment pipeline</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sat, 23 Aug 2025 22:10:57 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.14/MacSSH-1.8.14.dmg"
+                       sparkle:os="macos"
+                       length=""
+                       type="application/octet-stream"/>
+        </item>
+                    
+        <item>
             <title>MacSSH 1.8.13 - Automatic Release</title>
             <sparkle:version>193</sparkle:version>
             <sparkle:shortVersionString>1.8.13</sparkle:shortVersionString>
