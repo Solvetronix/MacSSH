@@ -31,5 +31,8 @@ sed "s/VERSION_PLACEHOLDER/$VERSION/g; s/BUILD_PLACEHOLDER/$BUILD/g; s/DATE_PLAC
 
             # Remove all placeholder signatures from existing items
             sed -i '' 's/sparkle:edSignature="YOUR_ED_SIGNATURE_HERE"//g' appcast.xml
+            
+            # Remove any other signature attributes that might exist
+            sed -i '' 's/sparkle:edSignature="[^"]*"//g' appcast.xml
 
-            echo "✅ Updated appcast.xml with version $VERSION and removed placeholder signatures"
+            echo "✅ Updated appcast.xml with version $VERSION and removed all signatures"

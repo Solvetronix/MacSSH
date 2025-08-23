@@ -21,6 +21,7 @@
 ### 🚀 Automatic Deployment System
 
 #### Main Instructions
+- **`docs/SIGNATURE_VERIFICATION_FIX.md`** - 🆕 **ИСПРАВЛЕНИЕ ПОДПИСИ** - Решение ошибки "improperly signed"
 - **`docs/NO_CONFLICT_DEPLOY_GUIDE.md`** - 🆕 **РЕШЕНИЕ КОНФЛИКТОВ** - Новый конфликт-свободный автодеплой
 - **`docs/QUICK_START_DEPLOY.md`** - 🆕 Quick start guide (5-minute setup)
 - **`docs/AUTOMATIC_DEPLOY_GUIDE.md`** - 🆕 Complete guide for automatic deployment with GitHub Actions
