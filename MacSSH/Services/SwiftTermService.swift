@@ -70,24 +70,6 @@ class SwiftTermService: ObservableObject {
                             DispatchQueue.main.async {
                                 let bytes = Array(data)
                                 terminal.feed(byteArray: bytes[...])
-                                
-                                // Проверяем, нужно ли отправить пароль
-                                if let output = String(data: data, encoding: .utf8) {
-                                    if output.contains("password:") || output.contains("Password:") {
-                                        // Отправляем пароль если запрашивается
-                                        if let profile = self.currentProfile,
-                                           profile.keyType == .password,
-                                           let password = profile.password,
-                                           !password.isEmpty {
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                                let passwordData = (password + "\n").data(using: .utf8) ?? Data()
-                                                if let inputPipe = process.standardInput as? Pipe {
-                                                    inputPipe.fileHandleForWriting.write(passwordData)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -95,15 +77,8 @@ class SwiftTermService: ObservableObject {
                     // Запускаем процесс
                     try process.run()
                     
-                    // Если используется пароль, отправляем его автоматически
-                    if profile.keyType == .password, let password = profile.password, !password.isEmpty {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            let passwordData = (password + "\n").data(using: .utf8) ?? Data()
-                            if let inputPipe = process.standardInput as? Pipe {
-                                inputPipe.fileHandleForWriting.write(passwordData)
-                            }
-                        }
-                    }
+                    // Встроенный терминал сам обработает интерактивную авторизацию
+                    // Пароль будет отправлен автоматически при запросе сервера
                     
                     DispatchQueue.main.async {
                         self.terminalView = terminal
@@ -169,8 +144,8 @@ class SwiftTermService: ObservableObject {
     private func buildSSHCommand(for profile: Profile) throws -> String {
         var command = "ssh"
         
-        // Добавляем опции для автоматического принятия fingerprint'а и интерактивности
-        command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=password,keyboard-interactive -t -t"
+        // Добавляем опции для автоматического принятия fingerprint'а
+        command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
         
         // Добавляем порт если не стандартный
         if profile.port != 22 {
