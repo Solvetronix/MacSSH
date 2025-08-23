@@ -113,6 +113,15 @@ class SwiftTermService: ObservableObject {
         }
     }
     
+    func sendData(_ data: [UInt8]) {
+        guard let process = sshProcess, isConnected else { return }
+        
+        let data = Data(data)
+        if let inputPipe = process.standardInput as? Pipe {
+            inputPipe.fileHandleForWriting.write(data)
+        }
+    }
+    
     func disconnect() {
         guard isConnected && !isDisconnecting else { return }
         

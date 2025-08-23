@@ -186,6 +186,10 @@ struct SwiftTerminalView: NSViewRepresentable {
             let terminal = TerminalView()
             terminal.configureNativeColors()
             terminal.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+            
+            // Настраиваем делегат для обработки копирования
+            context.coordinator.setupTerminal(terminal)
+            
             return terminal
         }
     }
@@ -199,7 +203,23 @@ struct SwiftTerminalView: NSViewRepresentable {
             }
         }
     }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject {
+        func setupTerminal(_ terminal: TerminalView) {
+            // SwiftTerm автоматически поддерживает копирование через Cmd+C
+            // и контекстное меню
+        }
+    }
 }
+
+// SwiftTerm автоматически поддерживает копирование текста через:
+// - Cmd+C для копирования выделенного текста
+// - Контекстное меню (правый клик)
+// - Выделение мышью и копирование
 
 #Preview {
     ProfessionalTerminalView(
