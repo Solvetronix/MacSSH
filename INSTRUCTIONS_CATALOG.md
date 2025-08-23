@@ -18,6 +18,20 @@
 - **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI for Sparkle updates (⚠️ CRITICAL: version management)
 - **`docs/UPDATE_SYSTEM_SUMMARY.md`** - Final summary of all changes in the update system
 
+### 🚀 Automatic Deployment System
+
+#### Main Instructions
+- **`docs/QUICK_START_DEPLOY.md`** - 🆕 Quick start guide (5-minute setup)
+- **`docs/AUTOMATIC_DEPLOY_GUIDE.md`** - 🆕 Complete guide for automatic deployment with GitHub Actions
+- **`docs/GITHUB_SECRETS_SETUP.md`** - 🆕 Setup guide for GitHub Secrets (certificates, keys)
+- **`docs/BRANCH_PROTECTION_SETUP.md`** - 🆕 Configuration guide for branch protection rules
+- **`docs/TESTING_AUTOMATIC_DEPLOY.md`** - 🆕 Testing guide for automatic deployment system
+- **`docs/AUTOMATIC_DEPLOY_SUMMARY.md`** - 🆕 Complete system summary and overview
+
+#### Configuration Files
+- **`.github/workflows/auto-deploy.yml`** - 🆕 GitHub Actions workflow for automatic deployment
+- **`.github/CODEOWNERS`** - 🆕 Code ownership configuration for pull request reviews
+
 #### Configuration Files
 - **`docs/appcast.xml`** - RSS feed for Sparkle automatic updates
 
@@ -54,6 +68,12 @@
 9. **`docs/CRITICAL_APPCAST_UPDATE.md`** - 🆕 CRITICAL: Never forget to push appcast.xml after release
 10. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI (⚠️ CRITICAL: version management)
 
+### 🚀 Automatic Deployment
+11. **`docs/AUTOMATIC_DEPLOY_GUIDE.md`** - 🆕 Complete automatic deployment guide
+12. **`docs/GITHUB_SECRETS_SETUP.md`** - 🆕 GitHub Secrets configuration
+13. **`docs/BRANCH_PROTECTION_SETUP.md`** - 🆕 Branch protection configuration
+14. **`docs/TESTING_AUTOMATIC_DEPLOY.md`** - 🆕 Testing automatic deployment system
+
 ### 📋 Release Management
 1. **`docs/RELEASE_INSTRUCTIONS.md`** - 🆕 **GLOBAL** release instructions for ALL versions
 2. **`docs/GITHUB_RELEASE_GUIDE.md`** - 🆕 GitHub Release Guide with GitHub CLI for Sparkle updates (⚠️ CRITICAL: version management)
@@ -79,7 +99,15 @@
 6. **Use `docs/SPARKLE_VERSION_FORMAT_FIX.md` for fixing appcast.xml version format issues**
 7. **Use `docs/CRITICAL_APPCAST_UPDATE.md` for the most common mistake that breaks updates**
 8. **Use `docs/GITHUB_RELEASE_GUIDE.md` for creating releases with GitHub CLI (⚠️ CRITICAL: version management)**
+<<<<<<< HEAD
 7. Use `docs/RELEASE_INSTRUCTIONS.md` for creating ALL releases (global instruction with DMG cleanup requirements)
+=======
+9. **Use `docs/AUTOMATIC_DEPLOY_GUIDE.md` for setting up automatic deployment**
+10. **Use `docs/GITHUB_SECRETS_SETUP.md` for configuring GitHub Secrets**
+11. **Use `docs/BRANCH_PROTECTION_SETUP.md` for setting up branch protection**
+12. **Use `docs/TESTING_AUTOMATIC_DEPLOY.md` for testing the deployment system**
+13. Use `docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md` for creating new releases
+>>>>>>> dev
 
 ### For Users
 1. Review `README.md` for basic information
