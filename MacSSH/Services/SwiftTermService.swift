@@ -70,6 +70,24 @@ class SwiftTermService: ObservableObject {
                             DispatchQueue.main.async {
                                 let bytes = Array(data)
                                 terminal.feed(byteArray: bytes[...])
+                                
+                                // Проверяем, нужно ли отправить пароль
+                                if let output = String(data: data, encoding: .utf8) {
+                                    if output.contains("password:") || output.contains("Password:") {
+                                        // Отправляем пароль если запрашивается
+                                        if let profile = self.currentProfile,
+                                           profile.keyType == .password,
+                                           let password = profile.password,
+                                           !password.isEmpty {
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                let passwordData = (password + "\n").data(using: .utf8) ?? Data()
+                                                if let inputPipe = process.standardInput as? Pipe {
+                                                    inputPipe.fileHandleForWriting.write(passwordData)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -79,7 +97,7 @@ class SwiftTermService: ObservableObject {
                     
                     // Если используется пароль, отправляем его автоматически
                     if profile.keyType == .password, let password = profile.password, !password.isEmpty {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                             let passwordData = (password + "\n").data(using: .utf8) ?? Data()
                             if let inputPipe = process.standardInput as? Pipe {
                                 inputPipe.fileHandleForWriting.write(passwordData)
