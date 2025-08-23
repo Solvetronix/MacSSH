@@ -4,6 +4,23 @@
 
 This is the **single, global release instruction** for all MacSSH versions. Follow these steps for any release.
 
+### 🔐 Code Signing Policy
+
+**ВСЕ релизы MacSSH теперь ОБЯЗАТЕЛЬНО подписываются Apple Developer ID сертификатом!**
+
+**Причины:**
+- ✅ Устранение предупреждений Gatekeeper
+- ✅ Профессиональный опыт установки
+- ✅ Доверие пользователей
+- ✅ Совместимость с автоматическими обновлениями
+- ✅ Соответствие стандартам коммерческих приложений
+
+**Требования:**
+- Все релизы должны быть подписаны
+- DMG должен быть очищен от технических файлов
+- Размер DMG должен быть оптимизирован
+- Автоматические обновления должны работать
+
 ## 🚀 How to Release
 
 ### 1. Pre-Release Preparation
@@ -159,15 +176,16 @@ git push origin main
 - [ ] **Работаем из ветки `main`** (git checkout main)
 - [ ] Version updated in `Info.plist`
 - [ ] Release build created successfully
-- [ ] **Application code signed with Developer ID** (prevents Gatekeeper warnings)
-- [ ] DMG file created
-- [ ] **Technical files (DSYM, debug symbols) removed from DMG**
-- [ ] Only essential files included in installer
+- [ ] **✅ Application code signed with Developer ID** (ОБЯЗАТЕЛЬНО!)
+- [ ] **✅ DMG file created with clean installation**
+- [ ] **✅ Technical files (DSYM, debug symbols) removed from DMG**
+- [ ] **✅ Only essential files included in installer**
+- [ ] **✅ DMG size optimized** (должен быть меньше 2MB)
 - [ ] Release notes written (`docs/releases/RELEASE_NOTES_X.Y.Z.md`)
 - [ ] GitHub description prepared
 - [ ] All files are in English (no Russian text)
 - [ ] Appcast.xml updated
-- [ ] DMG tested on clean system
+- [ ] **✅ DMG tested on clean system** (без предупреждений Gatekeeper)
 
 ## 🧹 DMG Cleanup Checklist
 
