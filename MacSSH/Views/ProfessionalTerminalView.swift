@@ -90,13 +90,13 @@ struct ProfessionalTerminalView: View {
                 connectToSSH()
             }
         }
-        .onDisappear {
-            // Отключаемся при исчезновении view
-            // Используем задержку чтобы избежать проблем при закрытии приложения
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                terminalService.disconnect()
-            }
-        }
+        // Убираем автоматическое отключение при исчезновении view
+        // Теперь отключение управляется только через WindowManager
+        // .onDisappear {
+        //     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        //         terminalService.disconnect()
+        //     }
+        // }
         .alert("Connection Error", isPresented: $showingError) {
             Button("OK") {
                 showingError = false

@@ -41,6 +41,9 @@ class WindowManager: ObservableObject {
             defer: false
         )
         
+        // Устанавливаем окно как неосновное, чтобы приложение не закрывалось при его закрытии
+        window.isReleasedWhenClosed = false
+        
         window.title = "\(profile.username)@\(profile.host) — Terminal"
         window.contentViewController = hostingController
         window.center()
