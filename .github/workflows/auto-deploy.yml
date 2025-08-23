@@ -16,6 +16,9 @@ jobs:
   deploy:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: macos-latest
+    permissions:
+      contents: write
+      packages: write
     
     steps:
       - name: Checkout code
@@ -23,6 +26,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          permissions: write
 
       - name: Get current version
         id: current-version
