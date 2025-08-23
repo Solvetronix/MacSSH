@@ -93,12 +93,22 @@ jobs:
           gh release create "${{ steps.current-version.outputs.tag }}" --title "MacSSH ${{ steps.current-version.outputs.new_version }} - Automatic Release" --notes-file RELEASE_NOTES.md --draft "$DMG_NAME"
           gh release edit "${{ steps.current-version.outputs.tag }}" --draft=false
 
+      - name: Update appcast.xml
+        run: |
+          DMG_NAME="MacSSH-${{ steps.current-version.outputs.new_version }}.dmg"
+          chmod +x update_appcast.sh
+          ./update_appcast.sh "${{ steps.current-version.outputs.new_version }}" "${{ steps.current-version.outputs.new_build }}" "$DMG_NAME"
+
+
+
+
+
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add $XCODE_PROJECT/project.pbxproj
-          git commit -m "Automatic release ${{ steps.current-version.outputs.new_version }} - Update version"
+          git add $XCODE_PROJECT/project.pbxproj appcast.xml
+          git commit -m "Automatic release ${{ steps.current-version.outputs.new_version }} - Update version and appcast"
           git push origin main
 
       - name: Deployment summary
