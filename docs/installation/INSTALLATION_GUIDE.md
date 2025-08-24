@@ -49,16 +49,6 @@ In the final dialog, click **"Open Anyway"** (not "Move to Trash"):
 
 Your MacSSH application is now installed and ready to use. You may need to repeat steps 2-5 when updating to new versions.
 
-## Troubleshooting
-
-### Application won't launch
-- Make sure you clicked **"Open Anyway"**, not **"Move to Trash"**
-- Check **System Settings** → **Privacy & Security** for MacSSH
-
-### "Damaged" error
-- Remove from Applications and download again
-- Follow the installation steps above
-
 ## Security Note
 
 This warning appears because MacSSH is not signed with Apple Developer ID ($99/year). The application is safe - it's open source and only makes SSH connections.
