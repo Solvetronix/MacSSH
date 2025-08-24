@@ -1,26 +1,26 @@
-# MacSSH - Быстрая установка
+# MacSSH - Quick Installation
 
-## 🚀 Быстрый старт
+## 🚀 Quick Start
 
-1. **Скачайте** `.dmg` файл с [Releases](https://github.com/Solvetronix/MacSSH/releases)
-2. **Установите** приложение в папку `Applications`
-3. **Запустите** приложение
+1. **Download** the `.dmg` file from [Releases](https://github.com/Solvetronix/MacSSH/releases)
+2. **Install** the application to the `Applications` folder
+3. **Launch** the application
 
-## ⚠️ macOS заблокировал приложение?
+## ⚠️ macOS blocked the application?
 
-Это нормально! MacSSH не подписан Apple Developer ID.
+This is normal! MacSSH is not signed with Apple Developer ID.
 
-### Решение:
+### Solution:
 1. **System Settings** → **Privacy & Security**
-2. Найдите **"MacSSH" was blocked**
-3. Нажмите **"Open Anyway"**
-4. Введите пароль администратора
+2. Find **"MacSSH" was blocked**
+3. Click **"Open Anyway"**
+4. Enter administrator password
 
-## 📖 Подробная инструкция
+## 📖 Detailed Instructions
 
-См. [docs/installation/INSTALLATION_GUIDE.md](docs/installation/INSTALLATION_GUIDE.md) для подробной инструкции с скриншотами.
+See [docs/installation/INSTALLATION_GUIDE.md](docs/installation/INSTALLATION_GUIDE.md) for detailed instructions with screenshots.
 
-## 🔧 Сборка из исходников
+## 🔧 Build from Source
 
 ```bash
 git clone https://github.com/Solvetronix/MacSSH.git
@@ -28,7 +28,7 @@ cd MacSSH
 xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Release build
 ```
 
-## 🆘 Проблемы?
+## 🆘 Problems?
 
-- Проверьте [Issues](https://github.com/Solvetronix/MacSSH/issues)
-- Создайте новый Issue с описанием проблемы
+- Check [Issues](https://github.com/Solvetronix/MacSSH/issues)
+- Create a new Issue with problem description

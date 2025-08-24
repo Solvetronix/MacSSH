@@ -1,131 +1,131 @@
-# MacSSH - Инструкция по установке
+# MacSSH - Installation Guide
 
-## Обзор
+## Overview
 
-MacSSH - это профессиональный SSH-клиент для macOS с встроенным терминалом SwiftTerm. Приложение не подписано Apple Developer ID, поэтому macOS может блокировать его запуск. Эта инструкция поможет вам безопасно установить и запустить приложение.
+MacSSH is a professional SSH client for macOS with built-in SwiftTerm terminal. The application is not signed with Apple Developer ID, so macOS may block its launch. This guide will help you safely install and run the application.
 
-## Системные требования
+## System Requirements
 
-- macOS 14.0 или новее
-- Поддержка ARM64 (Apple Silicon) и x86_64 (Intel)
-- Минимум 100 МБ свободного места
+- macOS 14.0 or newer
+- ARM64 (Apple Silicon) and x86_64 (Intel) support
+- Minimum 100 MB free space
 
-## Установка
+## Installation
 
-### Шаг 1: Скачивание и установка
+### Step 1: Download and Install
 
-1. Скачайте файл `.dmg` с последней версией MacSSH
-2. Дважды кликните на файл `.dmg` для монтирования
-3. Перетащите приложение `MacSSH` в папку `Applications`
-4. Извлеките диск (Eject) и удалите файл `.dmg`
+1. Download the `.dmg` file with the latest version of MacSSH
+2. Double-click the `.dmg` file to mount it
+3. Drag the `MacSSH` application to the `Applications` folder
+4. Eject the disk and delete the `.dmg` file
 
-### Шаг 2: Первый запуск и обход Gatekeeper
+### Step 2: First Launch and Gatekeeper Bypass
 
-При первом запуске macOS покажет предупреждение о безопасности. Это нормально для приложений, не подписанных Apple Developer ID.
+On first launch, macOS will show a security warning. This is normal for applications not signed with Apple Developer ID.
 
-#### Вариант A: Через System Settings (Рекомендуется)
+#### Option A: Through System Settings (Recommended)
 
-1. **Откройте System Settings** → **Privacy & Security**
-2. Найдите раздел **"MacSSH" was blocked to protect your Mac**
-3. Нажмите кнопку **"Open Anyway"**
-4. В появившемся диалоге выберите **"Open Anyway"**
-5. Введите пароль администратора для подтверждения
+1. **Open System Settings** → **Privacy & Security**
+2. Find the section **"MacSSH" was blocked to protect your Mac**
+3. Click the **"Open Anyway"** button
+4. In the dialog that appears, select **"Open Anyway"**
+5. Enter administrator password to confirm
 
 ![Privacy & Security Settings](02-privacy-security-settings.png)
 
-#### Вариант B: Через Finder
+#### Option B: Through Finder
 
-1. Найдите приложение `MacSSH` в папке `Applications`
-2. **Control+клик** (или правой кнопкой мыши) на приложении
-3. Выберите **"Open"** из контекстного меню
-4. В диалоге подтверждения нажмите **"Open"**
+1. Find the `MacSSH` application in the `Applications` folder
+2. **Control+click** (or right-click) on the application
+3. Select **"Open"** from the context menu
+4. Click **"Open"** in the confirmation dialog
 
-### Шаг 3: Подтверждение запуска
+### Step 3: Launch Confirmation
 
-После нажатия "Open Anyway" появится финальный диалог подтверждения:
+After clicking "Open Anyway", a final confirmation dialog will appear:
 
 ![Open Anyway Confirmation](03-open-anyway-confirmation.png)
 
-1. Нажмите **"Open Anyway"** (не "Move to Trash")
-2. Введите пароль администратора
-3. Приложение запустится
+1. Click **"Open Anyway"** (not "Move to Trash")
+2. Enter administrator password
+3. The application will launch
 
-## Безопасность
+## Security
 
-### Почему macOS блокирует приложение?
+### Why does macOS block the application?
 
-- **Gatekeeper** - система безопасности macOS, которая проверяет подпись приложений
-- MacSSH не подписан Apple Developer ID (стоимость $99/год)
-- Это **не означает**, что приложение вредоносное
+- **Gatekeeper** - macOS security system that verifies application signatures
+- MacSSH is not signed with Apple Developer ID (costs $99/year)
+- This **does not mean** the application is malicious
 
-### Как убедиться в безопасности?
+### How to verify security?
 
-1. **Исходный код открыт** - можете проверить код на GitHub
-2. **Сборка локальная** - приложение собрано из исходников
-3. **Нет сетевых запросов** - приложение не отправляет данные
-4. **Только SSH-соединения** - использует стандартные протоколы
+1. **Open source code** - you can check the code on GitHub
+2. **Local build** - application is built from source code
+3. **No network requests** - application doesn't send data
+4. **SSH connections only** - uses standard protocols
 
-## Устранение неполадок
+## Troubleshooting
 
-### Приложение не запускается
+### Application won't launch
 
-1. Убедитесь, что вы нажали **"Open Anyway"**, а не **"Move to Trash"**
-2. Проверьте настройки в **System Settings** → **Privacy & Security**
-3. Попробуйте переустановить приложение
+1. Make sure you clicked **"Open Anyway"**, not **"Move to Trash"**
+2. Check settings in **System Settings** → **Privacy & Security**
+3. Try reinstalling the application
 
-### Ошибка "damaged" или "corrupted"
+### "Damaged" or "corrupted" error
 
-1. Удалите приложение из `Applications`
-2. Скачайте заново с GitHub
-3. Следуйте инструкции по установке
+1. Remove the application from `Applications`
+2. Download again from GitHub
+3. Follow the installation instructions
 
-### Проблемы с правами доступа
+### Permission issues
 
-1. Откройте **System Settings** → **Privacy & Security**
-2. Найдите MacSSH в списке разрешений
-3. Включите необходимые разрешения (сеть, файлы и т.д.)
+1. Open **System Settings** → **Privacy & Security**
+2. Find MacSSH in the permissions list
+3. Enable necessary permissions (network, files, etc.)
 
-## Альтернативные способы установки
+## Alternative Installation Methods
 
-### Через Homebrew (для разработчиков)
+### Via Homebrew (for developers)
 
 ```bash
-# Клонируйте репозиторий
+# Clone the repository
 git clone https://github.com/your-username/MacSSH.git
 cd MacSSH
 
-# Соберите проект
+# Build the project
 xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Release build
 
-# Скопируйте в Applications
+# Copy to Applications
 cp -R build/Release/MacSSH.app /Applications/
 ```
 
-### Через командную строку (для опытных пользователей)
+### Via command line (for advanced users)
 
 ```bash
-# Временно отключить Gatekeeper (только для разработки!)
+# Temporarily disable Gatekeeper (development only!)
 sudo spctl --master-disable
 
-# Запустить приложение
+# Launch the application
 open /Applications/MacSSH.app
 
-# Включить Gatekeeper обратно
+# Re-enable Gatekeeper
 sudo spctl --master-enable
 ```
 
-## Поддержка
+## Support
 
-Если у вас возникли проблемы с установкой:
+If you encounter installation issues:
 
-1. Проверьте [Issues на GitHub](https://github.com/your-username/MacSSH/issues)
-2. Создайте новый Issue с описанием проблемы
-3. Приложите скриншоты ошибок
+1. Check [Issues on GitHub](https://github.com/your-username/MacSSH/issues)
+2. Create a new Issue with problem description
+3. Attach error screenshots
 
-## Обновления
+## Updates
 
-При обновлении приложения может потребоваться повторить шаги 2-3, так как macOS может снова заблокировать новую версию.
+When updating the application, you may need to repeat steps 2-3, as macOS may block the new version again.
 
 ---
 
-**Примечание**: Эта инструкция предназначена для пользователей, которые доверяют исходному коду приложения. Если у вас есть сомнения в безопасности, не устанавливайте приложение.
+**Note**: This guide is intended for users who trust the application's source code. If you have security concerns, do not install the application.
