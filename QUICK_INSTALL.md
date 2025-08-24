@@ -2,7 +2,9 @@
 
 ## 🚀 Quick Start
 
-1. **Download** the `.dmg` file from [Releases](https://github.com/Solvetronix/MacSSH/releases)
+1. **Download** the `.dmg` file from [GitHub Releases](https://github.com/Solvetronix/MacSSH/releases)
+   - Go to the latest release
+   - Download `MacSSH-vX.X.X.dmg` file
 2. **Install** the application to the `Applications` folder
 3. **Launch** the application
 

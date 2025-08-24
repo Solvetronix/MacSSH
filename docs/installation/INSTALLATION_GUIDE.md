@@ -4,17 +4,13 @@
 
 MacSSH is a professional SSH client for macOS with built-in SwiftTerm terminal. The application is not signed with Apple Developer ID, so macOS may block its launch. This guide will help you safely install and run the application.
 
-## System Requirements
-
-- macOS 14.0 or newer
-- ARM64 (Apple Silicon) and x86_64 (Intel) support
-- Minimum 100 MB free space
-
 ## Installation
 
 ### Step 1: Download and Install
 
-1. Download the `.dmg` file with the latest version of MacSSH
+1. **Download** the `.dmg` file from [GitHub Releases](https://github.com/Solvetronix/MacSSH/releases)
+   - Go to the latest release
+   - Download `MacSSH-vX.X.X.dmg` file
 2. Double-click the `.dmg` file to mount it
 3. Drag the `MacSSH` application to the `Applications` folder
 4. Eject the disk and delete the `.dmg` file
