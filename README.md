@@ -75,9 +75,34 @@ xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Debug build
 ## Installation
 
 ### Requirements
-- macOS 13.0 or newer
+- macOS 14.0 or newer
 - Xcode 15.0 or newer (for building from source)
 - VS Code or Cursor (for editing files with automatic synchronization)
+
+### 📦 Download & Install
+
+**Option 1: Download DMG (Recommended)**
+1. Download the latest `.dmg` file from [Releases](https://github.com/Solvetronix/MacSSH/releases)
+2. Follow the [Installation Guide](docs/installation/INSTALLATION_GUIDE.md) for detailed instructions
+
+**Option 2: Build from Source**
+```bash
+git clone https://github.com/Solvetronix/MacSSH.git
+cd MacSSH
+xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Release build
+```
+
+### ⚠️ Important: macOS Gatekeeper
+
+Since MacSSH is not signed with Apple Developer ID, macOS may block the application on first launch. This is normal for open-source applications.
+
+**To run the application:**
+1. Go to **System Settings** → **Privacy & Security**
+2. Find **"MacSSH" was blocked to protect your Mac**
+3. Click **"Open Anyway"**
+4. Confirm with administrator password
+
+See [Installation Guide](docs/installation/INSTALLATION_GUIDE.md) for detailed instructions with screenshots.
 
 ### ⚠️ Important: macOS Permissions
 
