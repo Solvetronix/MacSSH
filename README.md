@@ -2,26 +2,50 @@
 
 MacSSH is a native macOS application for managing SSH connections with a built-in file manager for working with remote files and folders.
 
-## 🚀 Quick Installation
+## 🚀 Installation Guide
 
-### Download & Install
+### Step 1: Download and Install
 
 1. **Download** the `.dmg` file from [GitHub Releases](https://github.com/Solvetronix/MacSSH/releases)
    - Go to the latest release
    - Download `MacSSH-vX.X.X.dmg` file
-2. **Install** the application to the `Applications` folder
-3. **Launch** the application
+2. Double-click the `.dmg` file to mount it
+3. Drag the `MacSSH` application to the `Applications` folder
+4. Eject the disk and delete the `.dmg` file
 
-### ⚠️ macOS blocked the application?
+### Step 2: First Launch - Gatekeeper Warning
 
-This is normal! Follow these steps:
+When you first try to launch MacSSH, macOS will show this security warning:
 
-1. **System Settings** → **Privacy & Security**
-2. Find **"MacSSH" was blocked**
-3. Click **"Open Anyway"**
-4. Enter administrator password
+![Gatekeeper Warning](docs/installation/01-gatekeeper-warning.png)
 
-📖 **Detailed Instructions**: See [Installation Guide](docs/installation/INSTALLATION_GUIDE.md) for step-by-step guide with screenshots.
+**Don't click "Move to Trash"** - this is normal for unsigned applications.
+
+### Step 3: Open System Settings
+
+1. Go to **System Settings** → **Privacy & Security**
+2. Scroll down to find the security section
+3. You'll see: **"MacSSH" was blocked to protect your Mac**
+
+![Privacy & Security Settings](docs/installation/02-privacy-security-settings.png)
+
+### Step 4: Click "Open Anyway"
+
+1. Click the **"Open Anyway"** button next to the MacSSH warning
+2. A confirmation dialog will appear
+
+### Step 5: Final Confirmation
+
+In the final dialog, click **"Open Anyway"** (not "Move to Trash"):
+
+![Open Anyway Confirmation](docs/installation/03-open-anyway-confirmation.png)
+
+3. Enter your administrator password when prompted
+4. MacSSH will launch successfully
+
+## That's It!
+
+Your MacSSH application is now installed and ready to use. You may need to repeat steps 2-5 when updating to new versions.
 
 ## Features
 
