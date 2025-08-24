@@ -2,6 +2,8 @@ import Foundation
 import AppKit
 import SwiftUI
 
+// SSHConnectionError уже определен в модуле
+
 class EmbeddedTerminalService: ObservableObject {
     @Published var output: String = ""
     @Published var isConnected: Bool = false
@@ -29,7 +31,7 @@ class EmbeddedTerminalService: ObservableObject {
         
         if !PermissionsService.forceCheckPermissions() {
             LoggingService.shared.debug("Permissions check failed", source: "EmbeddedTerminalService")
-            throw SSHConnectionError.permissionDenied("Full Disk Access не предоставлен")
+            throw SSHConnectionError.permissionDenied("Full Disk Access not granted")
         }
         
         LoggingService.shared.debug("Permissions check passed", source: "EmbeddedTerminalService")
@@ -299,11 +301,11 @@ class EmbeddedTerminalService: ObservableObject {
         // Если используется пароль, проверяем наличие sshpass
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             if !SSHService.checkSSHPassAvailability() {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SSH connections. Install it with: brew install sshpass")
             }
             // Используем полный путь к sshpass для надежности
             guard let sshpassPath = SSHService.getSSHPassPath() else {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не найден в системе")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass не найден в системе. Установите его командой: brew install sshpass")
             }
             command = "\(sshpassPath) -p '\(password)' ssh"
         } else {

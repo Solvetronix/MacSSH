@@ -8,7 +8,7 @@ class WindowManager: ObservableObject {
     @Published var currentProfile: Profile?
     private var terminalWindows: [String: NSWindow] = [:]
     private var windowDelegates: [String: TerminalWindowDelegate] = [:]
-    private var terminalServices: [String: SwiftTermService] = [:]
+    private var terminalServices: [String: SwiftTermProfessionalService] = [:]
     
     private init() {}
     
@@ -27,11 +27,11 @@ class WindowManager: ObservableObject {
         }
         
         // Создаем сервис терминала
-        let terminalService = SwiftTermService()
+        let terminalService = SwiftTermProfessionalService()
         terminalServices[windowId] = terminalService
         
         // Создаем новое окно
-        let terminalView = ProfessionalTerminalView(profile: profile, terminalService: terminalService)
+        let terminalView = SwiftTermProfessionalTerminalView(profile: profile, terminalService: terminalService)
         let hostingController = NSHostingController(rootView: terminalView)
         
         let window = NSWindow(

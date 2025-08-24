@@ -158,7 +158,7 @@ class ProfileViewModel: ObservableObject {
         } catch let SSHConnectionError.connectionFailed(message) {
             await MainActor.run {
                 self.connectionError = message
-                self.connectionLog.append("❌ Connection failed: \(message)")
+                self.connectionLog.append("❌ Connection error: \(message)")
             }
         } catch let SSHConnectionError.authenticationFailed(message) {
             await MainActor.run {
@@ -181,6 +181,12 @@ class ProfileViewModel: ObservableObject {
                 self.connectionError = message
                 self.connectionLog.append("❌ External command not found: \(message)")
                 self.showingPermissionsManager = true
+            }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.connectionError = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                self.connectionLog.append("❌ sshpass not installed: \(message)")
+                self.connectionLog.append("💡 Install sshpass: brew install sshpass")
             }
         } catch {
             await MainActor.run {
@@ -217,6 +223,12 @@ class ProfileViewModel: ObservableObject {
                     self.profiles[index].lastConnectionDate = Date()
                     self.saveProfiles()
                 }
+            }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.connectionError = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                self.connectionLog.append("❌ sshpass not installed: \(message)")
+                self.connectionLog.append("💡 Install sshpass: brew install sshpass")
             }
         } catch {
             await MainActor.run {
@@ -277,6 +289,12 @@ class ProfileViewModel: ObservableObject {
                     }
                 }
             }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.connectionError = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                self.connectionLog.append("❌ sshpass not installed: \(message)")
+                self.connectionLog.append("💡 Install sshpass: brew install sshpass")
+            }
         } catch {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
@@ -308,32 +326,16 @@ class ProfileViewModel: ObservableObject {
     
     /// Open file browser for profile
     func openFileBrowser(for profile: Profile) async {
-        let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] ProfileViewModel: openFileBrowser STARTED")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
-        print("📝 [\(timestamp)] ProfileViewModel: Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile keyType: \(profile.keyType)")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile username: \(profile.username)")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile port: \(profile.port)")
-        print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
-        print("📝 [\(timestamp)] ProfileViewModel: About to set isBrowsingFiles = true")
-        
         await MainActor.run {
-            print("📝 [\(timestamp)] ProfileViewModel: Setting UI state")
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
             // Reset to root directory for new profile
             self.currentDirectory = "/"
             self.connectionLog.removeAll()
             self.connectionLog.append("[blue]Opening file browser for \(profile.host)...")
-            print("📝 [\(timestamp)] ProfileViewModel: UI state set successfully")
         }
         
         do {
-            print("📝 [\(timestamp)] ProfileViewModel: About to call SSHService.listDirectory")
-            print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
-            print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
             
             let result = try await SSHService.listDirectory(profile, path: currentDirectory)
             await MainActor.run {
@@ -343,19 +345,17 @@ class ProfileViewModel: ObservableObject {
                 }
                 self.connectionLog.append("[green]✅ File browser opened successfully")
             }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.fileBrowserError = "Для подключения по паролю требуется установить sshpass. Установите его командой: brew install sshpass"
+                self.connectionLog.append("❌ sshpass не установлен: \(message)")
+                self.connectionLog.append("💡 Установите sshpass: brew install sshpass")
+            }
         } catch {
-            print("📝 [\(timestamp)] ProfileViewModel: openFileBrowser ERROR")
-            print("📝 [\(timestamp)] ProfileViewModel: Error type: \(type(of: error))")
-            print("📝 [\(timestamp)] ProfileViewModel: Error description: \(error.localizedDescription)")
-            print("📝 [\(timestamp)] ProfileViewModel: Error: \(error)")
-            
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to open file browser: \(error.localizedDescription)")
-                self.connectionLog.append("[red]Error type: \(type(of: error))")
-                self.connectionLog.append("[red]Full error: \(error)")
                 if self.checkForPermissionError(error) {
-                    self.connectionLog.append("[yellow]⚠️ This appears to be a permission error")
                     self.showingPermissionsManager = true
                 }
             }
@@ -368,17 +368,6 @@ class ProfileViewModel: ObservableObject {
     
     /// Navigate to directory
     func navigateToDirectory(_ profile: Profile, path: String) async {
-        let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] ProfileViewModel: navigateToDirectory STARTED")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
-        print("📝 [\(timestamp)] ProfileViewModel: Path: \(path)")
-        print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
-        print("📝 [\(timestamp)] ProfileViewModel: Thread: \(Thread.current.isMainThread ? "Main" : "Background")")
-        print("📝 [\(timestamp)] ProfileViewModel: Stack trace:")
-        Thread.callStackSymbols.prefix(10).forEach { symbol in
-            print("📝 [\(timestamp)]   \(symbol)")
-        }
-        
         await MainActor.run {
             self.isBrowsingFiles = true
             self.fileBrowserError = nil
@@ -386,7 +375,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            print("📝 [\(timestamp)] ProfileViewModel: About to call SSHService.listDirectory")
             let normalized = normalizePath(path)
             let result = try await SSHService.listDirectory(profile, path: normalized)
             await MainActor.run {
@@ -397,12 +385,13 @@ class ProfileViewModel: ObservableObject {
                 }
                 self.connectionLog.append("[green]✅ Navigated to \(normalized)")
             }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.fileBrowserError = "Для подключения по паролю требуется установить sshpass. Установите его командой: brew install sshpass"
+                self.connectionLog.append("❌ sshpass не установлен: \(message)")
+                self.connectionLog.append("💡 Установите sshpass: brew install sshpass")
+            }
         } catch {
-            print("📝 [\(timestamp)] ProfileViewModel: navigateToDirectory ERROR")
-            print("📝 [\(timestamp)] ProfileViewModel: Error type: \(type(of: error))")
-            print("📝 [\(timestamp)] ProfileViewModel: Error description: \(error.localizedDescription)")
-            print("📝 [\(timestamp)] ProfileViewModel: Error: \(error)")
-            
             await MainActor.run {
                 self.fileBrowserError = error.localizedDescription
                 self.connectionLog.append("❌ Failed to navigate: \(error.localizedDescription)")
@@ -432,6 +421,12 @@ class ProfileViewModel: ObservableObject {
                     self.connectionLog.append(log)
                 }
                 self.connectionLog.append("[green]✅ File opened in Finder")
+            }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.connectionError = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                self.connectionLog.append("❌ sshpass not installed: \(message)")
+                self.connectionLog.append("💡 Install sshpass: brew install sshpass")
             }
         } catch {
             await MainActor.run {
@@ -464,6 +459,12 @@ class ProfileViewModel: ObservableObject {
                 }
                 self.connectionLog.append("[green]✅ File opened in VS Code")
             }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.connectionError = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                self.connectionLog.append("❌ sshpass not installed: \(message)")
+                self.connectionLog.append("💡 Install sshpass: brew install sshpass")
+            }
         } catch {
             await MainActor.run {
                 self.connectionError = error.localizedDescription
@@ -481,34 +482,25 @@ class ProfileViewModel: ObservableObject {
     
     /// Mount directory in Finder
     func mountDirectoryInFinder(_ profile: Profile, directory: RemoteFile) async {
-        let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] ProfileViewModel: mountDirectoryInFinder FUNCTION STARTED")
-        print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
-        print("📝 [\(timestamp)] ProfileViewModel: Directory: \(directory.name), Path: \(directory.path)")
-        print("📝 [\(timestamp)] ProfileViewModel: Current directory: \(currentDirectory)")
-        print("📝 [\(timestamp)] ProfileViewModel: About to set isConnecting = true")
-        
         await MainActor.run {
             self.isConnecting = true
             self.connectionError = nil
             self.connectionLog.append("[blue]Mounting directory in Finder: \(directory.name)")
-            self.connectionLog.append("[blue]Current directory: \(currentDirectory)")
-            self.connectionLog.append("[blue]Directory path: \(directory.path)")
         }
         
         do {
-            print("📝 [\(timestamp)] ProfileViewModel: About to call SSHService.mountDirectoryInFinder")
-            print("📝 [\(timestamp)] ProfileViewModel: Profile: \(profile.name), Host: \(profile.host)")
-            print("📝 [\(timestamp)] ProfileViewModel: Directory path: \(directory.path)")
-            print("📝 [\(timestamp)] ProfileViewModel: Directory name: \(directory.name)")
             let logs = try await SSHService.mountDirectoryInFinder(profile, remotePath: directory.path)
-            print("📝 [\(timestamp)] ProfileViewModel: SSHService.mountDirectoryInFinder returned successfully")
-            print("📝 [\(timestamp)] ProfileViewModel: Logs count: \(logs.count)")
             await MainActor.run {
                 for log in logs {
                     self.connectionLog.append(log)
                 }
                 self.connectionLog.append("[green]✅ Directory mounted in Finder")
+            }
+        } catch let SSHConnectionError.sshpassNotInstalled(message) {
+            await MainActor.run {
+                self.connectionError = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                self.connectionLog.append("❌ sshpass not installed: \(message)")
+                self.connectionLog.append("💡 Install sshpass: brew install sshpass")
             }
         } catch {
             await MainActor.run {
@@ -523,8 +515,6 @@ class ProfileViewModel: ObservableObject {
         await MainActor.run {
             self.isConnecting = false
         }
-        
-        print("📝 [\(timestamp)] ProfileViewModel: mountDirectoryInFinder FUNCTION COMPLETED")
     }
     
     /// Перейти в родительскую директорию
@@ -575,7 +565,6 @@ class ProfileViewModel: ObservableObject {
     /// Check for available updates
     func checkForUpdates() async {
         let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] [ProfileViewModel] Starting update check...")
         
         await MainActor.run {
             connectionLog.append("🔄 [\(timestamp)] [ProfileViewModel] Starting update check...")
@@ -589,13 +578,8 @@ class ProfileViewModel: ObservableObject {
         let lastCheck = UserDefaults.standard.object(forKey: lastCheckKey) as? Date ?? Date.distantPast
         let timeSinceLastCheck = Date().timeIntervalSince(lastCheck)
         
-        await MainActor.run {
-            connectionLog.append("⏰ [\(timestamp)] [ProfileViewModel] Last check: \(lastCheck), Time since: \(timeSinceLastCheck) seconds")
-        }
-        
         // Only check if it's been more than 1 hour since last check
         if timeSinceLastCheck < 3600 { // 1 hour in seconds
-            print("📝 [\(timestamp)] [ProfileViewModel] Skipping update check - checked recently")
             await MainActor.run {
                 connectionLog.append("⏭️ [\(timestamp)] [ProfileViewModel] Skipping update check - checked recently (\(timeSinceLastCheck) seconds ago)")
             }
@@ -608,7 +592,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         // Use only Sparkle for updates
-        print("📝 [\(timestamp)] [ProfileViewModel] Using Sparkle update system")
         await UpdateService.checkForUpdates()
         
         await MainActor.run {
@@ -620,7 +603,6 @@ class ProfileViewModel: ObservableObject {
     /// Force check for updates (ignores time restrictions)
     func forceCheckForUpdates() async {
         let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] [ProfileViewModel] Force checking for updates...")
         
         await MainActor.run {
             connectionLog.append("🚀 [\(timestamp)] [ProfileViewModel] Force checking for updates (ignoring time restrictions)...")
@@ -635,7 +617,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         // Use the new force check method that bypasses time restrictions
-        print("📝 [\(timestamp)] [ProfileViewModel] Using Sparkle force update system")
         await UpdateService.forceCheckForUpdates()
         
         await MainActor.run {
@@ -646,8 +627,6 @@ class ProfileViewModel: ObservableObject {
     
     /// Install update automatically
     func installUpdate() async {
-        print("📝 [ProfileViewModel] Installing update...")
-        
         await MainActor.run {
             connectionLog.append("[blue]Installing update...")
         }

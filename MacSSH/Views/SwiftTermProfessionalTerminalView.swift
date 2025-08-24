@@ -2,9 +2,11 @@ import SwiftUI
 import AppKit
 import SwiftTerm
 
-struct ProfessionalTerminalView: View {
+// SSHConnectionError уже определен в модуле
+
+struct SwiftTermProfessionalTerminalView: View {
     let profile: Profile
-    @ObservedObject var terminalService: SwiftTermService
+    @ObservedObject var terminalService: SwiftTermProfessionalService
     @State private var commandHistory: [String] = [] // Локальная история команд для текущей сессии
     @State private var currentCommandIndex: Int = 0 // Будет обновляться при добавлении команд
     @State private var showingError: Bool = false
@@ -49,6 +51,8 @@ struct ProfessionalTerminalView: View {
             if terminalService.isConnected, let _ = terminalService.getTerminalView() {
                 SwiftTerminalView(terminalService: terminalService)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.leading, 4)
+                    .background(Color.white, alignment: .leading)
             } else if terminalService.isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -110,6 +114,9 @@ struct ProfessionalTerminalView: View {
         Task {
             do {
                 try await terminalService.connectToSSH(profile: profile)
+            } catch let SSHConnectionError.sshpassNotInstalled(message) {
+                errorMessage = "sshpass is required for password-based connections. Install it with: brew install sshpass"
+                showingError = true
             } catch {
                 errorMessage = error.localizedDescription
                 showingError = true
@@ -176,7 +183,7 @@ struct TerminalCommandLineView: View {
 }
 
 struct SwiftTerminalView: NSViewRepresentable {
-    let terminalService: SwiftTermService
+    let terminalService: SwiftTermProfessionalService
     
     func makeNSView(context: Context) -> TerminalView {
         // Получаем терминал из сервиса или создаем новый
@@ -210,9 +217,9 @@ struct SwiftTerminalView: NSViewRepresentable {
     }
     
     class Coordinator: NSObject {
-        private weak var terminalService: SwiftTermService?
+        private weak var terminalService: SwiftTermProfessionalService?
         
-        func setupTerminal(_ terminal: TerminalView, service: SwiftTermService) {
+        func setupTerminal(_ terminal: TerminalView, service: SwiftTermProfessionalService) {
             self.terminalService = service
             terminal.terminalDelegate = self
         }
@@ -268,7 +275,7 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
 // - Выделение мышью и копирование
 
 #Preview {
-    ProfessionalTerminalView(
+    SwiftTermProfessionalTerminalView(
         profile: Profile(
             name: "Test Server",
             host: "example.com",
@@ -278,6 +285,6 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
             privateKeyPath: nil,
             keyType: .password
         ),
-        terminalService: SwiftTermService()
+        terminalService: SwiftTermProfessionalService()
     )
 }
