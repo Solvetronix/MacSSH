@@ -72,6 +72,17 @@ brew install sshpass
 - ✅ **Update System** - Stay current with automatic updates
 - ✅ **macOS Native** - Designed specifically for macOS
 
+## 🤖 **Coming Soon: AI-Powered Terminal**
+
+> **🚀 Future Enhancement: AI Terminal Assistant**
+
+- **🧠 AI Command Execution** - Write prompts and let AI execute terminal commands
+- **🔑 Token-Based AI Integration** - Connect your AI service via API tokens
+- **⚡ Smart Task Automation** - AI will handle complex terminal tasks automatically
+- **🎯 Professional Terminal** - Built on native SwiftTerm with AI capabilities
+
+---
+
 ## 👥 Contributing & Development
 
 ### **Looking for Developers!**
