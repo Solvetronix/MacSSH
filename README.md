@@ -6,50 +6,12 @@ MacSSH is a native macOS application for managing SSH connections with a built-i
 
 > **⚠️ IMPORTANT: Follow these steps carefully to install MacSSH**
 
-### **Step 1: Download and Install**
+📖 **[📋 Complete Installation Guide with Screenshots](docs/installation/INSTALLATION_GUIDE.md)**
 
-1. **Download** the `.dmg` file from [GitHub Releases](https://github.com/Solvetronix/MacSSH/releases)
-   - Go to the latest release
-   - Download `MacSSH-vX.X.X.dmg` file
-2. Double-click the `.dmg` file to mount it
-3. Drag the `MacSSH` application to the `Applications` folder
-4. Eject the disk and delete the `.dmg` file
-
-### **Step 2: First Launch - Gatekeeper Warning**
-
-When you first try to launch MacSSH, macOS will show this security warning:
-
-![Gatekeeper Warning](docs/installation/01-gatekeeper-warning.png)
-
-**Don't click "Move to Trash"** - this is normal for unsigned applications.
-
-### **Step 3: Open System Settings**
-
-1. Go to **System Settings** → **Privacy & Security**
-2. Scroll down to find the security section
-3. You'll see: **"MacSSH" was blocked to protect your Mac**
-
-![Privacy & Security Settings](docs/installation/02-privacy-security-settings.png)
-
-### **Step 4: Click "Open Anyway"**
-
-1. Click the **"Open Anyway"** button next to the MacSSH warning
-2. A confirmation dialog will appear
-
-### **Step 5: Final Confirmation**
-
-In the final dialog, click **"Open Anyway"** (not "Move to Trash"):
-
-![Open Anyway Confirmation](docs/installation/03-open-anyway-confirmation.png)
-
-3. Enter your administrator password when prompted
-4. MacSSH will launch successfully
-
----
-
-## **✅ That's It!**
-
-Your MacSSH application is now installed and ready to use. You may need to repeat steps 2-5 when updating to new versions.
+### **Quick Steps:**
+1. **Download** from [GitHub Releases](https://github.com/Solvetronix/MacSSH/releases)
+2. **Install** to Applications folder
+3. **Launch** and follow Gatekeeper bypass steps
 
 ---
 
