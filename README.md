@@ -72,23 +72,6 @@ brew install sshpass
 - ✅ **Update System** - Stay current with automatic updates
 - ✅ **macOS Native** - Designed specifically for macOS
 
-## ⚠️ Important: macOS Permissions
-
-The MacSSH application requires special permissions to execute external commands (ssh, sftp, scp). The application automatically checks and requests necessary permissions.
-
-**Required permissions:**
-1. **Full Disk Access** - required for executing SSH commands
-2. **Accessibility** - for automation (optional)
-
-**Automatic setup:**
-- The application automatically checks permissions on startup
-- You can see the status of all permissions in SSH Tools Manager
-- The "Request Full Disk Access" button automatically opens System Settings
-- Detailed instructions are available in SSH Tools Manager
-
-**Manual setup:**
-If automatic setup doesn't work, follow the instructions in the [PERMISSIONS_FIX.md](PERMISSIONS_FIX.md) file.
-
 ## 👥 Contributing & Development
 
 ### **Looking for Developers!**
