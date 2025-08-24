@@ -23,6 +23,8 @@ When you first try to launch MacSSH, macOS will show this security warning:
 
 **Don't click "Move to Trash"** - this is normal for unsigned applications.
 
+**Click "Done"** to close this dialog.
+
 ### Step 3: Open System Settings
 
 1. Go to **System Settings** → **Privacy & Security**
