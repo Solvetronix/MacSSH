@@ -1,6 +1,17 @@
-# MacSSH - SSH Terminal & File Manager
+# MacSSH - Professional SSH Terminal & File Manager for macOS
 
-MacSSH is a native macOS application for managing SSH connections with a built-in file manager for working with remote files and folders.
+> **🚀 The easiest way to manage SSH connections and remote files on your Mac**
+
+MacSSH combines the power of a professional SSH terminal with an intuitive file manager, making remote server management simple and efficient.
+
+## ✨ **Why Choose MacSSH?**
+
+- **🔐 One-Click SSH Connections** - Connect to servers instantly with saved profiles
+- **📁 Visual File Browser** - Browse remote files like in Finder
+- **💻 Built-in Terminal** - Professional SwiftTerm terminal with copy/paste support
+- **📝 Smart File Editing** - Open files in VS Code/Cursor with auto-sync
+- **🔄 Auto Updates** - Always get the latest version automatically
+- **🎯 Zero Configuration** - Works out of the box with macOS
 
 ## 🚀 **INSTALLATION GUIDE** 🚀
 
@@ -15,28 +26,25 @@ MacSSH is a native macOS application for managing SSH connections with a built-i
 
 ---
 
-## Features
+## 🎯 **Key Features**
 
-### SSH Connections
-- ✅ SSH connection profile management
-- ✅ Password and private key authentication support
-- ✅ Automatic Terminal.app opening with SSH connection
-- ✅ Connection testing
-- ✅ Recent connections history
+### **SSH Made Simple**
+- ✅ **Profile Management** - Save and organize your server connections
+- ✅ **Password & Key Auth** - Support for both authentication methods
+- ✅ **Connection Testing** - Verify your setup before connecting
+- ✅ **Recent History** - Quick access to your last connections
 
-### File Manager
-- ✅ Browse files and folders on remote hosts
-- ✅ Navigate through the file system
-- ✅ Open files in VS Code/Cursor with automatic change synchronization
-- ✅ Open files in Finder (automatic download)
-- ✅ Mount remote directories in Finder via SSHFS
-- ✅ Display file information (size, permissions, modification date)
+### **File Management**
+- ✅ **Visual Browser** - Navigate remote files like local folders
+- ✅ **Smart Editing** - Open files in VS Code/Cursor with live sync
+- ✅ **Finder Integration** - Download and open files in Finder
+- ✅ **SSHFS Mounting** - Mount remote directories as local drives
 
-### Updates
-- ✅ Automatic update checking via GitHub
-- ✅ One-click download and installation
-- ✅ Version comparison and release notes
-- ✅ Manual update option
+### **Developer Friendly**
+- ✅ **Auto-Sync Editing** - Changes sync automatically when you save
+- ✅ **Terminal Integration** - Built-in professional terminal
+- ✅ **Update System** - Stay current with automatic updates
+- ✅ **macOS Native** - Designed specifically for macOS
 
 ## ⚠️ Important: macOS Permissions
 
