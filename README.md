@@ -26,6 +26,32 @@ MacSSH combines the power of a professional SSH terminal with an intuitive file 
 
 ---
 
+## 🔧 **Required Dependencies**
+
+### **sshpass - Password Authentication Tool**
+
+MacSSH requires `sshpass` for automatic password transmission to SSH terminals. This is the main dependency you need to install.
+
+**Install via Homebrew:**
+```bash
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install sshpass
+brew install sshpass
+```
+
+**Why sshpass?**
+- Enables automatic password entry for SSH connections
+- Allows MacSSH to handle password authentication seamlessly
+- Required for the terminal integration feature
+
+**Alternative installation methods:**
+- Download from [sshpass website](https://sourceforge.net/projects/sshpass/)
+- Install via MacPorts: `sudo port install sshpass`
+
+---
+
 ## 🎯 **Key Features**
 
 ### **SSH Made Simple**
