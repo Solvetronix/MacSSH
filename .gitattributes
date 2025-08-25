@@ -1,0 +1,11 @@
+# Hide contributors from repository page
+# This file may help hide contributor information
+
+# Disable blame for all files
+* -blame
+
+# Hide contributors in specific files
+*.md -blame
+*.swift -blame
+*.plist -blame
+*.json -blame

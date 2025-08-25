@@ -486,7 +486,7 @@ class SSHService {
         // Если используется пароль, проверяем наличие sshpass
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             if !checkSSHPassAvailability() {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен. Для автоматической передачи пароля установите sshpass: brew install sshpass")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SSH connections. Install it with: brew install sshpass")
             }
             command = "sshpass -p '\(password)' ssh"
         } else {
@@ -554,53 +554,34 @@ class SSHService {
     static func listDirectory(_ profile: Profile, path: String = ".") async throws -> SFTPResult {
         let timestamp = Date().timeIntervalSince1970
         LoggingService.shared.info("Listing directory: \(path) for \(profile.name) (\(profile.host))", source: "FileManager")
-        print("📝 [\(timestamp)] RepositoryService: listDirectory STARTED")
-        print("📝 [\(timestamp)] Profile: \(profile.name), Host: \(profile.host)")
-        print("📝 [\(timestamp)] Path: \(path)")
-        print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
-        print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("📝 [\(timestamp)] Profile username: \(profile.username)")
-        print("📝 [\(timestamp)] Profile port: \(profile.port)")
-        print("📝 [\(timestamp)] Profile id: \(profile.id)")
         
         var debugLogs: [String] = []
         var files: [RemoteFile] = []
-        print("📝 [\(timestamp)] RepositoryService: Created variables")
         
         debugLogs.append("[blue][\(timestamp)] Listing directory: \(path)")
-        print("📝 [\(timestamp)] RepositoryService: Added directory log")
         
-        print("📝 [\(timestamp)] RepositoryService: About to call buildSFTPCommand")
         let sftpCommand = try buildSFTPCommand(for: profile)
-        print("📝 [\(timestamp)] RepositoryService: buildSFTPCommand completed")
         debugLogs.append("[blue][\(timestamp)] SFTP command: \(sftpCommand)")
         
         // Create temporary script for SFTP
         let tempScript = try createTempSFTPListScript(for: profile, path: path)
         debugLogs.append("[blue][\(timestamp)] Created SFTP script: \(tempScript.path)")
         
-        print("📝 [\(timestamp)] RepositoryService: About to create Process")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [tempScript.path]
-        print("📝 [\(timestamp)] RepositoryService: Process created with bash and script")
         
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
         
         debugLogs.append("[blue][\(timestamp)] Executing SFTP list command...")
-        print("📝 [\(timestamp)] RepositoryService: About to execute SFTP process")
         
         do {
             debugLogs.append("[blue][\(timestamp)] Starting SFTP process...")
-            print("📝 [\(timestamp)] RepositoryService: Starting SFTP process")
             try process.run()
-            print("📝 [\(timestamp)] RepositoryService: SFTP process started")
             debugLogs.append("[blue][\(timestamp)] SFTP process started, waiting for completion...")
-            print("📝 [\(timestamp)] RepositoryService: About to wait for SFTP process")
             process.waitUntilExit()
-            print("📝 [\(timestamp)] RepositoryService: SFTP process completed")
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
@@ -624,12 +605,7 @@ class SSHService {
             
         } catch {
             LoggingService.shared.error("SFTP process error: \(error.localizedDescription)", source: "FileManager")
-            print("📝 [\(timestamp)] RepositoryService: SFTP process ERROR")
-            print("📝 [\(timestamp)] Error type: \(type(of: error))")
-            print("📝 [\(timestamp)] Error description: \(error.localizedDescription)")
-            print("📝 [\(timestamp)] Error: \(error)")
             debugLogs.append("[red][\(timestamp)] ❌ SFTP process error: \(error.localizedDescription)")
-            debugLogs.append("[red][\(timestamp)] ❌ Error type: \(type(of: error))")
             throw SSHConnectionError.sftpError("SFTP error: \(error.localizedDescription)")
         }
         
@@ -951,34 +927,15 @@ class SSHService {
     // MARK: - Private Helper Methods
     
     private static func buildSFTPCommand(for profile: Profile) throws -> String {
-        let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] RepositoryService: buildSFTPCommand STARTED")
-        print("📝 [\(timestamp)] Profile name: \(profile.name)")
-        print("📝 [\(timestamp)] Profile host: \(profile.host)")
-        print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
-        print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("📝 [\(timestamp)] SSHPass available: \(checkSSHPassAvailability())")
-        
         var command = ""
         
-        print("📝 [\(timestamp)] RepositoryService: Building SFTP command")
-        print("📝 [\(timestamp)] Profile keyType: \(profile.keyType)")
-        print("📝 [\(timestamp)] Profile has password: \(profile.password != nil && !profile.password!.isEmpty)")
-        print("📝 [\(timestamp)] SSHPass available: \(checkSSHPassAvailability())")
-        
-        print("📝 [\(timestamp)] RepositoryService: Checking keyType")
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
-            print("📝 [\(timestamp)] RepositoryService: Password authentication detected")
             if !checkSSHPassAvailability() {
-                print("📝 [\(timestamp)] ❌ SSHPass not available, throwing error")
-                throw SSHConnectionError.sshpassNotInstalled("sshpass is not installed. To automatically pass passwords, install sshpass: brew install sshpass")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SFTP connections. Install it with: brew install sshpass")
             }
             command = "sshpass -p '\(password)' sftp"
-            print("📝 [\(timestamp)] ✅ Using sshpass with password")
         } else {
-            print("📝 [\(timestamp)] RepositoryService: Non-password authentication detected")
             command = "sftp"
-            print("📝 [\(timestamp)] ✅ Using sftp without password")
         }
         
         command += " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -989,7 +946,6 @@ class SSHService {
         
         command += " \(profile.username)@\(profile.host)"
         
-        print("Final SFTP command: \(command)")
         return command
     }
     
@@ -998,7 +954,7 @@ class SSHService {
         
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             if !checkSSHPassAvailability() {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SCP connections. Install it with: brew install sshpass")
             }
             command = "sshpass -p '\(password)' scp"
         } else {
@@ -1025,7 +981,7 @@ class SSHService {
         
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             if !checkSSHPassAvailability() {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SCP connections. Install it with: brew install sshpass")
             }
             command = "sshpass -p '\(password)' scp"
         } else {
@@ -1069,7 +1025,7 @@ class SSHService {
         let connectionString: String
         if profile.keyType == .password, let password = profile.password, !password.isEmpty {
             if !checkSSHPassAvailability() {
-                throw SSHConnectionError.sshpassNotInstalled("sshpass не установлен для SSHFS")
+                throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SSHFS connections. Install it with: brew install sshpass")
             }
             connectionString = "sshpass -p '\(password)' sshfs \(profile.username)@\(profile.host):\(remotePath) \(mountPoint)"
         } else {
@@ -1084,20 +1040,10 @@ class SSHService {
 
     
     private static func createTempSFTPListScript(for profile: Profile, path: String) throws -> URL {
-        let timestamp = Date().timeIntervalSince1970
-        print("📝 [\(timestamp)] RepositoryService: createTempSFTPListScript STARTED")
         let tempDir = FileManager.default.temporaryDirectory
         let scriptURL = tempDir.appendingPathComponent("sftp_list_\(profile.id.uuidString).sh")
         
-        print("📝 [\(timestamp)] RepositoryService: Creating SFTP script")
-        print("📝 [\(timestamp)] RepositoryService: Temp directory: \(tempDir.path)")
-        print("📝 [\(timestamp)] RepositoryService: Script URL: \(scriptURL.path)")
-        print("📝 [\(timestamp)] RepositoryService: Profile: \(profile.name), Host: \(profile.host)")
-        print("📝 [\(timestamp)] RepositoryService: Path: \(path)")
-        print("📝 [\(timestamp)] RepositoryService: About to create script content")
-        
         var scriptContent = "#!/bin/bash\n"
-        print("📝 [\(timestamp)] RepositoryService: Created scriptContent variable")
         scriptContent += "set -e\n"
         scriptContent += "echo 'Listing directory: \(path)'\n"
         
@@ -1131,19 +1077,10 @@ class SSHService {
         scriptContent += "quit\n"
         scriptContent += "EOF\n"
         
-        print("📝 [\(timestamp)] RepositoryService: About to write script to file")
         do {
-            print("📝 [\(timestamp)] RepositoryService: Writing script content to file")
             try scriptContent.write(to: scriptURL, atomically: true, encoding: .utf8)
-            print("📝 [\(timestamp)] RepositoryService: Script written successfully")
-            print("📝 [\(timestamp)] RepositoryService: Setting file permissions")
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
-            print("📝 [\(timestamp)] RepositoryService: File permissions set successfully")
         } catch {
-            print("📝 [\(timestamp)] RepositoryService: ERROR writing script file")
-            print("📝 [\(timestamp)] RepositoryService: Error type: \(type(of: error))")
-            print("📝 [\(timestamp)] RepositoryService: Error description: \(error.localizedDescription)")
-            print("📝 [\(timestamp)] RepositoryService: Error: \(error)")
             throw SSHConnectionError.processError("Failed to create SFTP script: \(error.localizedDescription)")
         }
         

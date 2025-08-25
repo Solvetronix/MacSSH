@@ -99,3 +99,6 @@ iOSInjectionProject/
 # Build artifacts
 *.dmg
 *.app
+
+# SwiftTerm local copy
+SwiftTerm-main/

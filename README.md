@@ -1,8 +1,87 @@
-# MacSSH - SSH Terminal & File Manager
+# MacSSH - Professional SSH Terminal & File Manager for macOS
 
-MacSSH is a native macOS application for managing SSH connections with a built-in file manager for working with remote files and folders.
+> **🚀 The easiest way to manage SSH connections and remote files on your Mac**
 
+MacSSH combines the power of a professional SSH terminal with an intuitive file manager, making remote server management simple and efficient.
 
+## ✨ **Why Choose MacSSH?**
+
+- **🔐 One-Click SSH Connections** - Connect to servers instantly with saved profiles
+- **📁 Visual File Browser** - Browse remote files like in Finder
+- **💻 Built-in Terminal** - Professional SwiftTerm terminal with copy/paste support
+- **📝 Smart File Editing** - Open files in VS Code/Cursor with auto-sync
+- **🔄 Auto Updates** - Always get the latest version automatically
+- **🎯 Zero Configuration** - Works out of the box with macOS
+
+## 🚀 **INSTALLATION GUIDE** 🚀
+
+> **⚠️ IMPORTANT: Follow these steps carefully to install MacSSH**
+
+📖 **[📋 Complete Installation Guide with Screenshots](docs/installation/INSTALLATION_GUIDE.md)**
+
+### **Quick Steps:**
+1. **Download** from [GitHub Releases](https://github.com/Solvetronix/MacSSH/releases)
+2. **Install** to Applications folder
+3. **Launch** and follow Gatekeeper bypass steps
+
+---
+
+## 🔧 **Required Dependencies**
+
+### **sshpass - Password Authentication Tool**
+
+MacSSH requires `sshpass` for automatic password transmission to SSH terminals. This is the main dependency you need to install.
+
+**Install via Homebrew:**
+```bash
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install sshpass
+brew install sshpass
+```
+
+**Why sshpass?**
+- Enables automatic password entry for SSH connections
+- Allows MacSSH to handle password authentication seamlessly
+- Required for the terminal integration feature
+
+**Alternative installation methods:**
+- Download from [sshpass website](https://sourceforge.net/projects/sshpass/)
+- Install via MacPorts: `sudo port install sshpass`
+
+---
+
+## 🎯 **Key Features**
+
+### **SSH Made Simple**
+- ✅ **Profile Management** - Save and organize your server connections
+- ✅ **Password & Key Auth** - Support for both authentication methods
+- ✅ **Connection Testing** - Verify your setup before connecting
+- ✅ **Recent History** - Quick access to your last connections
+
+### **File Management**
+- ✅ **Visual Browser** - Navigate remote files like local folders
+- ✅ **Smart Editing** - Open files in VS Code/Cursor with live sync
+- ✅ **Finder Integration** - Download and open files in Finder
+- ✅ **SSHFS Mounting** - Mount remote directories as local drives
+
+### **Developer Friendly**
+- ✅ **Auto-Sync Editing** - Changes sync automatically when you save
+- ✅ **Terminal Integration** - Built-in professional terminal
+- ✅ **Update System** - Stay current with automatic updates
+- ✅ **macOS Native** - Designed specifically for macOS
+
+## 🤖 **Coming Soon: AI-Powered Terminal**
+
+> **🚀 Future Enhancement: AI Terminal Assistant**
+
+- **🧠 AI Command Execution** - Write prompts and let AI execute terminal commands
+- **🔑 Token-Based AI Integration** - Connect your AI service via API tokens
+- **⚡ Smart Task Automation** - AI will handle complex terminal tasks automatically
+- **🎯 Professional Terminal** - Built on native SwiftTerm with AI capabilities
+
+---
 
 ## 👥 Contributing & Development
 
@@ -48,281 +127,3 @@ xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Debug build
 - **Discussions**: Join project discussions on GitHub
 
 **🎯 Goal**: Create the best SSH management tool for macOS with community input!
-
-## Features
-
-### SSH Connections
-- ✅ SSH connection profile management
-- ✅ Password and private key authentication support
-- ✅ Automatic Terminal.app opening with SSH connection
-- ✅ Connection testing
-- ✅ Recent connections history
-
-### File Manager
-- ✅ Browse files and folders on remote hosts
-- ✅ Navigate through the file system
-- ✅ Open files in VS Code/Cursor with automatic change synchronization
-- ✅ Open files in Finder (automatic download)
-- ✅ Mount remote directories in Finder via SSHFS
-- ✅ Display file information (size, permissions, modification date)
-
-### Updates
-- ✅ Automatic update checking via GitHub
-- ✅ One-click download and installation
-- ✅ Version comparison and release notes
-- ✅ Manual update option
-
-## Installation
-
-### Requirements
-- macOS 13.0 or newer
-- Xcode 15.0 or newer (for building from source)
-- VS Code or Cursor (for editing files with automatic synchronization)
-
-### ⚠️ Important: macOS Permissions
-
-The MacSSH application requires special permissions to execute external commands (ssh, sftp, scp). The application automatically checks and requests necessary permissions.
-
-**Required permissions:**
-1. **Full Disk Access** - required for executing SSH commands
-2. **Accessibility** - for automation (optional)
-
-**Automatic setup:**
-- The application automatically checks permissions on startup
-- You can see the status of all permissions in SSH Tools Manager
-- The "Request Full Disk Access" button automatically opens System Settings
-- Detailed instructions are available in SSH Tools Manager
-
-**Manual setup:**
-If automatic setup doesn't work, follow the instructions in the [PERMISSIONS_FIX.md](PERMISSIONS_FIX.md) file.
-
-### 🔍 Required Tools & Software
-
-MacSSH automatically searches for the following tools and software on your system:
-
-#### **Text Editors (Required for file editing)**
-The application searches for VS Code or Cursor in these locations:
-- `/usr/local/bin/code`
-- `/opt/homebrew/bin/code`
-- `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`
-- `/Applications/Cursor.app/Contents/Resources/app/bin/code`
-- Also checks if `code` command is available in PATH
-
-**Installation:**
-- **VS Code**: Download from https://code.visualstudio.com/
-- **Cursor**: Download from https://cursor.sh/
-
-#### **SSH Tools (Required for SSH operations)**
-The application checks for these built-in macOS tools:
-- **ssh** - `/usr/bin/ssh`
-- **ssh-keyscan** - `/usr/bin/ssh-keyscan`
-- **sftp** - `/usr/bin/sftp`
-- **scp** - `/usr/bin/scp`
-
-These are included with macOS by default.
-
-#### **Additional Tools (Optional but recommended)**
-The application searches for these tools in multiple locations:
-
-**sshpass** (for password-based authentication):
-- `/opt/homebrew/bin/sshpass`
-- `/usr/local/bin/sshpass`
-- `/usr/bin/sshpass`
-
-**sshfs** (for mounting remote directories):
-- `/usr/bin/sshfs`
-- `/usr/local/bin/sshfs`
-- `/opt/homebrew/bin/sshfs`
-
-**Installation:**
-```bash
-# Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install required tools
-brew install sshpass
-brew install --cask macfuse
-brew install sshfs
-```
-
-#### **Tool Status Checking**
-You can check the status of all tools in the application:
-1. Open **Tools > SSH Tools Manager**
-2. Click **Check Tools** button
-3. Review the status of all required tools and permissions
-
-### Building from Source
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/MacSSH.git
-cd MacSSH
-```
-
-2. Open the project in Xcode:
-```bash
-open MacSSH.xcodeproj
-```
-
-3. Build and run the project (⌘+R)
-
-## Usage
-
-### Checking Permissions
-
-The application automatically checks permissions on startup. For manual checking:
-
-1. Open **Tools > SSH Tools Manager** menu
-2. Review the status of all permissions and tools
-3. Use the buttons:
-   - **Check Tools** - recheck status
-   - **Request Full Disk Access** - request permission
-   - **Show Instructions** - show detailed instructions
-4. Follow the recommendations to configure missing permissions
-
-### Creating an SSH Profile
-
-1. Click the "+" button to create a new profile
-2. Fill in the connection information:
-   - **Name** - profile name
-   - **Host** - IP address or domain name of the server
-   - **Port** - SSH port (default 22)
-   - **Username** - username
-   - **Authentication** - choose authentication type:
-     - Password - password
-     - Private Key - private key
-
-### Connecting to Server
-
-1. Select a profile from the list
-2. Click "Test Connection & Open Terminal" button to:
-   - Test the connection
-   - Automatically open Terminal.app with SSH session
-
-### Working with Files
-
-1. Select a profile from the list
-2. Click "Open File Browser" button (folder icon)
-3. In the opened file browser window:
-   - Browse files and folders
-   - Double-click on a folder to navigate into it
-   - Use action buttons:
-     - 📁 **Open directory** - navigate to folder (for directories)
-     - 📝 **Open in VS Code/Cursor** - open file in VS Code/Cursor with synchronization (for files)
-     - 📄 **Open in Finder** - download and open file in Finder (for files)
-
-### Mounting in Finder
-
-To mount a remote directory in Finder:
-
-1. Make sure `sshfs` is installed
-2. Use the file browser to navigate to the desired directory
-3. The mounting functionality is available through the SSH Tools Manager
-4. The folder will appear in Finder as an external drive
-
-### Opening Files
-
-To open files:
-
-1. In the file browser, select a file
-2. Use action buttons:
-   - 📝 **Open in VS Code/Cursor** - open file in VS Code/Cursor with automatic change synchronization
-   - 📄 **Open in Finder** - download and open file in Finder
-
-#### Editing in VS Code/Cursor
-
-When opening a file in VS Code/Cursor:
-- The file is automatically downloaded to a temporary folder
-- VS Code/Cursor opens with the downloaded file
-- All changes are automatically synchronized with the remote server when saved
-- Change tracking works in the background
-
-### Checking for Updates
-
-MacSSH includes an automatic update system:
-
-1. Click the "More Options" menu (⋯) in the toolbar
-2. Select "Check for Updates"
-3. If an update is available:
-   - Review version changes and release notes
-   - Click "Download & Install" to update
-   - Or click "View on GitHub" for manual download
-
-For detailed information about the update system, see [UPDATE_SYSTEM.md](UPDATE_SYSTEM.md).
-
-## Project Structure
-
-```
-MacSSH/
-├── MacSSH/
-│   ├── Views/
-│   │   ├── ContentView.swift          # Main interface
-│   │   ├── ProfileFormView.swift      # Profile form
-│   │   ├── FileBrowserView.swift      # File browser
-│   │   └── ToolsInfoView.swift        # Tools information
-│   ├── ViewModels/
-│   │   └── ProfileViewModel.swift     # Application logic
-│   ├── Models/
-│   │   └── Profile.swift              # Profile model
-│   ├── Services/
-│   │   └── RepositoryService.swift    # SSH and SFTP services
-│   └── Assets.xcassets/               # Resources
-├── MacSSHTests/                       # Unit tests
-└── MacSSHUITests/                     # UI tests
-```
-
-## Technical Details
-
-### SSH Connections
-- Uses built-in macOS SSH clients
-- Support for `sshpass` for automatic password transmission
-- Automatic acceptance of SSH host keys
-
-### File Manager
-- **SFTP** for browsing the file system
-- **SCP** for downloading files
-- **SSHFS** for mounting directories
-- Parsing `ls -la` output to get file information
-
-### Security
-- Passwords stored in Keychain (planned)
-- Temporary files automatically deleted
-- SSH private key support
-
-## Development Plans
-
-- [ ] Integration with macOS Keychain for secure password storage
-- [ ] Support for uploading files to server
-- [ ] Remote file editing
-- [ ] Multiple SSH session support
-- [ ] Integration with popular code editors
-- [ ] SFTP bookmarks support
-- [ ] Profile export/import
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 📚 Documentation
-
-### Developer Documentation
-- **[📋 Instructions Catalog](INSTRUCTIONS_CATALOG.md)** - Complete catalog of all instructions and documentation
-- **[🚀 Quick Version Fix](docs/QUICK_VERSION_FIX.md)** - Quick fix for application version problem
-- **[🔧 Version Management](docs/VERSION_MANAGEMENT_GUIDE.md)** - Detailed guide for version management
-- **[⚡ Automatic Updates](docs/AUTOMATIC_UPDATE_GUIDE.md)** - Automatic update system
-- **[🔧 Sparkle Setup](docs/SPARKLE_SETUP.md)** - Sparkle Framework setup
-- **[🚀 GitHub Release Guide](docs/GITHUB_RELEASE_GUIDE.md)** - Creating releases with GitHub CLI (⚠️ CRITICAL: version management)
-
-### Release Documentation
-- **[📦 Release Notes](docs/releases/)** - Release notes
-- **[🎯 Release Instructions](docs/releases/RELEASE_INSTRUCTIONS_1.8.0.md)** - Release creation instructions
-
-### Troubleshooting
-- **[🔐 Permissions Fix](PERMISSIONS_FIX.md)** - macOS permissions troubleshooting
-- **[⚡ Update System](UPDATE_SYSTEM.md)** - Update system information
-
-## Support
-
-If you have questions or suggestions, create an Issue in the repository. 
-# Test Automatic Release System
-# Test Feature for Automatic Release

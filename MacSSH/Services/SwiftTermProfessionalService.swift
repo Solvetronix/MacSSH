@@ -3,7 +3,9 @@ import AppKit
 import SwiftUI
 import SwiftTerm
 
-class SwiftTermService: ObservableObject {
+// SSHConnectionError уже определен в модуле
+
+class SwiftTermProfessionalService: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var isLoading: Bool = false
     @Published var connectionStatus: String = ""
@@ -19,7 +21,7 @@ class SwiftTermService: ObservableObject {
         
         self.isLoading = true
         self.isConnected = false
-        self.connectionStatus = "Подключение..."
+        self.connectionStatus = "Connecting..."
         
         // Проверяем разрешения (убираем строгую проверку для SwiftTerm)
         // if !PermissionsService.forceCheckPermissions() {
@@ -133,7 +135,7 @@ class SwiftTermService: ObservableObject {
                         self.currentProfile = profile
                         self.isConnected = true
                         self.isLoading = false
-                        self.connectionStatus = "Подключен к \(profile.host)"
+                        self.connectionStatus = "Connected to \(profile.host)"
                         
                         LoggingService.shared.debug("SwiftTerm SSH connection established", source: "SwiftTermService")
                         continuation.resume()
@@ -141,7 +143,7 @@ class SwiftTermService: ObservableObject {
                 } catch {
                     DispatchQueue.main.async {
                         self.isLoading = false
-                        self.connectionStatus = "Ошибка подключения: \(error.localizedDescription)"
+                        self.connectionStatus = "Connection error: \(error.localizedDescription)"
                         LoggingService.shared.debug("SwiftTerm SSH connection failed: \(error)", source: "SwiftTermService")
                         continuation.resume(throwing: error)
                     }
@@ -220,6 +222,10 @@ class SwiftTermService: ObservableObject {
             
             // Используем sshpass для неинтерактивной отправки пароля
             if let password = profile.password, !password.isEmpty {
+                // Проверяем доступность sshpass
+                if !SSHService.checkSSHPassAvailability() {
+                    throw SSHConnectionError.sshpassNotInstalled("sshpass is required for automatic password transmission in SSH connections. Install it with: brew install sshpass")
+                }
                 // Попробуем через переменную окружения (более безопасно)
                 command = "/opt/homebrew/bin/sshpass -e " + command
             }
