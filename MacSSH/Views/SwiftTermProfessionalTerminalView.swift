@@ -11,6 +11,8 @@ struct SwiftTermProfessionalTerminalView: View {
     @State private var currentCommandIndex: Int = 0 // Будет обновляться при добавлении команд
     @State private var showingError: Bool = false
     @State private var errorMessage: String = ""
+    @State private var gptService: GPTTerminalService?
+    @State private var showingGPTSettings = false
     
     // Терминальные цвета
     private let terminalBackground = Color(red: 0.1, green: 0.1, blue: 0.1)
@@ -23,6 +25,21 @@ struct SwiftTermProfessionalTerminalView: View {
             // Статус подключения в заголовке окна
             HStack {
                 Spacer()
+                
+                // GPT Settings button (if no GPT service)
+                if gptService == nil {
+                    Button(action: { showingGPTSettings = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "brain.head.profile")
+                                .foregroundColor(.blue)
+                            Text("Enable AI")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Enable AI Terminal Assistant")
+                }
                 
                 // Статус подключения
                 HStack(spacing: 4) {
@@ -49,10 +66,18 @@ struct SwiftTermProfessionalTerminalView: View {
             
             // SwiftTerm терминал
             if terminalService.isConnected, let _ = terminalService.getTerminalView() {
-                SwiftTerminalView(terminalService: terminalService)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.leading, 4)
-                    .background(Color.white, alignment: .leading)
+                VStack(spacing: 0) {
+                    SwiftTerminalView(terminalService: terminalService)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.leading, 4)
+                        .background(Color.white, alignment: .leading)
+                    
+                    // GPT Terminal Assistant
+                    if let gptService = gptService {
+                        Divider()
+                        GPTTerminalView(gptService: gptService)
+                    }
+                }
             } else if terminalService.isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -93,6 +118,24 @@ struct SwiftTermProfessionalTerminalView: View {
             if !terminalService.isConnected && !terminalService.isLoading {
                 connectToSSH()
             }
+            
+            // Initialize GPT service when connected
+            if terminalService.isConnected && gptService == nil {
+                initializeGPTService()
+            }
+        }
+        .onChange(of: terminalService.isConnected) { isConnected in
+            if isConnected && gptService == nil {
+                initializeGPTService()
+            }
+        }
+        .onChange(of: showingGPTSettings) { showing in
+            if !showing {
+                // Re-initialize GPT service when settings are closed
+                if terminalService.isConnected && gptService == nil {
+                    initializeGPTService()
+                }
+            }
         }
         // Убираем автоматическое отключение при исчезновении view
         // Теперь отключение управляется только через WindowManager
@@ -107,6 +150,11 @@ struct SwiftTermProfessionalTerminalView: View {
             }
         } message: {
             Text(errorMessage)
+        }
+        .sheet(isPresented: $showingGPTSettings) {
+            GPTSettingsView(isPresented: $showingGPTSettings)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -870,6 +918,27 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
             LoggingService.shared.debug("🎯 Selection changed - terminal content logging disabled", source: "SwiftTerminalView")
         } else {
             LoggingService.shared.debug("🎯 Selection is now INACTIVE", source: "SwiftTerminalView")
+        }
+    }
+}
+
+// MARK: - GPT Service initialization
+extension SwiftTermProfessionalTerminalView {
+    private func initializeGPTService() {
+        LoggingService.shared.debug("🔧 Initializing GPT Terminal Service", source: "SwiftTermProfessionalTerminalView")
+        
+        // Get API key from UserDefaults or settings
+        let apiKey = UserDefaults.standard.string(forKey: "OpenAI_API_Key") ?? ""
+        
+        if !apiKey.isEmpty {
+            LoggingService.shared.info("🔑 OpenAI API key found, creating GPT service", source: "SwiftTermProfessionalTerminalView")
+            gptService = GPTTerminalService(
+                apiKey: apiKey,
+                terminalService: terminalService
+            )
+            LoggingService.shared.success("✅ GPT Terminal Service initialized successfully", source: "SwiftTermProfessionalTerminalView")
+        } else {
+            LoggingService.shared.warning("⚠️ OpenAI API key not found. GPT features disabled.", source: "SwiftTermProfessionalTerminalView")
         }
     }
 }

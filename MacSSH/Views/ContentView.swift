@@ -67,6 +67,7 @@ struct ConnectionListView: View {
     @Binding var showingPermissionsManager: Bool
     @State private var profileToDelete: Profile? = nil
     @State private var showingAboutDialog = false
+    @State private var showingGPTSettings = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -127,6 +128,11 @@ struct ConnectionListView: View {
                     }
                     .help("macOS Permissions Manager")
                     
+                    Button(action: { showingGPTSettings = true }) {
+                        Image(systemName: "brain.head.profile")
+                    }
+                    .help("AI Terminal Assistant Settings")
+                    
                     Button(action: { showingAddProfile = true }) {
                         Image(systemName: "plus")
                     }.disabled(viewModel.isConnecting)
@@ -149,6 +155,11 @@ struct ConnectionListView: View {
         })
         .sheet(isPresented: $showingAboutDialog) {
             AboutView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingGPTSettings) {
+            GPTSettingsView(isPresented: $showingGPTSettings)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
