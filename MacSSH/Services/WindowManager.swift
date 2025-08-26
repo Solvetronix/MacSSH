@@ -9,6 +9,7 @@ class WindowManager: ObservableObject {
     private var terminalWindows: [String: NSWindow] = [:]
     private var windowDelegates: [String: TerminalWindowDelegate] = [:]
     private var terminalServices: [String: SwiftTermProfessionalService] = [:]
+    private var aiChatWindows: [String: NSWindow] = [:]
     
     private init() {}
     
@@ -87,6 +88,12 @@ class WindowManager: ObservableObject {
         }
         terminalWindows.removeAll()
         windowDelegates.removeAll()
+        
+        // Закрываем все окна AI чата
+        for (_, window) in aiChatWindows {
+            window.close()
+        }
+        aiChatWindows.removeAll()
     }
     
     // Метод для удаления окна из словарей (вызывается делегатом)
@@ -98,6 +105,46 @@ class WindowManager: ObservableObject {
         
         terminalWindows.removeValue(forKey: windowId)
         windowDelegates.removeValue(forKey: windowId)
+    }
+    
+    @MainActor
+    func openMultiStepAIChatWindow(for profile: Profile) {
+        let windowId = "ai_chat_\(profile.id.uuidString)"
+        
+        // Проверяем, не открыто ли уже окно для этого профиля
+        if let existingWindow = aiChatWindows[windowId], existingWindow.isVisible {
+            existingWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+        
+        // Find existing terminal service for this profile
+        let terminalWindowId = "terminal_\(profile.id.uuidString)"
+        guard let terminalService = terminalServices[terminalWindowId] else {
+            print("No terminal service found for profile \(profile.host)")
+            return
+        }
+        
+        // Создаем новое окно
+        let aiChatView = MultiStepAIChatWindow(profile: profile, terminalService: terminalService)
+        let hostingController = NSHostingController(rootView: aiChatView)
+        
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        // Устанавливаем окно как неосновное, чтобы приложение не закрывалось при его закрытии
+        window.isReleasedWhenClosed = false
+        
+        window.title = "Multi-Step AI Assistant — \(profile.username)@\(profile.host)"
+        window.contentViewController = hostingController
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        
+        // Сохраняем ссылку на окно
+        aiChatWindows[windowId] = window
     }
 }
 

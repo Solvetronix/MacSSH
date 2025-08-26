@@ -9,6 +9,7 @@ class SwiftTermProfessionalService: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var isLoading: Bool = false
     @Published var connectionStatus: String = ""
+    @Published var currentOutput: String = ""
     
     private var terminalView: TerminalView?
     private var sshProcess: Process?
@@ -87,9 +88,9 @@ class SwiftTermProfessionalService: ObservableObject {
                                 let bytes = Array(data)
                                 terminal.feed(byteArray: bytes[...])
                                 
-                                // Логируем весь вывод для отладки
+                                // Сохраняем вывод для GPT анализа
                                 if let output = String(data: data, encoding: .utf8) {
-                                    LoggingService.shared.info("📥 SSH Output: '\(output.replacingOccurrences(of: "\n", with: "\\n"))'", source: "SwiftTermService")
+                                    self?.currentOutput += output
                                     
                                     // Проверяем, нужно ли отправить пароль
                                     if output.contains("password:") || output.contains("Password:") {
@@ -179,6 +180,15 @@ class SwiftTermProfessionalService: ObservableObject {
         } else {
             LoggingService.shared.error("❌ Failed to get input pipe for sending data", source: "SwiftTermService")
         }
+    }
+    
+    // MARK: - Terminal output access
+    func getCurrentOutput() async -> String? {
+        return currentOutput
+    }
+    
+    func clearOutput() {
+        currentOutput = ""
     }
     
     func disconnect() {

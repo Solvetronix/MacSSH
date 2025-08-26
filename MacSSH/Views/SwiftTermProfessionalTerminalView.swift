@@ -2,6 +2,8 @@ import SwiftUI
 import AppKit
 import SwiftTerm
 
+// GPTTab enum removed - no longer needed
+
 // SSHConnectionError уже определен в модуле
 
 struct SwiftTermProfessionalTerminalView: View {
@@ -11,7 +13,6 @@ struct SwiftTermProfessionalTerminalView: View {
     @State private var currentCommandIndex: Int = 0 // Будет обновляться при добавлении команд
     @State private var showingError: Bool = false
     @State private var errorMessage: String = ""
-    @State private var gptService: GPTTerminalService?
     @State private var showingGPTSettings = false
     
     // Терминальные цвета
@@ -26,20 +27,7 @@ struct SwiftTermProfessionalTerminalView: View {
             HStack {
                 Spacer()
                 
-                // GPT Settings button (if no GPT service)
-                if gptService == nil {
-                    Button(action: { showingGPTSettings = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "brain.head.profile")
-                                .foregroundColor(.blue)
-                            Text("Enable AI")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .help("Enable AI Terminal Assistant")
-                }
+                // GPT Settings button removed - AI is now in separate window
                 
                 // Статус подключения
                 HStack(spacing: 4) {
@@ -50,6 +38,23 @@ struct SwiftTermProfessionalTerminalView: View {
                     Text(terminalService.isConnected ? "Connected" : "Disconnected")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundColor(.secondary)
+                }
+                
+                // Multi-Step AI button
+                if terminalService.isConnected {
+                    Button(action: {
+                        WindowManager.shared.openMultiStepAIChatWindow(for: profile)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "brain")
+                                .foregroundColor(.orange)
+                            Text("AI Assistant")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Open Multi-Step AI Assistant")
                 }
                 
                 if terminalService.isLoading {
@@ -64,20 +69,12 @@ struct SwiftTermProfessionalTerminalView: View {
             
             Divider()
             
-            // SwiftTerm терминал
+            // SwiftTerm терминал - всегда видимый
             if terminalService.isConnected, let _ = terminalService.getTerminalView() {
-                VStack(spacing: 0) {
-                    SwiftTerminalView(terminalService: terminalService)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.leading, 4)
-                        .background(Color.white, alignment: .leading)
-                    
-                    // GPT Terminal Assistant
-                    if let gptService = gptService {
-                        Divider()
-                        GPTTerminalView(gptService: gptService)
-                    }
-                }
+                SwiftTerminalView(terminalService: terminalService)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.leading, 4)
+                    .background(Color.white, alignment: .leading)
             } else if terminalService.isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -111,6 +108,8 @@ struct SwiftTermProfessionalTerminalView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(NSColor.controlBackgroundColor))
             }
+            
+            // GPT Terminal Assistant removed - now in separate window
         }
         .frame(minWidth: 800, minHeight: 600)
         .onAppear {
@@ -118,25 +117,8 @@ struct SwiftTermProfessionalTerminalView: View {
             if !terminalService.isConnected && !terminalService.isLoading {
                 connectToSSH()
             }
-            
-            // Initialize GPT service when connected
-            if terminalService.isConnected && gptService == nil {
-                initializeGPTService()
-            }
         }
-        .onChange(of: terminalService.isConnected) { isConnected in
-            if isConnected && gptService == nil {
-                initializeGPTService()
-            }
-        }
-        .onChange(of: showingGPTSettings) { showing in
-            if !showing {
-                // Re-initialize GPT service when settings are closed
-                if terminalService.isConnected && gptService == nil {
-                    initializeGPTService()
-                }
-            }
-        }
+        // GPT settings removed - AI is now in separate window
         // Убираем автоматическое отключение при исчезновении view
         // Теперь отключение управляется только через WindowManager
         // .onDisappear {
@@ -151,11 +133,7 @@ struct SwiftTermProfessionalTerminalView: View {
         } message: {
             Text(errorMessage)
         }
-        .sheet(isPresented: $showingGPTSettings) {
-            GPTSettingsView(isPresented: $showingGPTSettings)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
+        // GPT settings sheet removed - AI is now in separate window
     }
     
     private func connectToSSH() {
@@ -306,7 +284,7 @@ struct SwiftTerminalView: NSViewRepresentable {
                 object: terminal,
                 queue: .main
             ) { _ in
-                LoggingService.shared.debug("🎯 Terminal frame changed", source: "SwiftTerminalView")
+                // Removed excessive logging to reduce log spam
             }
             
             // Добавляем обработчик для событий окна
@@ -922,24 +900,74 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
     }
 }
 
-// MARK: - GPT Service initialization
-extension SwiftTermProfessionalTerminalView {
-    private func initializeGPTService() {
-        LoggingService.shared.debug("🔧 Initializing GPT Terminal Service", source: "SwiftTermProfessionalTerminalView")
-        
-        // Get API key from UserDefaults or settings
-        let apiKey = UserDefaults.standard.string(forKey: "OpenAI_API_Key") ?? ""
-        
-        if !apiKey.isEmpty {
-            LoggingService.shared.info("🔑 OpenAI API key found, creating GPT service", source: "SwiftTermProfessionalTerminalView")
-            gptService = GPTTerminalService(
-                apiKey: apiKey,
-                terminalService: terminalService
-            )
-            LoggingService.shared.success("✅ GPT Terminal Service initialized successfully", source: "SwiftTermProfessionalTerminalView")
-        } else {
-            LoggingService.shared.warning("⚠️ OpenAI API key not found. GPT features disabled.", source: "SwiftTermProfessionalTerminalView")
+// GPT Service initialization and TabView removed - AI is now in separate window
+
+struct ExecutionStepView: View {
+    let step: ExecutionStep
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Step header
+            HStack {
+                Text("Step \(step.stepNumber)")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                
+                Spacer()
+                
+                Text(step.timestamp, style: .time)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Button(isExpanded ? "Hide" : "Show") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+            
+            // Explanation
+            Text(step.explanation)
+                .font(.body)
+                .foregroundColor(.primary)
+            
+            // Command
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Command:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Text(step.command)
+                    .font(.system(.body, design: .monospaced))
+                    .padding(8)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(6)
+            }
+            
+            // Output (expandable)
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Output:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Text(step.output)
+                        .font(.system(.caption, design: .monospaced))
+                        .padding(8)
+                        .background(Color(NSColor.textBackgroundColor))
+                        .cornerRadius(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
+        .padding()
+        .background(Color(NSColor.windowBackgroundColor))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
     }
 }
 

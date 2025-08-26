@@ -1,27 +1,10 @@
 import SwiftUI
 
-struct GPTTerminalView: View {
+struct GPTAssistantTabView: View {
     @ObservedObject var gptService: GPTTerminalService
-    @State private var userRequest = ""
-    @State private var suggestedCommand: String?
-    @State private var showingConfirmation = false
-    @State private var isEditingCommand = false
-    @State private var editedCommand = ""
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                Image(systemName: "brain.head.profile")
-                    .foregroundColor(.blue)
-                Text("AI Terminal Assistant")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.horizontal)
-            
-            Divider()
-            
+        VStack(spacing: 0) {
             // Input area
             VStack(alignment: .leading, spacing: 12) {
                 Text("Ask GPT to help with terminal operations:")
@@ -110,41 +93,21 @@ struct GPTTerminalView: View {
                         Spacer()
                     }
                 }
-                .padding()
-                .background(Color.blue.opacity(0.05))
-                .cornerRadius(12)
-                .padding(.horizontal)
-            }
-            
-            // Error display
-            if let error = gptService.lastError {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle")
-                            .foregroundColor(.red)
-                        Text("Error:")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Spacer()
-                    }
-                    
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
                 .padding(.horizontal)
             }
             
             Spacer()
         }
-        .frame(height: 200)
-        .background(Color(NSColor.controlBackgroundColor))
     }
     
-    // MARK: - Actions
+    // State variables
+    @State private var userRequest = ""
+    @State private var suggestedCommand: String?
+    @State private var showingConfirmation = false
+    @State private var isEditingCommand = false
+    @State private var editedCommand = ""
+    
+    // Methods
     private func askGPT() {
         guard !userRequest.isEmpty else { return }
         
@@ -154,118 +117,88 @@ struct GPTTerminalView: View {
             let result = await gptService.processUserRequest(userRequest)
             
             await MainActor.run {
+                LoggingService.shared.debug("📥 Received result from GPT service: '\(result)'", source: "GPTTerminalView")
+                
                 if let result = result {
-                    LoggingService.shared.debug("📥 Received result from GPT service: '\(result)'", source: "GPTTerminalView")
-                    
-                    // Check if it's a command execution result
                     if result.hasPrefix("✅ Command executed:") {
                         LoggingService.shared.info("✅ Command was executed automatically", source: "GPTTerminalView")
                         resetState()
-                    } else if result.hasPrefix("⚠️ Command blocked") {
+                    } else if result.hasPrefix("🚫 Command blocked:") {
                         LoggingService.shared.warning("🚫 Command was blocked by security", source: "GPTTerminalView")
-                        suggestedCommand = result
+                        suggestedCommand = extractCommand(from: result)
+                        showingConfirmation = true
                     } else {
                         LoggingService.shared.debug("💬 GPT gave text response, extracting command", source: "GPTTerminalView")
-                        // GPT gave a text response, try to extract command
-                        suggestedCommand = extractCommandFromResponse(result)
+                        suggestedCommand = extractCommand(from: result)
+                        showingConfirmation = true
                     }
                 } else {
                     LoggingService.shared.warning("⚠️ No result from GPT service", source: "GPTTerminalView")
-                    // No result, might be an error
-                    suggestedCommand = nil
                 }
             }
         }
     }
     
     private func executeCommand() {
-        let commandToExecute = isEditingCommand ? editedCommand : (suggestedCommand ?? "")
-        guard !commandToExecute.isEmpty else { return }
+        guard let command = suggestedCommand else { return }
         
-        LoggingService.shared.info("🚀 User executing suggested command: '\(commandToExecute)'", source: "GPTTerminalView")
+        LoggingService.shared.info("🚀 User executing suggested command: '\(command)'", source: "GPTTerminalView")
         
-        // Execute the command through the terminal service
-        // This will be handled by the GPT service
         Task {
-            let result = await gptService.processUserRequest("Execute: \(commandToExecute)")
-            await MainActor.run {
+            do {
+                let result = await gptService.processUserRequest("Execute command: \(command)")
                 LoggingService.shared.debug("✅ Command execution completed", source: "GPTTerminalView")
-                resetState()
+            } catch {
+                LoggingService.shared.error("❌ Command execution failed: \(error.localizedDescription)", source: "GPTTerminalView")
             }
         }
+        
+        resetState()
     }
     
     private func resetState() {
-        LoggingService.shared.debug("🔄 Resetting GPT Terminal View state", source: "GPTTerminalView")
         userRequest = ""
         suggestedCommand = nil
+        showingConfirmation = false
         isEditingCommand = false
         editedCommand = ""
-        gptService.lastError = nil
+        LoggingService.shared.debug("🔄 Resetting GPT Terminal View state", source: "GPTTerminalView")
     }
     
-    // MARK: - Helper functions
-    private func extractCommandFromResponse(_ response: String) -> String? {
+    private func extractCommand(from response: String) -> String? {
         LoggingService.shared.debug("🔍 Extracting command from GPT response: '\(response)'", source: "GPTTerminalView")
         
-        // Try to extract command from GPT's text response
-        // This is a fallback when GPT doesn't use tool calls
+        // Look for command patterns in the response
+        let patterns = [
+            "```bash\\s*([^`]+)```",
+            "```shell\\s*([^`]+)```",
+            "`([^`]+)`",
+            "command:\\s*([^\\n]+)",
+            "execute:\\s*([^\\n]+)"
+        ]
         
-        let lines = response.components(separatedBy: .newlines)
-        
-        // Look for lines that look like commands
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Skip empty lines and explanations
-            if trimmed.isEmpty || trimmed.hasPrefix("Here") || trimmed.hasPrefix("You can") {
-                continue
-            }
-            
-            // Check if line looks like a command
-            if isLikelyCommand(trimmed) {
-                LoggingService.shared.info("✅ Extracted command from response: '\(trimmed)'", source: "GPTTerminalView")
-                return trimmed
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+               let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) {
+                
+                let range = Range(match.range(at: 1), in: response)!
+                let command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if !command.isEmpty {
+                    LoggingService.shared.info("✅ Extracted command from response: '\(command)'", source: "GPTTerminalView")
+                    return command
+                }
             }
         }
         
         LoggingService.shared.warning("⚠️ No command found in GPT response", source: "GPTTerminalView")
         return nil
     }
-    
-    private func isLikelyCommand(_ text: String) -> Bool {
-        // Simple heuristic to detect if text looks like a command
-        let commandPatterns = [
-            "^[a-zA-Z]+\\s",           // Starts with word + space
-            "^[a-zA-Z]+$",             // Just a command name
-            "^[a-zA-Z]+\\s+[a-zA-Z0-9_./-]+", // Command with arguments
-            "^cd\\s+",                 // cd command
-            "^ls\\s*",                 // ls command
-            "^cat\\s+",                // cat command
-            "^grep\\s+",               // grep command
-            "^find\\s+",               // find command
-            "^ps\\s*",                 // ps command
-            "^top\\s*",                // top command
-            "^df\\s*",                 // df command
-            "^du\\s*"                  // du command
-        ]
-        
-        for pattern in commandPatterns {
-            if text.range(of: pattern, options: .regularExpression) != nil {
-                return true
-            }
-        }
-        
-        return false
-    }
 }
 
-// MARK: - Preview
-struct GPTTerminalView_Previews: PreviewProvider {
-    static var previews: some View {
-        GPTTerminalView(gptService: GPTTerminalService(
-            apiKey: "test",
-            terminalService: SwiftTermProfessionalService()
-        ))
-    }
+#Preview {
+    GPTAssistantTabView(gptService: GPTTerminalService(
+        apiKey: "test",
+        terminalService: SwiftTermProfessionalService()
+    ))
 }
