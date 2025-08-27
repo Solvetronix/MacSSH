@@ -314,6 +314,8 @@ class GPTTerminalService: ObservableObject {
     }
     
     func planNextStep() async {
+        // Stop immediately if multi-step mode was turned off
+        guard isMultiStepMode else { return }
         guard currentStep < 3 else {
             await MainActor.run {
                 isMultiStepMode = false
@@ -390,9 +392,11 @@ class GPTTerminalService: ObservableObject {
         conversationHistory.append(planningRequest)
         
         do {
+            // Clip planning prompt to avoid model limits
+            let clippedPlanning = sanitizeForGPT(planningRequest.content, maxChars: 12000)
             let openAIRequest = OpenAIRequest(
                 model: "gpt-4o",
-                messages: conversationHistory,
+                messages: conversationHistory.dropLast() + [Message(role: "user", content: clippedPlanning)],
                 tools: [], // Remove tools to prevent GPT from executing commands
                 tool_choice: "none"
             )
@@ -410,10 +414,11 @@ class GPTTerminalService: ObservableObject {
             let gptCompletionCheck = executionHistory.count >= 1 ? await checkTaskCompletionWithGPT(
                 originalTask: currentTask,
                 executionHistory: executionHistory,
-                responseContent: responseContent
+                responseContent: sanitizeForGPT(responseContent, maxChars: 6000)
             ) : false
             
-            let isTaskComplete = gptCompletionCheck || currentStep >= 3 // Fallback: limit to 3 steps maximum
+            let phraseCompletion = responseContent.lowercased().contains("task complete")
+            let isTaskComplete = gptCompletionCheck || phraseCompletion || currentStep >= 3 // Fallback: limit to 3 steps maximum
             
             LoggingService.shared.info("🔍 Checking task completion. Response contains 'task complete': \(responseContent.lowercased().contains("task complete"))", source: "GPTTerminalService")
             LoggingService.shared.info("🔍 Response content: \(responseContent)", source: "GPTTerminalService")
@@ -435,9 +440,13 @@ class GPTTerminalService: ObservableObject {
                 // Check if this command was already executed recently
                 let recentCommands = executionHistory.suffix(2).map { $0.command }
                 if recentCommands.contains(command) {
-                    LoggingService.shared.warning("⚠️ Command '\(command)' was already executed. Skipping...", source: "GPTTerminalService")
-                    // Continue with next step instead of repeating
-                    await planNextStep()
+                    LoggingService.shared.warning("⚠️ Command '\(command)' was already executed recently. Concluding task to avoid loop.", source: "GPTTerminalService")
+                    await MainActor.run {
+                        isMultiStepMode = false
+                        totalSteps = currentStep
+                    }
+                    let summary = await createTaskSummary()
+                    addSummaryMessage("**Задача завершена!** \(summary)")
                     return
                 }
                 
@@ -498,6 +507,15 @@ class GPTTerminalService: ObservableObject {
             }
             
         } catch {
+            let errText = error.localizedDescription.lowercased()
+            if errText.contains("429") || errText.contains("rate limit") {
+                LoggingService.shared.error("❌ OpenAI rate limit: \(error.localizedDescription)", source: "GPTTerminalService")
+                await MainActor.run {
+                    isMultiStepMode = false
+                    lastError = "Rate limit from OpenAI. Please retry in ~20s."
+                }
+                return
+            }
             await MainActor.run {
                 isMultiStepMode = false
                 lastError = "Failed to plan next step: \(error.localizedDescription)"
@@ -624,7 +642,7 @@ class GPTTerminalService: ObservableObject {
             """
         )
         
-        let userMessage = Message(role: "user", content: userRequest)
+        let userMessage = Message(role: "user", content: sanitizeForGPT(userRequest, maxChars: 12000))
         
         return OpenAIRequest(
             model: "gpt-4o",
@@ -632,6 +650,31 @@ class GPTTerminalService: ObservableObject {
             tools: [terminalTool],
             tool_choice: "auto"
         )
+    }
+
+    // MARK: - Prompt sanitation and clipping
+    /// Remove ANSI, normalize newlines, and clip long text to fit model/context limits
+    private func sanitizeForGPT(_ text: String, maxChars: Int = 20000) -> String {
+        // Strip ANSI escape sequences
+        let ansiPattern = "\u{001B}\\[[0-9;?]*[ -/]*[@-~]"
+        let regex = try? NSRegularExpression(pattern: ansiPattern, options: [])
+        var clean = text
+        if let regex = regex {
+            let range = NSRange(location: 0, length: (clean as NSString).length)
+            clean = regex.stringByReplacingMatches(in: clean, options: [], range: range, withTemplate: "")
+        }
+        // Normalize CRLF/CR -> LF
+        clean = clean.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        // Fast path
+        if clean.count <= maxChars { return clean }
+        // Head/Tail clipping to preserve начало и конец вывода
+        let marker = "\n\n... [truncated] ...\n\n"
+        let reserve = marker.count
+        let headCount = max(2000, min(8000, maxChars * 2 / 3))
+        let tailCount = max(1000, maxChars - headCount - reserve)
+        let head = String(clean.prefix(headCount))
+        let tail = String(clean.suffix(tailCount))
+        return head + marker + tail
     }
     
     // MARK: - OpenAI API call
@@ -683,7 +726,7 @@ class GPTTerminalService: ObservableObject {
             model: "gpt-4o",
             messages: [
                 Message(role: "system", content: systemPrompt),
-                Message(role: "user", content: prompt)
+                Message(role: "user", content: sanitizeForGPT(prompt, maxChars: 12000))
             ]
         )
         
@@ -1143,7 +1186,7 @@ class GPTTerminalService: ObservableObject {
                 model: "gpt-4o",
                 messages: [
                     Message(role: "system", content: "Ты - эксперт по анализу информации. Отвечай кратко и по делу."),
-                    Message(role: "user", content: prompt)
+                    Message(role: "user", content: sanitizeForGPT(prompt, maxChars: 8000))
                 ]
             )
             
@@ -1285,7 +1328,7 @@ class GPTTerminalService: ObservableObject {
                 model: "gpt-4o",
                 messages: [
                     Message(role: "system", content: "You are a task completion analyzer. Analyze if a terminal task has been completed successfully based on the original request and command outputs. Respond with only 'COMPLETE' or 'INCOMPLETE'."),
-                    Message(role: "user", content: analysisPrompt)
+                    Message(role: "user", content: sanitizeForGPT(analysisPrompt, maxChars: 8000))
                 ]
             )
             

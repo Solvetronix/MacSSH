@@ -50,17 +50,19 @@ struct MarkdownTextView: View {
                          processedText.contains("```") || processedText.contains(">")
         
         if hasMarkdown {
-            // Use AttributedString for markdown parsing (official Apple approach)
+            // Use AttributedString for markdown parsing (force hard line breaks)
             if let attributedString = try? AttributedString(markdown: processedText) {
                 Text(attributedString)
                     .textSelection(.enabled)
                     .multilineTextAlignment(.leading)
+                    .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 // Fallback to plain text if markdown parsing fails
                 Text(processedText)
                     .textSelection(.enabled)
                     .multilineTextAlignment(.leading)
+                    .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } else {
@@ -68,14 +70,18 @@ struct MarkdownTextView: View {
             Text(processedText)
                 .textSelection(.enabled)
                 .multilineTextAlignment(.leading)
+                .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
     
     private func preserveLineBreaks(_ text: String) -> String {
+        // Normalize real CRLF/CR to LF first
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        
         // Replace single newlines with double newlines to ensure proper paragraph breaks
         // This ensures that line breaks are preserved in markdown rendering
-        let lines = text.components(separatedBy: .newlines)
+        let lines = normalized.components(separatedBy: .newlines)
         let processedLines = lines.map { line in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             return trimmed.isEmpty ? "" : line
@@ -85,10 +91,12 @@ struct MarkdownTextView: View {
         let result = processedLines.joined(separator: "\n\n")
         
         // Additional processing for special characters that might interfere with markdown
-        return result
+        // Force hard line breaks for Markdown by adding two spaces before newline
+        let hardBreaks = result.replacingOccurrences(of: "\n", with: "  \n")
+        return hardBreaks
             .replacingOccurrences(of: "\\n", with: "\n") // Handle escaped newlines
             .replacingOccurrences(of: "\\t", with: "    ") // Handle tabs
-            .replacingOccurrences(of: "\\r", with: "\n") // Handle carriage returns
+            .replacingOccurrences(of: "\\r", with: "\n") // Handle carriage returns (escaped)
     }
 }
 

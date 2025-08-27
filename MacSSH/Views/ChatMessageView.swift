@@ -39,9 +39,11 @@ struct ChatMessageView: View {
                 
                 // Main content
                 VStack(alignment: .leading, spacing: 8) {
-                    AppleMarkdownView(message.content)
+                    AppleMarkdownView(normalizeOutput(message.content))
                         .textSelection(.enabled)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
                     
                     // Command section (if exists)
                     if let command = message.command {
@@ -112,7 +114,7 @@ struct ChatMessageView: View {
                             
                             if isExpanded {
                                 ScrollView {
-                                    Text(output)
+                                    Text(normalizeOutput(output))
                                         .font(.system(.caption, design: .monospaced))
                                         .padding(12)
                                         .background(
@@ -130,8 +132,9 @@ struct ChatMessageView: View {
                                 }
                                 .frame(maxHeight: 300)
                             } else {
-                                let previewText = output.prefix(100)
-                                let hasMore = output.count > 100
+                                let full = normalizeOutput(output)
+                                let previewText = full.prefix(100)
+                                let hasMore = full.count > 100
                                 let displayText = hasMore ? String(previewText) + "..." : String(previewText)
                                 
                                 Text(displayText)
@@ -202,4 +205,18 @@ struct ChatMessageView: View {
         ))
     }
     .padding()
+}
+
+private func normalizeOutput(_ text: String) -> String {
+    // Remove ANSI escape sequences
+    let ansiPattern = "\\u001B\\[[0-9;?]*[ -/]*[@-~]"
+    let regex = try? NSRegularExpression(pattern: ansiPattern, options: [])
+    var clean = text
+    if let regex = regex {
+        let range = NSRange(location: 0, length: (clean as NSString).length)
+        clean = regex.stringByReplacingMatches(in: clean, options: [], range: range, withTemplate: "")
+    }
+    // Normalize CRLF/CR to LF
+    clean = clean.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+    return clean
 }
