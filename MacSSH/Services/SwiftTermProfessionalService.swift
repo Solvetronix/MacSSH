@@ -9,6 +9,7 @@ class SwiftTermProfessionalService: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var isLoading: Bool = false
     @Published var connectionStatus: String = ""
+    @Published var currentOutput: String = ""
     
     private var terminalView: TerminalView?
     private var sshProcess: Process?
@@ -87,9 +88,12 @@ class SwiftTermProfessionalService: ObservableObject {
                                 let bytes = Array(data)
                                 terminal.feed(byteArray: bytes[...])
                                 
-                                // Логируем весь вывод для отладки
+                                // Сохраняем вывод для GPT анализа
                                 if let output = String(data: data, encoding: .utf8) {
-                                    LoggingService.shared.info("📥 SSH Output: '\(output.replacingOccurrences(of: "\n", with: "\\n"))'", source: "SwiftTermService")
+                                    self?.currentOutput += output
+                                    
+                                    // Уведомляем об изменении буфера
+                                    self?.notifyBufferChanged()
                                     
                                     // Проверяем, нужно ли отправить пароль
                                     if output.contains("password:") || output.contains("Password:") {
@@ -159,6 +163,8 @@ class SwiftTermProfessionalService: ObservableObject {
         let commandData = (command + "\n").data(using: .utf8) ?? Data()
         if let inputPipe = process.standardInput as? Pipe {
             inputPipe.fileHandleForWriting.write(commandData)
+            // Триггерим возможное ожидание
+            notifyBufferChanged()
         }
     }
     
@@ -179,6 +185,27 @@ class SwiftTermProfessionalService: ObservableObject {
         } else {
             LoggingService.shared.error("❌ Failed to get input pipe for sending data", source: "SwiftTermService")
         }
+    }
+    
+    // Method to notify about buffer changes for command completion detection
+    func notifyBufferChanged() {
+        // This will be called by the terminal delegate when the buffer changes
+        // We'll forward this to GPT service if needed
+        LoggingService.shared.debug("📊 Buffer changed notification received", source: "SwiftTermService")
+        
+        // Notify GPT service if available
+        // Note: We need to implement a way to communicate with GPT service
+        // For now, we'll use NotificationCenter
+        NotificationCenter.default.post(name: .terminalBufferChanged, object: nil)
+    }
+    
+    // MARK: - Terminal output access
+    func getCurrentOutput() async -> String? {
+        return currentOutput
+    }
+    
+    func clearOutput() {
+        currentOutput = ""
     }
     
     func disconnect() {
@@ -209,11 +236,12 @@ class SwiftTermProfessionalService: ObservableObject {
         return terminalView
     }
     
-    private func buildSSHCommand(for profile: Profile) throws -> String {
-        var command = "/usr/bin/ssh"
-        
-        // Добавляем опции для принудительного создания псевдо-терминала и интерактивности
-        command += " -t -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+// MARK: - SSH Command Building
+private func buildSSHCommand(for profile: Profile) throws -> String {
+    var command = "/usr/bin/ssh"
+    
+    // Добавляем опции для принудительного создания псевдо-терминала и интерактивности
+    command += " -t -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
         
         // Принудительно включаем парольную аутентификацию
         if profile.keyType == .password {

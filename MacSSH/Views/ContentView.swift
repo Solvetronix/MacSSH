@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var showingAddProfile = false
     @State private var selectedProfile: Profile?
     @State private var showingPermissionsManager = false
+    @State private var showingStructuredPlan = false
     
     var body: some View {
         NavigationSplitView {
@@ -12,7 +13,8 @@ struct ContentView: View {
                 viewModel: viewModel,
                 showingAddProfile: $showingAddProfile,
                 selectedProfile: $selectedProfile,
-                showingPermissionsManager: $showingPermissionsManager
+                showingPermissionsManager: $showingPermissionsManager,
+                showingStructuredPlan: $showingStructuredPlan
             )
             .frame(minWidth: 400, idealWidth: 500)
         } detail: {
@@ -65,8 +67,10 @@ struct ConnectionListView: View {
     @Binding var showingAddProfile: Bool
     @Binding var selectedProfile: Profile?
     @Binding var showingPermissionsManager: Bool
+    @Binding var showingStructuredPlan: Bool
     @State private var profileToDelete: Profile? = nil
     @State private var showingAboutDialog = false
+    @State private var showingGPTSettings = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -127,6 +131,16 @@ struct ConnectionListView: View {
                     }
                     .help("macOS Permissions Manager")
                     
+                    Button(action: { showingGPTSettings = true }) {
+                        Image(systemName: "brain.head.profile")
+                    }
+                    .help("AI Terminal Assistant Settings")
+                    
+                    Button(action: { showingStructuredPlan = true }) {
+                        Image(systemName: "list.bullet.clipboard")
+                    }
+                    .help("Structured Plan Execution")
+                    
                     Button(action: { showingAddProfile = true }) {
                         Image(systemName: "plus")
                     }.disabled(viewModel.isConnecting)
@@ -151,6 +165,19 @@ struct ConnectionListView: View {
             AboutView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingGPTSettings) {
+            GPTSettingsView(isPresented: $showingGPTSettings)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingStructuredPlan) {
+            StructuredPlanView(
+                terminalService: SwiftTermProfessionalService(),
+                gptService: GPTTerminalService(terminalService: SwiftTermProfessionalService())
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 }

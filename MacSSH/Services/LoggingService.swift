@@ -31,12 +31,21 @@ enum LogLevel: String, CaseIterable {
 }
 
 // Структура для лог-сообщения
-struct LogMessage: Identifiable {
+struct LogMessage: Identifiable, Hashable {
     let id = UUID()
     let timestamp: Date
     let level: LogLevel
     let source: String
     let message: String
+    
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: LogMessage, rhs: LogMessage) -> Bool {
+        return lhs.id == rhs.id
+    }
     
     var formattedTimestamp: String {
         let formatter = DateFormatter()
@@ -128,6 +137,109 @@ class LoggingService: ObservableObject {
         return logs.map { log in
             "[\(log.formattedTimestamp)] [\(log.level.rawValue)] [\(log.source)] \(log.message)"
         }.joined(separator: "\n")
+    }
+    
+    // Новый метод для получения сокращенных логов
+    func getCompactLogsAsText() -> String {
+        let importantLogs = logs.filter { log in
+            // Сохраняем все ошибки и предупреждения
+            if log.level == .error || log.level == .warning {
+                return true
+            }
+            
+            // Сохраняем успешные операции
+            if log.level == .success {
+                return true
+            }
+            
+            // Для info и debug - сохраняем только ключевые сообщения
+            let keyWords = ["error", "failed", "success", "connected", "disconnected", "started", "stopped", "updated", "created", "deleted", "permission", "access", "security", "update", "install", "download", "gpt", "openai", "api", "command", "terminal", "ssh", "executed", "planned", "step", "task", "complete"]
+            
+            return keyWords.contains { keyword in
+                log.message.lowercased().contains(keyword)
+            }
+        }
+        
+        // Если важных логов мало, добавляем последние 20 логов
+        if importantLogs.count < 10 {
+            let recentLogs = Array(logs.suffix(20))
+            let combinedLogs = Array(Set(importantLogs + recentLogs)).sorted { $0.timestamp < $1.timestamp }
+            return combinedLogs.map { log in
+                "[\(log.formattedTimestamp)] [\(log.level.rawValue)] \(log.message)"
+            }.joined(separator: "\n")
+        }
+        
+        return importantLogs.map { log in
+            "[\(log.formattedTimestamp)] [\(log.level.rawValue)] \(log.message)"
+        }.joined(separator: "\n")
+    }
+    
+    // Метод для получения только GPT-связанных логов
+    func getGPTLogsAsText() -> String {
+        let gptLogs = logs.filter { log in
+            let gptKeywords = ["gpt", "openai", "api", "command", "executed", "planned", "step", "task", "complete", "terminal", "ssh"]
+            return gptKeywords.contains { keyword in
+                log.message.lowercased().contains(keyword) || log.source.lowercased().contains("gpt")
+            }
+        }
+        
+        return gptLogs.map { log in
+            "[\(log.formattedTimestamp)] [\(log.level.rawValue)] \(log.message)"
+        }.joined(separator: "\n")
+    }
+    
+    // Метод для получения кратких логов для отладки
+    func getShortLogsAsText() -> String {
+        // Берем только последние 30 логов и фильтруем по важности
+        let recentLogs = Array(logs.suffix(30))
+        let importantLogs = recentLogs.filter { log in
+            // Всегда включаем ошибки и предупреждения
+            if log.level == .error || log.level == .warning {
+                return true
+            }
+            
+            // Включаем успешные операции
+            if log.level == .success {
+                return true
+            }
+            
+            // Для info - только важные сообщения
+            if log.level == .info {
+                let importantKeywords = ["gpt", "openai", "api", "command", "executed", "planned", "step", "task", "complete", "terminal", "ssh", "connected", "error", "failed", "success"]
+                return importantKeywords.contains { keyword in
+                    log.message.lowercased().contains(keyword)
+                }
+            }
+            
+            // Исключаем debug логи
+            return false
+        }
+        
+        return importantLogs.map { log in
+            "[\(log.formattedTimestamp)] \(log.level.icon) \(log.message)"
+        }.joined(separator: "\n")
+    }
+    
+    // Метод для получения краткого резюме логов
+    func getLogSummary() -> String {
+        let errorCount = logs.filter { $0.level == .error }.count
+        let warningCount = logs.filter { $0.level == .warning }.count
+        let successCount = logs.filter { $0.level == .success }.count
+        let totalCount = logs.count
+        
+        var summary = "📊 Log Summary:\n"
+        summary += "Total: \(totalCount) | Errors: \(errorCount) | Warnings: \(warningCount) | Success: \(successCount)\n\n"
+        
+        // Добавляем последние важные события
+        let recentImportant = logs.suffix(10).filter { $0.level != .debug }
+        if !recentImportant.isEmpty {
+            summary += "Recent events:\n"
+            summary += recentImportant.map { log in
+                "[\(log.formattedTimestamp)] \(log.level.icon) \(log.message)"
+            }.joined(separator: "\n")
+        }
+        
+        return summary
     }
     
     // Фильтрация логов по уровню
