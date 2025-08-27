@@ -39,7 +39,7 @@ struct ChatMessageView: View {
                 
                 // Main content
                 VStack(alignment: .leading, spacing: 8) {
-                    AppleMarkdownView(normalizeOutput(message.content))
+                    GPTMarkdownView(normalizeOutput(message.content))
                         .textSelection(.enabled)
                         .multilineTextAlignment(.leading)
                         .lineLimit(nil)
