@@ -198,7 +198,7 @@ struct GPTAssistantTabView: View {
 
 #Preview {
     GPTAssistantTabView(gptService: GPTTerminalService(
-        apiKey: "test",
+
         terminalService: SwiftTermProfessionalService()
     ))
 }

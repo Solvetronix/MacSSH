@@ -12,8 +12,7 @@ struct MultiStepAIChatWindow: View {
         self.terminalService = terminalService
         
         // Initialize GPT service with the provided terminal service
-        let apiKey = UserDefaults.standard.string(forKey: "OpenAI_API_Key") ?? ""
-        self._gptService = StateObject(wrappedValue: GPTTerminalService(apiKey: apiKey, terminalService: terminalService))
+        self._gptService = StateObject(wrappedValue: GPTTerminalService(terminalService: terminalService))
     }
     
     var body: some View {

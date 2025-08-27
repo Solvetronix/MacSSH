@@ -264,7 +264,7 @@ struct GPTTerminalView: View {
 struct GPTTerminalView_Previews: PreviewProvider {
     static var previews: some View {
         GPTTerminalView(gptService: GPTTerminalService(
-            apiKey: "test",
+    
             terminalService: SwiftTermProfessionalService()
         ))
     }

@@ -84,6 +84,8 @@ struct ChatMessageView: View {
                                         )
                                 )
                                 .foregroundColor(message.isDangerous ? .red : .orange)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     
@@ -124,10 +126,15 @@ struct ChatMessageView: View {
                                         .foregroundColor(.purple)
                                         .textSelection(.enabled)
                                         .multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                                 .frame(maxHeight: 300)
                             } else {
-                                Text(output.prefix(100) + (output.count > 100 ? "..." : ""))
+                                let previewText = output.prefix(100)
+                                let hasMore = output.count > 100
+                                let displayText = hasMore ? String(previewText) + "..." : String(previewText)
+                                
+                                Text(displayText)
                                     .font(.system(.caption, design: .monospaced))
                                     .padding(8)
                                     .background(
@@ -135,6 +142,8 @@ struct ChatMessageView: View {
                                             .fill(Color.purple.opacity(0.1))
                                     )
                                     .foregroundColor(.purple)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                                     .onTapGesture {
                                         withAnimation(.easeInOut(duration: 0.2)) {
                                             isExpanded.toggle()

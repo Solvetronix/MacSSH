@@ -10,7 +10,7 @@ struct MultiStepAITabView: View {
 
 #Preview {
     MultiStepAITabView(gptService: GPTTerminalService(
-        apiKey: "test",
+
         terminalService: SwiftTermProfessionalService()
     ))
 }

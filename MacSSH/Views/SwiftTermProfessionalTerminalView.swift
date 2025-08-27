@@ -251,6 +251,9 @@ struct SwiftTerminalView: NSViewRepresentable {
             self.currentTerminal = terminal
             terminal.terminalDelegate = self
             
+            // Enable change notifications for command completion detection
+            terminal.notifyUpdateChanges = true
+            
             // Настраиваем поддержку копирования и выделения
             setupCopyPasteSupport(terminal)
         }
@@ -897,6 +900,9 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
         } else {
             LoggingService.shared.debug("🎯 Selection is now INACTIVE", source: "SwiftTerminalView")
         }
+        
+        // Notify GPT service about buffer changes for command completion detection
+        terminalService?.notifyBufferChanged()
     }
 }
 

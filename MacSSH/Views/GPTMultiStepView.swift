@@ -166,7 +166,7 @@ struct GPTMultiStepView: View {
 
 #Preview {
     GPTMultiStepView(gptService: GPTTerminalService(
-        apiKey: "test",
+
         terminalService: SwiftTermProfessionalService()
     ))
 }

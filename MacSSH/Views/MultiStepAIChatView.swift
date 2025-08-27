@@ -178,7 +178,7 @@ struct PendingCommandView: View {
 
 #Preview {
     MultiStepAIChatView(gptService: GPTTerminalService(
-        apiKey: "test",
+
         terminalService: SwiftTermProfessionalService()
     ))
 }

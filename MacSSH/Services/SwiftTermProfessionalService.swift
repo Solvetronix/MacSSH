@@ -92,6 +92,9 @@ class SwiftTermProfessionalService: ObservableObject {
                                 if let output = String(data: data, encoding: .utf8) {
                                     self?.currentOutput += output
                                     
+                                    // Уведомляем об изменении буфера
+                                    self?.notifyBufferChanged()
+                                    
                                     // Проверяем, нужно ли отправить пароль
                                     if output.contains("password:") || output.contains("Password:") {
                                         LoggingService.shared.warning("🔐 Password prompt detected!", source: "SwiftTermService")
@@ -160,6 +163,8 @@ class SwiftTermProfessionalService: ObservableObject {
         let commandData = (command + "\n").data(using: .utf8) ?? Data()
         if let inputPipe = process.standardInput as? Pipe {
             inputPipe.fileHandleForWriting.write(commandData)
+            // Триггерим возможное ожидание
+            notifyBufferChanged()
         }
     }
     
@@ -180,6 +185,18 @@ class SwiftTermProfessionalService: ObservableObject {
         } else {
             LoggingService.shared.error("❌ Failed to get input pipe for sending data", source: "SwiftTermService")
         }
+    }
+    
+    // Method to notify about buffer changes for command completion detection
+    func notifyBufferChanged() {
+        // This will be called by the terminal delegate when the buffer changes
+        // We'll forward this to GPT service if needed
+        LoggingService.shared.debug("📊 Buffer changed notification received", source: "SwiftTermService")
+        
+        // Notify GPT service if available
+        // Note: We need to implement a way to communicate with GPT service
+        // For now, we'll use NotificationCenter
+        NotificationCenter.default.post(name: .terminalBufferChanged, object: nil)
     }
     
     // MARK: - Terminal output access
@@ -219,11 +236,12 @@ class SwiftTermProfessionalService: ObservableObject {
         return terminalView
     }
     
-    private func buildSSHCommand(for profile: Profile) throws -> String {
-        var command = "/usr/bin/ssh"
-        
-        // Добавляем опции для принудительного создания псевдо-терминала и интерактивности
-        command += " -t -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+// MARK: - SSH Command Building
+private func buildSSHCommand(for profile: Profile) throws -> String {
+    var command = "/usr/bin/ssh"
+    
+    // Добавляем опции для принудительного создания псевдо-терминала и интерактивности
+    command += " -t -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
         
         // Принудительно включаем парольную аутентификацию
         if profile.keyType == .password {

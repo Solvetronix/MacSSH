@@ -1,6 +1,11 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Notification Names
+extension Notification.Name {
+    static let terminalBufferChanged = Notification.Name("terminalBufferChanged")
+}
+
 // MARK: - OpenAI API Models
 struct OpenAIRequest: Codable {
     let model: String
@@ -155,7 +160,7 @@ class GPTTerminalService: ObservableObject {
     @Published var chatMessages: [ChatMessage] = []
     private var infoCollector = UniversalInfoCollector()
     
-    private let apiKey: String
+    private var apiKey: String
     private let terminalService: SwiftTermProfessionalService
     private var conversationHistory: [Message] = []
     private let maxSteps = 10 // Safety limit
@@ -179,12 +184,39 @@ class GPTTerminalService: ObservableObject {
         )
     )
     
-    init(apiKey: String, terminalService: SwiftTermProfessionalService) {
-        self.apiKey = apiKey
+    init(terminalService: SwiftTermProfessionalService) {
         self.terminalService = terminalService
+        self.apiKey = GPTTerminalService.resolveApiKey()
+        if self.apiKey.isEmpty {
+            LoggingService.shared.error("❌ OpenAI API key is empty. Set it in settings.", source: "GPTTerminalService")
+        } else {
+            LoggingService.shared.info("🔑 OpenAI API key loaded", source: "GPTTerminalService")
+        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTerminalBufferChanged),
+            name: .terminalBufferChanged,
+            object: nil
+        )
     }
     
-    // Convenience initializer removed - not needed anymore
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        // Cleanup if needed
+    }
+    
+    @objc private func handleTerminalBufferChanged() {
+        currentCompletionHandler?.bufferChanged()
+    }
+    
+    private static func resolveApiKey() -> String {
+        // Try multiple locations to improve robustness
+        let defaults = UserDefaults.standard
+        if let key = defaults.string(forKey: "OpenAIAPIKey"), !key.isEmpty { return key }
+        if let key = defaults.string(forKey: "OpenAI_API_Key"), !key.isEmpty { return key }
+        if let env = ProcessInfo.processInfo.environment["OPENAI_API_KEY"], !env.isEmpty { return env }
+        return ""
+    }
     
     // MARK: - Main processing function
     func processUserRequest(_ request: String) async -> String? {
@@ -494,18 +526,30 @@ class GPTTerminalService: ObservableObject {
             // Log the actual terminal output
             LoggingService.shared.info("📋 Command '\(command)' output: \(terminalOutput)", source: "GPTTerminalService")
             
+            // Additional verification that terminal is completely ready before analysis
+            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
+            // Final check that terminal output is stable
+            let finalOutputCheck = await terminalService.getCurrentOutput() ?? ""
+            let finalNewOutput = String(finalOutputCheck.dropFirst(outputBeforeCommand.count))
+            
+            // Use the most complete output
+            let finalTerminalOutput = finalNewOutput.isEmpty ? terminalOutput : finalNewOutput
+            
+            LoggingService.shared.info("🔍 Final verified output for analysis: '\(finalTerminalOutput)'", source: "GPTTerminalService")
+            
             // Collect information from output
-            infoCollector.collectFromOutput(terminalOutput, command: command)
+            infoCollector.collectFromOutput(finalTerminalOutput, command: command)
             
             // Add output to the existing assistant message
-            addOutputToLastAssistantMessage(terminalOutput)
+            addOutputToLastAssistantMessage(finalTerminalOutput)
             
             // Add to execution history
             let step = ExecutionStep(
                 stepNumber: currentStep,
                 command: command,
                 explanation: explanation,
-                output: terminalOutput
+                output: finalTerminalOutput
             )
             
             await MainActor.run {
@@ -591,7 +635,7 @@ class GPTTerminalService: ObservableObject {
     }
     
     // MARK: - OpenAI API call
-    private func callOpenAI(_ request: OpenAIRequest) async throws -> OpenAIResponse {
+    func callOpenAI(_ request: OpenAIRequest) async throws -> OpenAIResponse {
         LoggingService.shared.info("🌐 OpenAI API call", source: "GPTTerminalService")
         
         guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
@@ -631,6 +675,25 @@ class GPTTerminalService: ObservableObject {
         let openAIResponse = try decoder.decode(OpenAIResponse.self, from: data)
         
         return openAIResponse
+    }
+    
+    // MARK: - Simplified OpenAI API call for plan generation
+    func callOpenAI(prompt: String, systemPrompt: String) async throws -> String {
+        let request = OpenAIRequest(
+            model: "gpt-4o",
+            messages: [
+                Message(role: "system", content: systemPrompt),
+                Message(role: "user", content: prompt)
+            ]
+        )
+        
+        let response = try await callOpenAI(request)
+        
+        guard let content = response.choices.first?.message.content else {
+            throw GPTError.noResponse
+        }
+        
+        return content
     }
     
     // MARK: - Response handling
@@ -698,13 +761,53 @@ class GPTTerminalService: ObservableObject {
             terminalService.sendCommand(command)
         }
         
-        // Wait for command to complete with intelligent polling
+        // Ожидаем строго по событию промпта
         let actualOutput = await waitForCommandCompletion(command: command)
         
-        LoggingService.shared.success("✅ GPT executed command successfully: '\(command)'", source: "GPTTerminalService")
-        LoggingService.shared.info("📋 Actual command output: '\(actualOutput)'", source: "GPTTerminalService")
+        // Финальная проверка
+        let finalCheck = await terminalService.getCurrentOutput() ?? ""
+        let finalNewOutput = String(finalCheck.dropFirst(outputBeforeCommand.count))
         
-        return actualOutput
+        let verifiedOutput = finalNewOutput.isEmpty ? actualOutput : actualOutput
+        
+        LoggingService.shared.success("✅ GPT executed command successfully: '\(command)'", source: "GPTTerminalService")
+        LoggingService.shared.info("📋 Final verified command output: '\(verifiedOutput)'", source: "GPTTerminalService")
+        
+        return verifiedOutput
+    }
+    
+    // MARK: - Enhanced Command Completion Detection
+    
+    /// Enhanced method to ensure command completion with multiple verification layers
+    private func ensureCommandCompletion(command: String, initialOutput: String) async -> String {
+        LoggingService.shared.info("🔍 Enhanced completion verification for: '\(command)'", source: "GPTTerminalService")
+        
+        // First layer: Wait for basic completion
+        let basicOutput = await waitForCommandCompletion(command: command)
+        
+        // Second layer: Additional stability check
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        let stabilityCheck = await terminalService.getCurrentOutput() ?? ""
+        let stabilityNewOutput = String(stabilityCheck.dropFirst(outputBeforeCommand.count))
+        
+        // Third layer: Prompt detection verification
+        let hasPrompt = stabilityNewOutput.contains("$ ") || stabilityNewOutput.contains("# ") || 
+                       stabilityNewOutput.contains("> ") || stabilityNewOutput.contains("bash$") || 
+                       stabilityNewOutput.contains("zsh$") || stabilityNewOutput.contains("sh$")
+        
+        // Fourth layer: Command-specific completion verification
+        let isCommandComplete = isCommandSpecificCompletion(command: command, output: stabilityNewOutput)
+        
+        // Use the most complete output
+        let finalOutput = stabilityNewOutput.isEmpty ? basicOutput : stabilityNewOutput
+        
+        LoggingService.shared.info("🔍 Completion verification results:", source: "GPTTerminalService")
+        LoggingService.shared.info("  - Has prompt: \(hasPrompt)", source: "GPTTerminalService")
+        LoggingService.shared.info("  - Command-specific complete: \(isCommandComplete)", source: "GPTTerminalService")
+        LoggingService.shared.info("  - Output length: \(finalOutput.count)", source: "GPTTerminalService")
+        
+        return finalOutput
     }
     
     // MARK: - Command parsing
@@ -740,53 +843,141 @@ class GPTTerminalService: ObservableObject {
     private var outputBeforeCommand: String = ""
     
     private func waitForCommandCompletion(command: String) async -> String {
-        LoggingService.shared.info("⏳ Waiting for command completion: '\(command)'", source: "GPTTerminalService")
+        LoggingService.shared.info("⏳ Waiting for command completion (prompt-based, event-driven): '\(command)'", source: "GPTTerminalService")
         
-        let maxWaitTime: TimeInterval = 30.0 // Maximum 30 seconds
-        let pollInterval: TimeInterval = 0.5 // Check every 0.5 seconds
-        let startTime = Date()
-        
-        var lastOutputLength = 0
-        var stableOutputCount = 0
-        let requiredStableChecks = 3 // Need 3 consecutive stable outputs to consider complete
-        
-        while Date().timeIntervalSince(startTime) < maxWaitTime {
-            // Wait before checking
-            try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
-            
-            // Get current output
-            let currentOutput = await terminalService.getCurrentOutput() ?? ""
-            let newOutput = String(currentOutput.dropFirst(outputBeforeCommand.count))
-            
-            LoggingService.shared.debug("📊 Output check: length=\(newOutput.count), stable=\(stableOutputCount)", source: "GPTTerminalService")
-            
-            // Check if output has stabilized (no new content)
-            if newOutput.count == lastOutputLength {
-                stableOutputCount += 1
-                LoggingService.shared.debug("📊 Output stabilized: \(stableOutputCount)/\(requiredStableChecks)", source: "GPTTerminalService")
-                
-                if stableOutputCount >= requiredStableChecks {
-                    LoggingService.shared.info("✅ Command completed (output stabilized): '\(command)'", source: "GPTTerminalService")
-                    return newOutput.isEmpty ? "Command executed successfully" : newOutput
+        return await withCheckedContinuation { continuation in
+            let completionHandler = PromptCompletionHandler(
+                initialOutputLength: outputBeforeCommand.count,
+                terminalService: terminalService,
+                onComplete: { [weak self] output in
+                    self?.currentCompletionHandler = nil
+                    continuation.resume(returning: output)
                 }
-            } else {
-                // Output changed, reset stability counter
-                stableOutputCount = 0
-                lastOutputLength = newOutput.count
-                LoggingService.shared.debug("📊 Output changed, resetting stability counter", source: "GPTTerminalService")
-            }
+            )
             
-            // Check for command prompt indicators (for interactive commands)
-            if newOutput.contains("$ ") || newOutput.contains("# ") || newOutput.contains("> ") {
-                LoggingService.shared.info("✅ Command completed (prompt detected): '\(command)'", source: "GPTTerminalService")
-                return newOutput.isEmpty ? "Command executed successfully" : newOutput
+            self.currentCompletionHandler = completionHandler
+            completionHandler.checkNow()
+        }
+    }
+    
+    // Event-based prompt detector without timers/markers
+    private class PromptCompletionHandler {
+        private let initialOutputLength: Int
+        private let onComplete: (String) -> Void
+        private weak var terminalService: SwiftTermProfessionalService?
+        
+        // Guard against multiple resumes
+        private var didResume = false
+        private let resumeQueue = DispatchQueue(label: "macssh.prompt-completion.resume")
+        
+        // Common prompt patterns (configurable later via Profile if needed)
+        private let promptRegexes: [NSRegularExpression] = {
+            let patterns = [
+                "[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:[^\n]*\\$\\s*$", // user@host:path$
+                "[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:[^\n]*#\\s*$",     // root prompt
+                "\\$\\s*$",                                        // simple $
+                "#\\s*$",                                             // simple #
+                ">\\s*$",                                             // simple > (some shells)
+                "\\[[^\\]]+\\]\\s?\\$\\s*$"                 // [venv] $
+            ]
+            return patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.anchorsMatchLines]) }
+        }()
+        
+        init(initialOutputLength: Int, terminalService: SwiftTermProfessionalService, onComplete: @escaping (String) -> Void) {
+            self.initialOutputLength = initialOutputLength
+            self.terminalService = terminalService
+            self.onComplete = onComplete
+        }
+        
+        func bufferChanged() {
+            checkNow()
+        }
+        
+        func checkNow() {
+            Task { @MainActor in
+                let full = await terminalService?.getCurrentOutput() ?? ""
+                // Work only with the suffix produced after command start
+                let start = full.index(full.startIndex, offsetBy: max(0, initialOutputLength))
+                let suffix = String(full[start...])
+                guard let tailInSuffix = promptTailRange(in: suffix) else { return }
+                var shouldResume = false
+                resumeQueue.sync { if !didResume { didResume = true; shouldResume = true } }
+                guard shouldResume else { return }
+                // Compute tail range in original 'full'
+                let tailLower = full.index(start, offsetBy: suffix.distance(from: suffix.startIndex, to: tailInSuffix.lowerBound))
+                // Safe content range [start ..< tailLower]
+                let contentRange: Range<String.Index> = start <= tailLower ? start..<tailLower : start..<start
+                let result = String(full[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                onComplete(result.isEmpty ? "Command executed successfully" : result)
             }
         }
         
-        // Timeout reached
-        LoggingService.shared.warning("⏰ Command timeout after \(maxWaitTime) seconds: '\(command)'", source: "GPTTerminalService")
-        let finalOutput = await getTerminalOutput()
-        return finalOutput.isEmpty ? "Command executed (timeout)" : finalOutput
+        private func matchesPromptTail(in text: String) -> Bool {
+            for rx in promptRegexes { if rx.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) != nil { return true } }
+            return false
+        }
+        
+        private func promptTailRange(in text: String) -> Range<String.Index>? {
+            for rx in promptRegexes {
+                if let m = rx.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) {
+                    if let r = Range(m.range, in: text) { return r }
+                }
+            }
+            return nil
+        }
+    }
+    
+    // Property to store current completion handler
+    private var currentCompletionHandler: PromptCompletionHandler?
+    
+
+    
+    // Helper method to check for command-specific completion patterns
+    private func isCommandSpecificCompletion(command: String, output: String) -> Bool {
+        let cmd = command.lowercased()
+        let out = output.lowercased()
+        
+        // Check for specific command completion patterns
+        if cmd.contains("find") && (out.contains("no such file") || out.contains("0 files") || out.contains("total") || 
+                                   out.contains("$ ") || out.contains("# ") || out.contains("> ") ||
+                                   out.contains("rise@") || out.contains("bash$") || out.contains("zsh$")) {
+            return true
+        }
+        
+        if cmd.contains("grep") && (out.contains("no such file") || out.contains("binary file") || out.contains("matches")) {
+            return true
+        }
+        
+        if cmd.contains("ls") && (out.contains("no such file") || out.contains("total")) {
+            return true
+        }
+        
+        if cmd.contains("cat") && (out.contains("no such file") || out.contains("is a directory")) {
+            return true
+        }
+        
+        if cmd.contains("ps") && (out.contains("pid") || out.contains("command")) {
+            return true
+        }
+        
+        if cmd.contains("top") && out.contains("processes") {
+            return true
+        }
+        
+        if cmd.contains("df") && out.contains("filesystem") {
+            return true
+        }
+        
+        if cmd.contains("du") && out.contains("total") {
+            return true
+        }
+        
+        // For interactive commands, check for specific completion indicators
+        if cmd.contains("vim") || cmd.contains("nano") || cmd.contains("less") || cmd.contains("more") {
+            return out.contains("$ ") || out.contains("# ") || out.contains("> ")
+        }
+        
+        return false
     }
     
     private func getTerminalOutput() async -> String {

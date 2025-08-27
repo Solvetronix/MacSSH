@@ -41,17 +41,54 @@ struct MarkdownTextView: View {
     let text: String
     
     var body: some View {
-        // Use AttributedString for markdown parsing (official Apple approach)
-        if let attributedString = try? AttributedString(markdown: text) {
-            Text(attributedString)
-                .textSelection(.enabled)
-                .multilineTextAlignment(.leading)
+        // Ensure proper line breaks are preserved
+        let processedText = preserveLineBreaks(text)
+        
+        // Check if text contains markdown formatting
+        let hasMarkdown = processedText.contains("**") || processedText.contains("*") || 
+                         processedText.contains("`") || processedText.contains("#") ||
+                         processedText.contains("```") || processedText.contains(">")
+        
+        if hasMarkdown {
+            // Use AttributedString for markdown parsing (official Apple approach)
+            if let attributedString = try? AttributedString(markdown: processedText) {
+                Text(attributedString)
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                // Fallback to plain text if markdown parsing fails
+                Text(processedText)
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } else {
-            // Fallback to plain text if markdown parsing fails
-            Text(text)
+            // For plain text, use simple Text view with preserved line breaks
+            Text(processedText)
                 .textSelection(.enabled)
                 .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+    
+    private func preserveLineBreaks(_ text: String) -> String {
+        // Replace single newlines with double newlines to ensure proper paragraph breaks
+        // This ensures that line breaks are preserved in markdown rendering
+        let lines = text.components(separatedBy: .newlines)
+        let processedLines = lines.map { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return trimmed.isEmpty ? "" : line
+        }
+        
+        // Join with double newlines to ensure proper paragraph separation
+        let result = processedLines.joined(separator: "\n\n")
+        
+        // Additional processing for special characters that might interfere with markdown
+        return result
+            .replacingOccurrences(of: "\\n", with: "\n") // Handle escaped newlines
+            .replacingOccurrences(of: "\\t", with: "    ") // Handle tabs
+            .replacingOccurrences(of: "\\r", with: "\n") // Handle carriage returns
     }
 }
 
