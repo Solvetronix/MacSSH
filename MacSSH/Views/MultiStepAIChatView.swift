@@ -19,6 +19,14 @@ struct MultiStepAIChatView: View {
 struct ChatMessagesView: View {
     @ObservedObject var gptService: GPTTerminalService
     
+    // Ключ последнего сообщения (учитывает изменение текста/вывода)
+    private var lastMessageKey: String {
+        if let last = gptService.chatMessages.last {
+            return "\(last.id)-\(last.content.count)-\(last.output?.count ?? 0)"
+        }
+        return "none"
+    }
+    
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -33,26 +41,30 @@ struct ChatMessagesView: View {
                         PendingCommandView(gptService: gptService)
                             .id("pending-command")
                     }
+                    
+                    // Нижний якорь для стабильного автоскролла
+                    Color.clear.frame(height: 1).id("bottom-anchor")
                 }
                 .padding(.horizontal)
             }
-            .onChange(of: gptService.chatMessages.count) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
-            .onChange(of: gptService.isWaitingForConfirmation) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
+            .onAppear { scrollToBottom(proxy: proxy) }
+            .onChange(of: gptService.chatMessages.count) { _, _ in scrollToBottom(proxy: proxy) }
+            .onChange(of: gptService.isWaitingForConfirmation) { _, _ in scrollToBottom(proxy: proxy) }
+            .onChange(of: lastMessageKey) { _, _ in scrollToBottom(proxy: proxy) }
         }
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                if let lastMessage = gptService.chatMessages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                } else if gptService.isWaitingForConfirmation {
-                    proxy.scrollTo("pending-command", anchor: .bottom)
-                }
+        // Первый проход — сразу после обновления данных
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo("bottom-anchor", anchor: .bottom)
+            }
+        }
+        // Второй проход — после компоновки, чтобы исключить скрытие за рамкой
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo("bottom-anchor", anchor: .bottom)
             }
         }
     }
