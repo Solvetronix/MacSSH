@@ -242,10 +242,19 @@ class GPTTerminalService: ObservableObject {
             let userMessage = gptError.userFriendlyMessage
             await MainActor.run { lastError = userMessage }
             LoggingService.shared.error("❌ GPT API error: \(gptError.localizedDescription)", source: "GPTTerminalService")
+            // Post error to chat for user visibility
+            addChatMessage(ChatMessage(type: .system, content: "❌ \(userMessage)"))
             return nil
         } catch {
             await MainActor.run { lastError = error.localizedDescription }
             LoggingService.shared.error("❌ GPT API error: \(error.localizedDescription)", source: "GPTTerminalService")
+            // Detect offline/network issues and post a clear message
+            let lower = error.localizedDescription.lowercased()
+            if lower.contains("offline") || lower.contains("internet") || lower.contains("network") || lower.contains("not connected") {
+                addChatMessage(ChatMessage(type: .system, content: "❌ Нет подключения к интернету или OpenAI недоступен. Проверьте сеть и повторите попытку."))
+            } else {
+                addChatMessage(ChatMessage(type: .system, content: "❌ Ошибка обращения к OpenAI: \(error.localizedDescription)"))
+            }
             return nil
         }
     }
@@ -300,7 +309,8 @@ class GPTTerminalService: ObservableObject {
             - Be proactive - if you see potential issues, address them before they become problems
             - Use your knowledge of Unix/Linux systems to make intelligent decisions
             - Don't just plan navigation - actually execute the cd command when you know the target directory exists
-            - Say "TASK COMPLETE" immediately after successfully executing the final command
+            - Say "TASK COMPLETE" only after successfully executing the final command based on actual terminal output
+            - Do NOT say "TASK COMPLETE" during initial planning (before any command is executed)
             - For information gathering tasks, say "TASK COMPLETE" after collecting comprehensive information
             - Use **bold text** for emphasis and `code` formatting for commands and paths
             - IMPORTANT: After 3-5 steps of information gathering, provide a summary and say "TASK COMPLETE"
@@ -363,6 +373,10 @@ class GPTTerminalService: ObservableObject {
             - Do not repeat the same command multiple times
             - Maximum 3 steps allowed - if you've done 3 steps, say "TASK COMPLETE"
             
+            IMPORTANT SAFETY:
+            - Do NOT say "TASK COMPLETE" if no commands have been executed yet (Total steps executed == 0)
+            - Only declare completion after analyzing real terminal output from at least one executed command
+            
             COMMAND FORMATTING:
             - When providing commands, use ONLY the command itself in code blocks, like: `cut -d: -f1 /etc/passwd`
             - DO NOT add 'sh' prefix or extra formatting to commands
@@ -417,7 +431,7 @@ class GPTTerminalService: ObservableObject {
                 responseContent: sanitizeForGPT(responseContent, maxChars: 6000)
             ) : false
             
-            let phraseCompletion = responseContent.lowercased().contains("task complete")
+            let phraseCompletion = executionHistory.count >= 1 && currentStep >= 1 && responseContent.lowercased().contains("task complete")
             let isTaskComplete = gptCompletionCheck || phraseCompletion || currentStep >= 3 // Fallback: limit to 3 steps maximum
             
             LoggingService.shared.info("🔍 Checking task completion. Response contains 'task complete': \(responseContent.lowercased().contains("task complete"))", source: "GPTTerminalService")
@@ -514,11 +528,19 @@ class GPTTerminalService: ObservableObject {
                     isMultiStepMode = false
                     lastError = "Rate limit from OpenAI. Please retry in ~20s."
                 }
+                // Inform user in chat
+                addChatMessage(ChatMessage(type: .system, content: "💳 Лимит запросов OpenAI. Повторите через ~20 секунд."))
                 return
             }
             await MainActor.run {
                 isMultiStepMode = false
                 lastError = "Failed to plan next step: \(error.localizedDescription)"
+            }
+            // Network/offline friendly message in chat
+            if errText.contains("offline") || errText.contains("internet") || errText.contains("network") || errText.contains("not connected") || errText.contains("timed out") {
+                addChatMessage(ChatMessage(type: .system, content: "❌ Не удалось связаться с OpenAI: проблемы с сетью. Проверьте интернет и попробуйте снова."))
+            } else {
+                addChatMessage(ChatMessage(type: .system, content: "❌ Ошибка планирования шага: \(error.localizedDescription)"))
             }
         }
     }
