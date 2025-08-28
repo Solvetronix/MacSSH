@@ -326,10 +326,10 @@ class GPTTerminalService: ObservableObject {
     func planNextStep() async {
         // Stop immediately if multi-step mode was turned off
         guard isMultiStepMode else { return }
-        guard currentStep < 3 else {
+        guard currentStep < maxSteps else {
             await MainActor.run {
                 isMultiStepMode = false
-                lastError = "Maximum number of steps (3) reached. Task stopped for safety."
+                lastError = "Maximum number of steps (\(maxSteps)) reached. Task stopped for safety."
             }
             return
         }
@@ -371,7 +371,7 @@ class GPTTerminalService: ObservableObject {
             - If no further commands are needed to complete the task objective, say "TASK COMPLETE"
             - If you have executed 2-3 successful commands with useful output, say "TASK COMPLETE"
             - Do not repeat the same command multiple times
-            - Maximum 3 steps allowed - if you've done 3 steps, say "TASK COMPLETE"
+            - Maximum \(maxSteps) steps allowed - if you've reached this limit, say "TASK COMPLETE"
             
             IMPORTANT SAFETY:
             - Do NOT say "TASK COMPLETE" if no commands have been executed yet (Total steps executed == 0)
@@ -432,7 +432,7 @@ class GPTTerminalService: ObservableObject {
             ) : false
             
             let phraseCompletion = executionHistory.count >= 1 && currentStep >= 1 && responseContent.lowercased().contains("task complete")
-            let isTaskComplete = gptCompletionCheck || phraseCompletion || currentStep >= 3 // Fallback: limit to 3 steps maximum
+            let isTaskComplete = gptCompletionCheck || phraseCompletion || currentStep >= maxSteps // Fallback: limit to maxSteps
             
             LoggingService.shared.info("🔍 Checking task completion. Response contains 'task complete': \(responseContent.lowercased().contains("task complete"))", source: "GPTTerminalService")
             LoggingService.shared.info("🔍 Response content: \(responseContent)", source: "GPTTerminalService")
@@ -497,9 +497,9 @@ class GPTTerminalService: ObservableObject {
                     }
                 }
                 
-                if currentStep >= 3 {
-                    // Force completion after 3 steps
-                    LoggingService.shared.info("🔄 Reached maximum steps (3). Completing task...", source: "GPTTerminalService")
+                if currentStep >= maxSteps {
+                    // Force completion after reaching maxSteps
+                    LoggingService.shared.info("🔄 Reached maximum steps (\(maxSteps)). Completing task...", source: "GPTTerminalService")
                     
                     await MainActor.run {
                         isMultiStepMode = false
