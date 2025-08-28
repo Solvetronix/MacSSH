@@ -9,7 +9,7 @@
     <key>CFBundleIdentifier</key>
     <string>solvetronix.macssh</string>
     	<key>CFBundleVersion</key>
-	<string>1.8.29</string>
+	<string>209</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.8.29</string>
     <key>LSMinimumSystemVersion</key>
