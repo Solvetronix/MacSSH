@@ -16,6 +16,12 @@ class SwiftTermProfessionalService: ObservableObject {
     private var currentProfile: Profile?
     private var isDisconnecting = false
     
+    // Coalesce high-frequency buffer change notifications to avoid UI thrash
+    private let bufferDebounceQueue = DispatchQueue(label: "macssh.terminal.buffer.debounce")
+    private var bufferDebounceWorkItem: DispatchWorkItem?
+    private let bufferDebounceInterval: TimeInterval = 0.08
+    private var bufferCoalescedCount: Int = 0
+    
     @MainActor
     func connectToSSH(profile: Profile) async throws {
         LoggingService.shared.debug("Starting SwiftTerm SSH connection to \(profile.host)", source: "SwiftTermService")
@@ -187,16 +193,23 @@ class SwiftTermProfessionalService: ObservableObject {
         }
     }
     
-    // Method to notify about buffer changes for command completion detection
+    // Method to notify about buffer changes for command completion detection (throttled)
     func notifyBufferChanged() {
-        // This will be called by the terminal delegate when the buffer changes
-        // We'll forward this to GPT service if needed
-        LoggingService.shared.debug("📊 Buffer changed notification received", source: "SwiftTermService")
-        
-        // Notify GPT service if available
-        // Note: We need to implement a way to communicate with GPT service
-        // For now, we'll use NotificationCenter
-        NotificationCenter.default.post(name: .terminalBufferChanged, object: nil)
+        bufferDebounceQueue.async {
+            self.bufferCoalescedCount += 1
+            self.bufferDebounceWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                let coalesced = self.bufferCoalescedCount
+                self.bufferCoalescedCount = 0
+                DispatchQueue.main.async {
+                    LoggingService.shared.debug("📊 Buffer changed (coalesced \(coalesced))", source: "SwiftTermService")
+                    NotificationCenter.default.post(name: .terminalBufferChanged, object: nil)
+                }
+            }
+            self.bufferDebounceWorkItem = work
+            self.bufferDebounceQueue.asyncAfter(deadline: .now() + self.bufferDebounceInterval, execute: work)
+        }
     }
     
     // MARK: - Terminal output access

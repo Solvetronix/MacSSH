@@ -18,6 +18,8 @@ struct MultiStepAIChatView: View {
 // MARK: - Chat Messages View
 struct ChatMessagesView: View {
     @ObservedObject var gptService: GPTTerminalService
+    @State private var pendingScrollWork: DispatchWorkItem?
+    private let scrollDebounceInterval: TimeInterval = 0.12
     
     // Ключ последнего сообщения (учитывает изменение текста/вывода)
     private var lastMessageKey: String {
@@ -48,9 +50,9 @@ struct ChatMessagesView: View {
                 .padding(.horizontal)
             }
             .onAppear { scrollToBottom(proxy: proxy) }
-            .onChange(of: gptService.chatMessages.count) { _, _ in scrollToBottom(proxy: proxy) }
-            .onChange(of: gptService.isWaitingForConfirmation) { _, _ in scrollToBottom(proxy: proxy) }
-            .onChange(of: lastMessageKey) { _, _ in scrollToBottom(proxy: proxy) }
+            .onChange(of: gptService.chatMessages.count) { _, _ in debounceScroll(proxy: proxy) }
+            .onChange(of: gptService.isWaitingForConfirmation) { _, _ in debounceScroll(proxy: proxy) }
+            .onChange(of: lastMessageKey) { _, _ in debounceScroll(proxy: proxy) }
         }
     }
     
@@ -67,6 +69,13 @@ struct ChatMessagesView: View {
                 proxy.scrollTo("bottom-anchor", anchor: .bottom)
             }
         }
+    }
+
+    private func debounceScroll(proxy: ScrollViewProxy) {
+        pendingScrollWork?.cancel()
+        let work = DispatchWorkItem { scrollToBottom(proxy: proxy) }
+        pendingScrollWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + scrollDebounceInterval, execute: work)
     }
 }
 

@@ -734,12 +734,26 @@ class GPTTerminalService: ObservableObject {
                 urlRequest.httpMethod = "POST"
                 urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                 urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                // Set per-request timeouts
+                urlRequest.timeoutInterval = 30
                 
                 let encoder = JSONEncoder()
                 let requestData = try encoder.encode(request)
                 urlRequest.httpBody = requestData
                 
-                let (data, response) = try await URLSession.shared.data(for: urlRequest)
+                // Guard with Task timeout as well
+                let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group -> (Data, URLResponse) in
+                    group.addTask {
+                        return try await URLSession.shared.data(for: urlRequest)
+                    }
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 31_000_000_000)
+                        throw GPTError.apiError("Request timed out")
+                    }
+                    let result = try await group.next()!
+                    group.cancelAll()
+                    return result
+                }
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw GPTError.apiError("Invalid HTTP response")
                 }
@@ -770,6 +784,7 @@ class GPTTerminalService: ObservableObject {
             } catch {
                 // Network/timeouts: retry
                 lastError = error
+                LoggingService.shared.warning("⏳ OpenAI call failed (attempt #\(attempt + 1)): \(error.localizedDescription)", source: "GPTTerminalService")
             }
             
             // Backoff before next attempt if any
