@@ -9,120 +9,131 @@ struct GPTSettingsView: View {
     @State private var isKeyValid = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Header
+        VStack(spacing: 0) {
+            // Header styled like SSH Tools Manager
             HStack {
-                Image(systemName: "brain.head.profile")
-                    .foregroundColor(.blue)
                 Text("AI Terminal Assistant Settings")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                
                 Spacer()
-                Button(action: { isPresented = false }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
+                
+                Button("✕") {
+                    isPresented = false
                 }
                 .buttonStyle(.plain)
+                .font(.title2)
+                .foregroundColor(.primary)
+                .frame(width: 28, height: 28)
+                .background(Color.gray.opacity(0.15))
+                .clipShape(Circle())
+                .accessibilityLabel("Close")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.gray.opacity(0.05))
             
-            Divider()
-            
-            // API Key section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("OpenAI API Key")
-                    .font(.headline)
-                
-                Text("Enter your OpenAI API key to enable AI-powered terminal assistance. Your API key is stored locally and never shared.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                SecureField("sk-...", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: apiKey) { _ in
-                        validateAPIKey()
-                    }
-                
-                HStack {
-                    if isKeyValid {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Valid API key format")
-                            .foregroundColor(.green)
-                    } else if !apiKey.isEmpty {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text("Invalid API key format")
-                            .foregroundColor(.orange)
+            // Scrollable content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // API Key section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("OpenAI API Key")
+                            .font(.headline)
+                        
+                        Text("Enter your OpenAI API key to enable AI-powered terminal assistance. Your API key is stored locally and never shared.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        SecureField("sk-...", text: $apiKey)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: apiKey) { _ in
+                                validateAPIKey()
+                            }
+                        
+                        HStack {
+                            if isKeyValid {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Valid API key format")
+                                    .foregroundColor(.green)
+                            } else if !apiKey.isEmpty {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("Invalid API key format")
+                                    .foregroundColor(.orange)
+                            }
+                            
+                            Spacer()
+                            
+                            Button("Test Connection") {
+                                testAPIKey()
+                            }
+                            .disabled(apiKey.isEmpty || !isKeyValid)
+                            .buttonStyle(.bordered)
+                        }
                     }
                     
-                    Spacer()
-                    
-                    Button("Test Connection") {
-                        testAPIKey()
+                    // Instructions
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("How to get an API key:")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("1. Visit https://platform.openai.com/api-keys")
+                            Text("2. Sign in or create an account")
+                            Text("3. Click 'Create new secret key'")
+                            Text("4. Copy the key (starts with 'sk-')")
+                            Text("5. Paste it above")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     }
-                    .disabled(apiKey.isEmpty || !isKeyValid)
-                    .buttonStyle(.bordered)
-                }
-            }
-            
-            // Instructions
-            VStack(alignment: .leading, spacing: 12) {
-                Text("How to get an API key:")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("1. Visit https://platform.openai.com/api-keys")
-                    Text("2. Sign in or create an account")
-                    Text("3. Click 'Create new secret key'")
-                    Text("4. Copy the key (starts with 'sk-')")
-                    Text("5. Paste it above")
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-            
-            // Features
-            VStack(alignment: .leading, spacing: 12) {
-                Text("AI Features:")
-                    .font(.headline)
-                
-                                       VStack(alignment: .leading, spacing: 8) {
-                           GPTFeatureRow(icon: "terminal", title: "Smart Command Generation", description: "Ask in natural language, get shell commands")
-                           GPTFeatureRow(icon: "magnifyingglass", title: "File Search", description: "Find files and content intelligently")
-                           GPTFeatureRow(icon: "folder", title: "Directory Navigation", description: "Navigate and explore file systems")
-                           GPTFeatureRow(icon: "chart.bar", title: "System Monitoring", description: "Get system information and status")
-                       }
-                
-                Divider()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Safety:")
-                        .font(.headline)
-                    Toggle(isOn: $yoloEnabled) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("YOLO mode (auto-confirm dangerous commands)")
-                            Text("Use with caution. Disables confirmations for potentially dangerous commands.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    
+                    // Features
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("AI Features:")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            GPTFeatureRow(icon: "terminal", title: "Smart Command Generation", description: "Ask in natural language, get shell commands")
+                            GPTFeatureRow(icon: "magnifyingglass", title: "File Search", description: "Find files and content intelligently")
+                            GPTFeatureRow(icon: "folder", title: "Directory Navigation", description: "Navigate and explore file systems")
+                            GPTFeatureRow(icon: "chart.bar", title: "System Monitoring", description: "Get system information and status")
+                        }
+                        
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Safety:")
+                                .font(.headline)
+                            Toggle(isOn: $yoloEnabled) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("YOLO mode (auto-confirm dangerous commands)")
+                                    Text("Use with caution. Disables confirmations for potentially dangerous commands.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
                         }
                     }
                 }
+                .padding()
             }
-            
-            Spacer()
-            
-            // Save button
+
+            // Bottom action bar with Save button - always visible
             HStack {
                 Spacer()
-                
                 Button("Save Settings") {
                     saveSettings()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(apiKey.isEmpty)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.gray.opacity(0.05))
         }
-        .padding()
         .frame(width: 500, height: 600)
         .onAppear {
             loadSettings()
@@ -160,17 +171,14 @@ struct GPTSettingsView: View {
     }
     
     private func saveSettings() {
+        // Save settings without presenting any modal alerts
         LoggingService.shared.info("💾 Saving GPT settings", source: "GPTSettingsView")
         UserDefaults.standard.set(apiKey, forKey: "OpenAI_API_Key")
         UserDefaults.standard.set(yoloEnabled, forKey: "YOLOEnabled")
         LoggingService.shared.success("✅ GPT settings saved successfully", source: "GPTSettingsView")
-        alertMessage = "Settings saved successfully! AI features will be available in terminal."
-        showingAlert = true
         
-        // Close the modal after a short delay to show the success message
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            isPresented = false
-        }
+        // Immediately close the modal after saving
+        isPresented = false
     }
     
     private func loadSettings() {
