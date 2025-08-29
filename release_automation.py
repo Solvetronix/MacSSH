@@ -29,6 +29,9 @@ class MacSSHReleaseAutomation:
         self.current_build = None
         self.new_version = None
         self.new_build = None
+        # Текст заметок релиза (plain) и HTML-список для appcast
+        self.release_notes_text = None
+        self.release_notes_html = None
         
     def log(self, message, level="INFO"):
         """Логирование с временными метками"""
@@ -172,6 +175,8 @@ class MacSSHReleaseAutomation:
         
         tag = f"v{self.new_version}"
         
+        # Готовим содержимое заметок: если не заполнено, используем заглушку
+        notes_html = self.release_notes_html or "<ul><li>No release notes provided</li></ul>"
         # Создаем новый элемент для appcast.xml
         new_item = f'''        <item>
             <title>MacSSH {self.new_version} - Release</title>
@@ -179,12 +184,7 @@ class MacSSHReleaseAutomation:
             <sparkle:shortVersionString>{self.new_version}</sparkle:shortVersionString>
             <description><![CDATA[
                 <h2>What's New in MacSSH {self.new_version}</h2>
-                <ul>
-                    <li>🚀 Local build release</li>
-                    <li>🔧 Improved build process</li>
-                    <li>📦 DMG package creation</li>
-                    <li>⚡ Fast deployment pipeline</li>
-                </ul>
+                {notes_html}
             ]]></description>
             <pubDate>{current_date}</pubDate>
             <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/{tag}/{dmg_name}"
@@ -211,6 +211,80 @@ class MacSSHReleaseAutomation:
             f.write(appcast_content)
         
         self.log("appcast.xml обновлен")
+
+    def get_last_release_tag(self):
+        """Определение последнего релизного тега (v*)"""
+        # Пытаемся получить ближайший тег
+        result = self.run_command("git describe --tags --abbrev=0", check=False, capture_output=True)
+        if result and result.returncode == 0 and result.stdout.strip():
+            tag = result.stdout.strip()
+            self.log(f"Последний тег: {tag}")
+            return tag
+        # Фолбэк: берём последний по алфавиту/версии тег вида v*
+        result = self.run_command("git tag --list 'v*' | sort -V | tail -1", check=False, capture_output=True)
+        if result and result.returncode == 0 and result.stdout.strip():
+            tag = result.stdout.strip()
+            self.log(f"Последний тег: {tag}")
+            return tag
+        self.log("Теги не найдены — заметки будут сгенерированы из последних коммитов", "WARNING")
+        return None
+
+    def get_commit_messages_since(self, last_tag):
+        """Сбор сообщений коммитов с момента последнего тега до HEAD"""
+        if last_tag:
+            cmd = f"git log {last_tag}..HEAD --no-merges --pretty=format:%s"
+        else:
+            # Если нет тега — берём последние 20 коммитов
+            cmd = "git log --no-merges --pretty=format:%s -n 20"
+        result = self.run_command(cmd, check=False, capture_output=True)
+        if result and result.returncode == 0 and result.stdout.strip():
+            messages = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            # По возможности убираем автокоммит версии из заметок
+            if self.new_version:
+                messages = [m for m in messages if f"Update version to {self.new_version}" not in m]
+            return messages
+        return []
+
+    def format_release_notes_as_html(self, lines):
+        """Преобразование списка строк заметок в HTML-список"""
+        if not lines:
+            return "<ul><li>No changes listed</li></ul>"
+        items = "\n".join([f"<li>{line}</li>" for line in lines])
+        return f"<ul>\n{items}\n</ul>"
+
+    def prompt_release_notes(self):
+        """Интерактивное получение/подтверждение заметок релиза.
+        1) Пытается сгенерировать заметки из git log от последнего тега
+        2) Показывает предпросмотр и спрашивает подтверждение
+        3) Дает возможность ввести свои заметки (многострочно), разделяя пункты по строкам
+        """
+        last_tag = self.get_last_release_tag()
+        commits = self.get_commit_messages_since(last_tag)
+        if commits:
+            print("\n📝 Предварительные заметки релиза (из коммитов):")
+            for msg in commits:
+                print(f" - {msg}")
+            use_auto = input("\nИспользовать эти заметки? (Y/n): ").strip().lower()
+            if use_auto in ("", "y", "yes"): 
+                self.release_notes_text = "\n".join(commits)
+                self.release_notes_html = self.format_release_notes_as_html(commits)
+                return
+        # Ручной ввод
+        print("\nВведите заметки релиза. Каждый пункт — с новой строки. Пустая строка завершит ввод:")
+        lines = []
+        while True:
+            try:
+                line = input()
+            except EOFError:
+                break
+            if line.strip() == "":
+                break
+            lines.append(line.strip())
+        if not lines:
+            # Последний фолбэк — используем то, что собрали (может быть пусто)
+            lines = commits
+        self.release_notes_text = "\n".join(lines)
+        self.release_notes_html = self.format_release_notes_as_html(lines)
     
     def local_build(self):
         """Локальная сборка проекта"""
@@ -344,12 +418,19 @@ class MacSSHReleaseAutomation:
             # 2. Вычисление новых версий
             self.calculate_new_versions()
             
+            # 2.1 Сбор и подтверждение заметок релиза
+            self.prompt_release_notes()
+            
             # Подтверждение
             print(f"\n📋 План релиза:")
             print(f"   Текущая версия: {self.current_version} (build {self.current_build})")
             print(f"   Новая версия: {self.new_version} (build {self.new_build})")
             print(f"   DMG файл: MacSSH-{self.new_version}.dmg")
             print(f"   GitHub Release: v{self.new_version}")
+            if self.release_notes_text:
+                print("   Заметки релиза:")
+                for line in self.release_notes_text.splitlines():
+                    print(f"     - {line}")
             
             confirm = input("\nПродолжить? (y/N): ").strip().lower()
             if confirm != 'y':

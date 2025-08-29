@@ -12,10 +12,17 @@ class PlanExecutor: ObservableObject {
     
     private let terminalService: SwiftTermProfessionalService
     private let gptService: GPTTerminalService
+    private let reliableCompletion: ReliableCommandCompletion
+    // Safety & pauses
+    private var yoloEnabled: Bool = false
+    private var dangerContinuation: CheckedContinuation<Void, Never>?
+    private var checkpointContinuation: CheckedContinuation<Void, Never>?
     
     init(terminalService: SwiftTermProfessionalService, gptService: GPTTerminalService) {
         self.terminalService = terminalService
         self.gptService = gptService
+        self.reliableCompletion = ReliableCommandCompletion(terminalService: terminalService)
+        self.yoloEnabled = UserDefaults.standard.bool(forKey: "YOLOEnabled")
     }
     
     // MARK: - Plan Execution
@@ -25,7 +32,7 @@ class PlanExecutor: ObservableObject {
         
         await MainActor.run {
             self.currentPlan = plan
-            self.currentStatus = .executing
+            self.currentStatus = .planning
             self.isExecuting = true
             self.stepResults = []
             self.lastError = nil
@@ -36,7 +43,33 @@ class PlanExecutor: ObservableObject {
         var results: [StepExecutionResult] = []
         
         do {
-            // Execute each step
+            // PLAN phase indicator in chat/logs
+            LoggingService.shared.info("🧠 Planning steps...", source: "PlanExecutor")
+            await MainActor.run {
+                // Emit chat-like status via LoggingService; UI can subscribe and render
+                LoggingService.shared.info("[Chat] Планирование...", source: "PlanExecutor")
+                self.gptService.addAssistantMessage("Планирование...")
+            }
+            
+            // Switch to EXECUTION phase
+            await MainActor.run { self.currentStatus = .executing }
+            
+            // Apply plan-level pre and env once before steps
+            if let planPre = plan.planPre {
+                for cmd in planPre { _ = await executeCommand(cmd, timeoutSeconds: 15) }
+            }
+            var planEnvExports = ""
+            if let planEnv = plan.planEnv, !planEnv.isEmpty {
+                planEnvExports = planEnv.map { k, v in
+                    let esc = v.replacingOccurrences(of: "\"", with: "\\\"")
+                    return "export \(k)=\"\(esc)\""
+                }.joined(separator: "; ")
+            }
+            if !planEnvExports.isEmpty {
+                _ = await executeCommand(planEnvExports, timeoutSeconds: 10)
+            }
+
+            // Execute each step (PEOV cycle)
             for (index, step) in plan.steps.enumerated() {
                 await MainActor.run {
                     self.progress = Double(index) / Double(plan.steps.count)
@@ -44,30 +77,66 @@ class PlanExecutor: ObservableObject {
                 
                 LoggingService.shared.info("⚡ Executing step \(index + 1)/\(plan.steps.count): \(step.title)", source: "PlanExecutor")
                 
-                let stepResult = await executeStep(step, retryCount: 0, maxRetries: plan.maxRetries)
+                // OBSERVE: emit chat-like status
+                LoggingService.shared.info("[Chat] Выполнение...", source: "PlanExecutor")
+                await MainActor.run {
+                    self.gptService.addAssistantMessage("Выполнение шага \(index + 1)/\(plan.steps.count): \(step.title)")
+                }
+                
+                let stepResult = await executeStepWithAdaptation(step, retryCount: 0, maxRetries: plan.maxRetries)
                 results.append(stepResult)
                 
                 await MainActor.run {
                     self.stepResults.append(stepResult)
                 }
-                
-                // Check if step failed and handle retries
-                if stepResult.isFailed && stepResult.retryCount < plan.maxRetries {
-                    LoggingService.shared.warning("🔄 Step failed, attempting retry \(stepResult.retryCount + 1)/\(plan.maxRetries)", source: "PlanExecutor")
-                    
-                    for retry in 1...plan.maxRetries {
-                        let retryResult = await executeStep(step, retryCount: retry, maxRetries: plan.maxRetries)
-                        results.append(retryResult)
-                        
-                        await MainActor.run {
-                            self.stepResults.append(retryResult)
-                        }
-                        
-                        if retryResult.isSuccess {
-                            break
-                        }
+
+                // Optional testing checkpoint: pause for user testing before proceeding
+                if step.checkpoint == true {
+                    let instructions = step.testInstructions ?? "Промежуточное тестирование. Проверьте результат шага безопасно."
+                    let prompts = (step.testPrompts ?? []).joined(separator: "\n- ")
+                    let text = prompts.isEmpty ? instructions : instructions + "\n\nПредложенные тексты для тестирования:\n- " + prompts
+                    await MainActor.run {
+                        self.gptService.addAssistantMessage("⏸️ Чекпоинт: " + text)
                     }
+                    // Wait for explicit user confirmation to proceed
+                    LoggingService.shared.info("⏸️ Waiting for checkpoint confirmation...", source: "PlanExecutor")
+                    await waitForCheckpoint()
                 }
+
+                // Build verification after each step
+                await MainActor.run {
+                    self.gptService.addAssistantMessage("🔧 Проверка сборки...")
+                }
+                let buildCommand = "xcodebuild -project MacSSH.xcodeproj -scheme MacSSH -configuration Release -quiet build"
+                let buildResult = await executeCommand(buildCommand, timeoutSeconds: max(60, step.timeoutSeconds))
+                if buildResult.ok {
+                    LoggingService.shared.success("✅ Build succeeded after step \(index + 1)", source: "PlanExecutor")
+                    await MainActor.run { self.gptService.addAssistantMessage("✅ Сборка успешна") }
+                } else {
+                    LoggingService.shared.error("❌ Build failed after step \(index + 1)", source: "PlanExecutor")
+                    await MainActor.run { self.gptService.addAssistantMessage("❌ Сборка неуспешна") }
+                    // Finalize early with failure
+                    await MainActor.run {
+                        self.currentStatus = .failed
+                        self.isExecuting = false
+                        self.lastError = "Build failed after step \(index + 1)"
+                    }
+                    let totalDuration = Date().timeIntervalSince(startTime)
+                    return PlanExecutionResult(
+                        planId: plan.id,
+                        status: .failed,
+                        startTime: startTime,
+                        endTime: Date(),
+                        totalDuration: totalDuration,
+                        stepResults: results,
+                        globalSuccessResults: [],
+                        globalFailureResults: [],
+                        finalMessage: "Сборка неуспешна после шага \(index + 1)",
+                        error: "Build failed"
+                    )
+                }
+                
+                // No manual retry loop here; adaptation is handled inside executeStepWithAdaptation
                 
                 // Check timeout
                 let elapsed = Date().timeIntervalSince(startTime)
@@ -79,6 +148,11 @@ class PlanExecutor: ObservableObject {
             // Move to observation phase
             await MainActor.run {
                 self.currentStatus = .observing
+            }
+            LoggingService.shared.info("[Chat] Проверка...", source: "PlanExecutor")
+            await MainActor.run {
+                self.gptService.addAssistantMessage("Проверка…")
+                self.gptService.addAssistantMessage("Суммаризация…")
             }
             
             // Evaluate global criteria
@@ -109,6 +183,10 @@ class PlanExecutor: ObservableObject {
                 self.isExecuting = false
                 self.progress = 1.0
                 self.lastError = error
+            }
+            await MainActor.run {
+                let msg = (finalStatus == .completed) ? "Завершено успешно ✅" : "Завершено с ошибками ❌"
+                self.gptService.addAssistantMessage(msg)
             }
             
             let totalDuration = Date().timeIntervalSince(startTime)
@@ -150,16 +228,120 @@ class PlanExecutor: ObservableObject {
     
     // MARK: - Step Execution
     
+    private func executeStepWithAdaptation(_ step: PlanStep, retryCount: Int, maxRetries: Int) async -> StepExecutionResult {
+        // PRE: apply env exports and pre-commands if any
+        if let pre = step.pre, !pre.isEmpty {
+            for cmd in pre { _ = await executeCommand(cmd, timeoutSeconds: 10) }
+        }
+        // Execute original step
+        var result = await executeStep(step, retryCount: retryCount, maxRetries: maxRetries)
+        if result.isSuccess { return result }
+        
+        // If failed, try alternatives based on observed output
+        await MainActor.run {
+            self.gptService.addAssistantMessage("Адаптация…")
+        }
+        let combinedOutput = result.output.lowercased() + "\n" + (result.error ?? "").lowercased()
+        if let alternatives = step.alternatives, !alternatives.isEmpty {
+            for alt in alternatives {
+                // Match by regex if provided
+                if let pattern = alt.whenRegex, !pattern.isEmpty {
+                    if !matchesRegex(pattern: pattern, text: combinedOutput) { continue }
+                }
+                // Apply preparatory commands
+                var appliedType: String? = nil
+                var matchedRegex: String? = alt.whenRegex
+                if let applyCmds = alt.apply { for cmd in applyCmds { _ = await executeCommand(cmd, timeoutSeconds: 10) }; appliedType = "apply" }
+                // Replace command(s) if provided
+                if let replace = alt.replaceCommands, !replace.isEmpty {
+                    // Execute replacement pipeline as one joined command with '&&'
+                    let replacedCommand = replace.joined(separator: " && ")
+                    let replacedStep = PlanStep(
+                        id: step.id + "-alt",
+                        title: step.title + " (alternative)",
+                        description: step.description,
+                        command: replacedCommand,
+                        successCriteria: step.successCriteria,
+                        failureCriteria: step.failureCriteria,
+                        expectedOutput: step.expectedOutput,
+                        timeoutSeconds: step.timeoutSeconds,
+                        env: step.env,
+                        pre: nil,
+                        alternatives: nil
+                    )
+                    await MainActor.run {
+                        self.gptService.addAssistantMessage("Ретрай \(retryCount + 1)/\(maxRetries)")
+                    }
+                    result = await executeStep(replacedStep, retryCount: retryCount + 1, maxRetries: maxRetries)
+                    // annotate
+                    result = annotateAlternative(result: result, matchedRegex: matchedRegex, appliedType: "replace")
+                    if result.isSuccess { return result }
+                } else if alt.retry == true {
+                    // Retry original command after apply
+                    await MainActor.run {
+                        self.gptService.addAssistantMessage("Ретрай \(retryCount + 1)/\(maxRetries)")
+                    }
+                    result = await executeStep(step, retryCount: retryCount + 1, maxRetries: maxRetries)
+                    result = annotateAlternative(result: result, matchedRegex: matchedRegex, appliedType: appliedType ?? "retry")
+                    if result.isSuccess { return result }
+                }
+            }
+        }
+        
+        // Fallback retries up to maxRetries
+        if retryCount < maxRetries {
+            await MainActor.run {
+                self.gptService.addAssistantMessage("Ретрай \(retryCount + 1)/\(maxRetries)")
+            }
+            let retried = await executeStepWithAdaptation(step, retryCount: retryCount + 1, maxRetries: maxRetries)
+            return retried
+        }
+        
+        return result
+    }
+
+    private func annotateAlternative(result: StepExecutionResult, matchedRegex: String?, appliedType: String?) -> StepExecutionResult {
+        return StepExecutionResult(
+            stepId: result.stepId,
+            status: result.status,
+            command: result.command,
+            output: result.output,
+            error: result.error,
+            exitCode: result.exitCode,
+            rawStdout: result.rawStdout,
+            rawStderr: result.rawStderr,
+            startTime: result.startTime,
+            endTime: result.endTime,
+            duration: result.duration,
+            successCriteriaResults: result.successCriteriaResults,
+            failureCriteriaResults: result.failureCriteriaResults,
+            retryCount: result.retryCount,
+            notes: result.notes,
+            matchedAlternativeRegex: matchedRegex,
+            appliedAlternativeType: appliedType ?? "none"
+        )
+    }
+
     private func executeStep(_ step: PlanStep, retryCount: Int, maxRetries: Int) async -> StepExecutionResult {
         LoggingService.shared.info("🔧 Executing step: \(step.title) (retry \(retryCount)/\(maxRetries))", source: "PlanExecutor")
         
         let startTime = Date()
         
         // Execute command
-        let commandResult = await executeCommand(step.command, timeoutSeconds: step.timeoutSeconds)
+        let commandToRun: String
+        if let env = step.env, !env.isEmpty {
+            let exports = env.map { key, value in
+                let escaped = value.replacingOccurrences(of: "\"", with: "\\\"")
+                return "export \(key)=\"\(escaped)\""
+            }.joined(separator: "; ")
+            commandToRun = "\(exports); \(step.command)"
+        } else {
+            commandToRun = step.command
+        }
+        let commandResult = await executeCommand(commandToRun, timeoutSeconds: step.timeoutSeconds)
         
-        // Wait for command completion
-        let output = await waitForCommandCompletion(command: step.command, timeoutSeconds: step.timeoutSeconds)
+        // Use stdout from command result as step output
+        let output = commandResult.stdout
         
         let endTime = Date()
         let duration = endTime.timeIntervalSince(startTime)
@@ -189,17 +371,33 @@ class PlanExecutor: ObservableObject {
             command: step.command,
             output: output,
             error: error,
+            exitCode: commandResult.exitCode,
+            rawStdout: commandResult.stdout,
+            rawStderr: commandResult.stderr,
             startTime: startTime,
             endTime: endTime,
             duration: duration,
             successCriteriaResults: successResults,
             failureCriteriaResults: failureResults,
-            retryCount: retryCount
+            retryCount: retryCount,
+            notes: status == .failed ? "Applied PEOV evaluation. Consider alternatives if provided." : nil,
+            matchedAlternativeRegex: nil,
+            appliedAlternativeType: "none"
         )
     }
     
     private func executeCommand(_ command: String, timeoutSeconds: Int) async -> (ok: Bool, exitCode: Int, stdout: String, stderr: String) {
         LoggingService.shared.debug("🔧 Executing command: \(command)", source: "PlanExecutor")
+
+        // Safety: require confirmation for dangerous commands unless YOLO is enabled
+        if isDangerousCommand(command) && !yoloEnabled {
+            await MainActor.run {
+                self.gptService.addAssistantMessage("⚠️ Обнаружена потенциально опасная команда. Ожидаю подтверждение для выполнения:")
+                self.gptService.addAssistantMessage("`\(command)`")
+            }
+            LoggingService.shared.warning("⚠️ Dangerous command detected, waiting for confirmation", source: "PlanExecutor")
+            await waitForDangerConfirmation()
+        }
         
         // Save current output state
         let outputBeforeCommand = await terminalService.getCurrentOutput() ?? ""
@@ -208,12 +406,12 @@ class PlanExecutor: ObservableObject {
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Execute command
-        await MainActor.run {
-            terminalService.sendCommand(command)
-        }
+        // Wrap command to emit explicit exit code marker
+        let wrapped = "\(command); printf \"[[MACSSH_EXIT=%d]]\\n\" $?"
+        await MainActor.run { terminalService.sendCommand(wrapped) }
         
-        // Wait for completion
-        let output = await waitForCommandCompletion(command: command, timeoutSeconds: timeoutSeconds)
+        // Wait for completion using reliable monitor
+        let output = await reliableCompletion.waitForCommandCompletion(command: wrapped)
         
         // Additional safety delay to ensure terminal is fully ready
         try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -222,11 +420,60 @@ class PlanExecutor: ObservableObject {
         let currentOutput = await terminalService.getCurrentOutput() ?? ""
         let newOutput = String(currentOutput.dropFirst(outputBeforeCommand.count))
         
-        // Determine success (simplified - in real implementation you'd parse actual exit code)
-        let ok = !newOutput.lowercased().contains("error") && !newOutput.lowercased().contains("command not found")
-        let exitCode = ok ? 0 : 1
+        // Parse explicit exit code marker [[MACSSH_EXIT=N]]
+        var exitCode = -1
+        var cleanedOutput = newOutput
+        if let range = newOutput.range(of: #"\[\[MACSSH_EXIT=(\d+)\]\]"#, options: .regularExpression) {
+            let match = String(newOutput[range])
+            if let numRange = match.range(of: #"\d+"#, options: .regularExpression) {
+                exitCode = Int(match[numRange]) ?? -1
+            }
+            // Remove the marker line from stdout
+            cleanedOutput.removeSubrange(range)
+        }
+        // Fallback if marker not found: heuristic
+        if exitCode == -1 {
+            let lower = newOutput.lowercased()
+            let hasNegative = lower.contains("error") || lower.contains("command not found") || lower.contains("no such file") || lower.contains("permission denied")
+            exitCode = hasNegative ? 1 : 0
+        }
+        let ok = (exitCode == 0)
         
-        return (ok: ok, exitCode: exitCode, stdout: newOutput, stderr: "")
+        return (ok: ok, exitCode: exitCode, stdout: cleanedOutput.trimmingCharacters(in: .whitespacesAndNewlines), stderr: "")
+    }
+
+    // MARK: - Safety helpers
+    private func isDangerousCommand(_ command: String) -> Bool {
+        let patterns = [
+            #"\brm\s+-rf\b"#,
+            #"\bsudo\b"#,
+            #"\bmkfs\b|\bfdisk\b"#,
+            #"\bshutdown\b|\breboot\b|\bhalt\b"#,
+            #"\bchmod\s+-R\s+777\b"#
+        ]
+        return patterns.contains { command.range(of: $0, options: .regularExpression) != nil }
+    }
+    
+    private func waitForDangerConfirmation() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.dangerContinuation = continuation
+        }
+    }
+    
+    private func waitForCheckpoint() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.checkpointContinuation = continuation
+        }
+    }
+    
+    // External triggers from UI
+    func confirmDanger() {
+        dangerContinuation?.resume()
+        dangerContinuation = nil
+    }
+    func confirmCheckpoint() {
+        checkpointContinuation?.resume()
+        checkpointContinuation = nil
     }
     
     private func waitForCommandCompletion(command: String, timeoutSeconds: Int) async -> String {

@@ -165,6 +165,12 @@ class GPTTerminalService: ObservableObject {
     private var conversationHistory: [Message] = []
     private let maxSteps = 10 // Safety limit
     
+    // OpenAI rate limiting
+    private let openAIThrottle = OpenAIThrottle(minIntervalSeconds: 2.0, maxConcurrent: 1)
+    private let openAIMaxRetries = 4
+    private let openAIBaseBackoff: TimeInterval = 2.0
+    private let openAIMaxBackoff: TimeInterval = 18.0
+    
     // Universal terminal tool definition
     private let terminalTool = Tool(
         type: "function",
@@ -708,38 +714,74 @@ class GPTTerminalService: ObservableObject {
             throw GPTError.invalidURL
         }
         
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let encoder = JSONEncoder()
-        let requestData = try encoder.encode(request)
-        urlRequest.httpBody = requestData
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            LoggingService.shared.error("❌ Invalid HTTP response from OpenAI", source: "GPTTerminalService")
-            throw GPTError.apiError("Invalid HTTP response")
+        // Minimalistic chat notice about waiting for OpenAI response
+        await MainActor.run {
+            self.addChatMessage(ChatMessage(type: .system, content: "⏳ Ожидаю ответ OpenAI…"))
         }
-        
-        guard httpResponse.statusCode == 200 else {
-            let errorData = String(data: data, encoding: .utf8) ?? "Unknown error"
-            LoggingService.shared.error("❌ OpenAI API error: HTTP \(httpResponse.statusCode) - \(errorData)", source: "GPTTerminalService")
+
+        var lastError: Error?
+        for attempt in 0...openAIMaxRetries {
+            // Throttle and serialize calls
+            await openAIThrottle.acquire()
+            defer { Task { await openAIThrottle.release() } }
             
-            // Special handling for quota exceeded
-            if httpResponse.statusCode == 429 && errorData.contains("insufficient_quota") {
-                LoggingService.shared.error("💳 OpenAI API quota exceeded", source: "GPTTerminalService")
-                throw GPTError.quotaExceeded
+            // Small jitter before each call to avoid bursts
+            let jitterMs = Int.random(in: 120...360)
+            try? await Task.sleep(nanoseconds: UInt64(jitterMs) * 1_000_000)
+            
+            do {
+                var urlRequest = URLRequest(url: url)
+                urlRequest.httpMethod = "POST"
+                urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                
+                let encoder = JSONEncoder()
+                let requestData = try encoder.encode(request)
+                urlRequest.httpBody = requestData
+                
+                let (data, response) = try await URLSession.shared.data(for: urlRequest)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw GPTError.apiError("Invalid HTTP response")
+                }
+                
+                if httpResponse.statusCode == 200 {
+                    let decoder = JSONDecoder()
+                    let openAIResponse = try decoder.decode(OpenAIResponse.self, from: data)
+                    return openAIResponse
+                } else {
+                    let errorData = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    LoggingService.shared.error("❌ OpenAI API error: HTTP \(httpResponse.statusCode) - \(errorData)", source: "GPTTerminalService")
+                    
+                    if httpResponse.statusCode == 429 {
+                        // Quota vs. rate limit
+                        if errorData.contains("insufficient_quota") {
+                            throw GPTError.quotaExceeded
+                        }
+                        // Rate limit: retry with backoff
+                        lastError = GPTError.apiError("HTTP 429: rate limit")
+                    } else if (500...599).contains(httpResponse.statusCode) {
+                        // Server error: retry
+                        lastError = GPTError.apiError("HTTP \(httpResponse.statusCode): server error")
+                    } else {
+                        // Other errors: do not retry
+                        throw GPTError.apiError("HTTP \(httpResponse.statusCode): \(errorData)")
+                    }
+                }
+            } catch {
+                // Network/timeouts: retry
+                lastError = error
             }
             
-            throw GPTError.apiError("HTTP \(httpResponse.statusCode): \(errorData)")
+            // Backoff before next attempt if any
+            if attempt < openAIMaxRetries {
+                let base = openAIBaseBackoff * pow(2.0, Double(attempt))
+                let jitter = Double(Int.random(in: 200...900)) / 1000.0
+                let delay = min(openAIMaxBackoff, base + jitter)
+                LoggingService.shared.warning("⏳ Backing off \(String(format: "%.1f", delay))s before retry (attempt #\(attempt + 1))", source: "GPTTerminalService")
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
         }
-        
-        let decoder = JSONDecoder()
-        let openAIResponse = try decoder.decode(OpenAIResponse.self, from: data)
-        
-        return openAIResponse
+        throw lastError ?? GPTError.apiError("Unknown error")
     }
     
     // MARK: - Simplified OpenAI API call for plan generation
@@ -822,8 +864,13 @@ class GPTTerminalService: ObservableObject {
         // Wait a moment for terminal to stabilize
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
+        // Avoid interactive pagers (less/more) that can block: force non-paging
+        let nonPagingPrefix = "export PAGER=cat; export LESS='-F -X -R';"
+        // Add lightweight safety for heavy-output commands
+        let safeCmd = makeNonBlocking(command)
+        let wrappedCommand = "\(nonPagingPrefix) \(safeCmd)"
         await MainActor.run {
-            terminalService.sendCommand(command)
+            terminalService.sendCommand(wrappedCommand)
         }
         
         // Ожидаем строго по событию промпта
@@ -1300,6 +1347,23 @@ class GPTTerminalService: ObservableObject {
         
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    // Heuristic wrapper to prevent UI lockups on massive outputs
+    private func makeNonBlocking(_ command: String) -> String {
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        var cmd = trimmed
+        // Add timeout for long-running commands
+        if !lower.hasPrefix("timeout ") {
+            cmd = "timeout 30s \(cmd)"
+        }
+        // Cap output for known heavy listings
+        let heavyPatterns = ["dpkg -l", "rpm -qa", "journalctl", "find ", "du -a", "ls -la /", "cat /var/log"]
+        if heavyPatterns.contains(where: { lower.contains($0) }) && !lower.contains("| head") {
+            cmd += " | head -n 500"
+        }
+        return cmd
+    }
     
     private func checkTaskCompletionWithGPT(originalTask: String, executionHistory: [ExecutionStep], responseContent: String) async -> Bool {
         // Create a comprehensive analysis prompt for GPT
@@ -1432,6 +1496,44 @@ class GPTTerminalService: ObservableObject {
     }
     
 
+}
+
+// MARK: - OpenAI Throttle Helper
+final class OpenAIThrottle {
+    private let minInterval: TimeInterval
+    private let maxConcurrent: Int
+    private var lastCallTime: Date = .distantPast
+    private let semaphore: DispatchSemaphore
+    private let queue = DispatchQueue(label: "macssh.openai.throttle")
+    
+    init(minIntervalSeconds: TimeInterval, maxConcurrent: Int) {
+        self.minInterval = minIntervalSeconds
+        self.maxConcurrent = maxConcurrent
+        self.semaphore = DispatchSemaphore(value: maxConcurrent)
+    }
+    
+    func acquire() async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            queue.async {
+                // Limit concurrency
+                self.semaphore.wait()
+                
+                // Enforce minimal interval
+                let now = Date()
+                let elapsed = now.timeIntervalSince(self.lastCallTime)
+                let waitSeconds = max(0, self.minInterval - elapsed)
+                if waitSeconds > 0 {
+                    Thread.sleep(forTimeInterval: waitSeconds)
+                }
+                self.lastCallTime = Date()
+                cont.resume()
+            }
+        }
+    }
+    
+    func release() async {
+        queue.async { self.semaphore.signal() }
+    }
 }
 
 // MARK: - Errors

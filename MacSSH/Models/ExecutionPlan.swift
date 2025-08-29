@@ -11,10 +11,21 @@ struct PlanStep: Codable, Identifiable {
     let failureCriteria: [FailureCriterion]
     let expectedOutput: String?
     let timeoutSeconds: Int
+    // Optional environment variables and pre-commands for this step
+    let env: [String: String]?
+    let pre: [String]?
+    // Optional alternatives to apply on failure
+    let alternatives: [StepAlternative]?
+    // Optional manual testing checkpoint
+    let checkpoint: Bool?
+    let testInstructions: String?
+    let testPrompts: [String]?
     
     init(id: String, title: String, description: String, command: String, 
          successCriteria: [SuccessCriterion] = [], failureCriteria: [FailureCriterion] = [],
-         expectedOutput: String? = nil, timeoutSeconds: Int = 30) {
+         expectedOutput: String? = nil, timeoutSeconds: Int = 30,
+         env: [String: String]? = nil, pre: [String]? = nil, alternatives: [StepAlternative]? = nil,
+         checkpoint: Bool? = nil, testInstructions: String? = nil, testPrompts: [String]? = nil) {
         self.id = id
         self.title = title
         self.description = description
@@ -23,6 +34,33 @@ struct PlanStep: Codable, Identifiable {
         self.failureCriteria = failureCriteria
         self.expectedOutput = expectedOutput
         self.timeoutSeconds = timeoutSeconds
+        self.env = env
+        self.pre = pre
+        self.alternatives = alternatives
+        self.checkpoint = checkpoint
+        self.testInstructions = testInstructions
+        self.testPrompts = testPrompts
+    }
+}
+
+// MARK: - Step Alternatives
+
+struct StepAlternative: Codable, Identifiable {
+    let id = UUID()
+    /// Regex pattern to match in combined output to trigger this alternative
+    let whenRegex: String?
+    /// Commands to apply (like mkdir -p, export, etc.) before retrying original command
+    let apply: [String]?
+    /// Replacement commands to execute instead of the original command
+    let replaceCommands: [String]?
+    /// Whether to retry the original command after apply
+    let retry: Bool?
+    
+    init(whenRegex: String? = nil, apply: [String]? = nil, replaceCommands: [String]? = nil, retry: Bool? = nil) {
+        self.whenRegex = whenRegex
+        self.apply = apply
+        self.replaceCommands = replaceCommands
+        self.retry = retry
     }
 }
 
@@ -76,10 +114,14 @@ struct ExecutionPlan: Codable, Identifiable {
     let globalFailureCriteria: [FailureCriterion]
     let maxTotalTime: Int // seconds
     let maxRetries: Int
+    // Plan-level environment and pre-commands
+    let planEnv: [String: String]?
+    let planPre: [String]?
     
     init(title: String, description: String, steps: [PlanStep], 
          globalSuccessCriteria: [SuccessCriterion] = [], globalFailureCriteria: [FailureCriterion] = [],
-         maxTotalTime: Int = 300, maxRetries: Int = 3) {
+         maxTotalTime: Int = 300, maxRetries: Int = 3,
+         planEnv: [String: String]? = nil, planPre: [String]? = nil) {
         self.title = title
         self.description = description
         self.steps = steps
@@ -87,6 +129,8 @@ struct ExecutionPlan: Codable, Identifiable {
         self.globalFailureCriteria = globalFailureCriteria
         self.maxTotalTime = maxTotalTime
         self.maxRetries = maxRetries
+        self.planEnv = planEnv
+        self.planPre = planPre
     }
 }
 
@@ -116,12 +160,18 @@ struct StepExecutionResult: Codable, Identifiable {
     let command: String
     let output: String
     let error: String?
+    let exitCode: Int
+    let rawStdout: String
+    let rawStderr: String
     let startTime: Date
     let endTime: Date?
     let duration: TimeInterval
     let successCriteriaResults: [CriterionResult]
     let failureCriteriaResults: [CriterionResult]
     let retryCount: Int
+    let notes: String?
+    let matchedAlternativeRegex: String?
+    let appliedAlternativeType: String? // apply|replace|retry|none
     
     var isSuccess: Bool {
         status == .success

@@ -3,6 +3,7 @@ import SwiftUI
 struct GPTSettingsView: View {
     @Binding var isPresented: Bool
     @State private var apiKey = ""
+    @State private var yoloEnabled = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var isKeyValid = false
@@ -16,6 +17,12 @@ struct GPTSettingsView: View {
                 Text("AI Terminal Assistant Settings")
                     .font(.title2)
                     .fontWeight(.semibold)
+                Spacer()
+                Button(action: { isPresented = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
             }
             
             Divider()
@@ -85,6 +92,21 @@ struct GPTSettingsView: View {
                            GPTFeatureRow(icon: "folder", title: "Directory Navigation", description: "Navigate and explore file systems")
                            GPTFeatureRow(icon: "chart.bar", title: "System Monitoring", description: "Get system information and status")
                        }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Safety:")
+                        .font(.headline)
+                    Toggle(isOn: $yoloEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("YOLO mode (auto-confirm dangerous commands)")
+                            Text("Use with caution. Disables confirmations for potentially dangerous commands.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
             
             Spacer()
@@ -140,6 +162,7 @@ struct GPTSettingsView: View {
     private func saveSettings() {
         LoggingService.shared.info("💾 Saving GPT settings", source: "GPTSettingsView")
         UserDefaults.standard.set(apiKey, forKey: "OpenAI_API_Key")
+        UserDefaults.standard.set(yoloEnabled, forKey: "YOLOEnabled")
         LoggingService.shared.success("✅ GPT settings saved successfully", source: "GPTSettingsView")
         alertMessage = "Settings saved successfully! AI features will be available in terminal."
         showingAlert = true
@@ -153,6 +176,7 @@ struct GPTSettingsView: View {
     private func loadSettings() {
         LoggingService.shared.debug("📂 Loading GPT settings", source: "GPTSettingsView")
         apiKey = UserDefaults.standard.string(forKey: "OpenAI_API_Key") ?? ""
+        yoloEnabled = UserDefaults.standard.bool(forKey: "YOLOEnabled")
         validateAPIKey()
         LoggingService.shared.debug("📂 Loaded API key: \(apiKey.isEmpty ? "empty" : "present")", source: "GPTSettingsView")
     }

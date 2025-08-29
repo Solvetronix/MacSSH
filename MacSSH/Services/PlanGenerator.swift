@@ -58,6 +58,8 @@ class PlanGenerator: ObservableObject {
            - Критерии неудачи (что указывает на ошибку)
            - Ожидаемый вывод (если применимо)
            - Таймаут в секундах
+           - Необязательные pre-команды (например, создание каталогов), переменные окружения `env`
+           - Альтернативы на случай неуспеха: `whenRegex`, `apply` (команды для подготовки), `replaceCommands`, `retry`
         
         3. Определи глобальные критерии успеха для всего плана
         4. Установи разумные ограничения по времени и повторным попыткам
@@ -87,7 +89,28 @@ class PlanGenerator: ObservableObject {
                 }
               ],
               "expectedOutput": "ожидаемый вывод (опционально)",
-              "timeoutSeconds": 30
+              "timeoutSeconds": 30,
+              "env": { "KEY": "VALUE" },
+              "pre": ["mkdir -p /tmp/safe"],
+              "checkpoint": false,
+              "testInstructions": "Кратко опиши, как проверить этот шаг вручную без опасных действий",
+              "testPrompts": [
+                "Собери безопасный диагностический снимок",
+                "Проверь недоступные команды и предложи аналоги",
+                "Собери только чтение-метрики (df/top) без sudo"
+              ],
+              "alternatives": [
+                {
+                  "whenRegex": "No such file or directory",
+                  "apply": ["mkdir -p /tmp/safe"],
+                  "retry": true
+                },
+                {
+                  "whenRegex": "command not found",
+                  "replaceCommands": ["ss -lntp | head -n 20"],
+                  "retry": false
+                }
+              ]
             }
           ],
           "globalSuccessCriteria": [
