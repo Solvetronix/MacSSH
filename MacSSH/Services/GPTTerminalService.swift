@@ -160,6 +160,11 @@ class GPTTerminalService: ObservableObject {
     @Published var chatMessages: [ChatMessage] = []
     private var infoCollector = UniversalInfoCollector()
     
+    // Lightweight persistent context per host (previous task summaries)
+    private var lastTaskSummaries: [String] = [] // keep up to 3
+    // Avoid spamming waiting messages
+    private var isWaitingOpenAIShown: Bool = false
+    
     private var apiKey: String
     private let terminalService: SwiftTermProfessionalService
     private var conversationHistory: [Message] = []
@@ -204,6 +209,8 @@ class GPTTerminalService: ObservableObject {
             name: .terminalBufferChanged,
             object: nil
         )
+        // Load persisted summaries for current host
+        loadLastSummaries()
     }
     
     deinit {
@@ -279,14 +286,21 @@ class GPTTerminalService: ObservableObject {
             showingTaskInput = false
             taskInput = ""
             
-            // Clear chat history and info collector
-            clearChatHistory()
+            // Keep chat history across tasks; reset only internal collector
             infoCollector = UniversalInfoCollector()
             addUserMessage(task)
             addAssistantMessage("Я начну выполнение задачи: \(task)")
         }
         
         // Initialize conversation with task
+        // Reload summaries for current host (profile may be available only now)
+        loadLastSummaries()
+        var planningContextIntro = ""
+        if !lastTaskSummaries.isEmpty {
+            let clipped = lastTaskSummaries.suffix(3).map { sanitizeForGPT($0, maxChars: 600) }
+            let joined = clipped.enumerated().map { "\($0.offset+1). \($0.element)" }.joined(separator: "\n\n")
+            planningContextIntro = "Previous task summaries (up to 3, newest last; use only if relevant, do not repeat):\n\n" + joined + "\n\n"
+        }
         let systemMessage = Message(
             role: "system",
             content: """
@@ -320,6 +334,8 @@ class GPTTerminalService: ObservableObject {
             - For information gathering tasks, say "TASK COMPLETE" after collecting comprehensive information
             - Use **bold text** for emphasis and `code` formatting for commands and paths
             - IMPORTANT: After 3-5 steps of information gathering, provide a summary and say "TASK COMPLETE"
+            
+            \(planningContextIntro)
             """
         )
         
@@ -652,6 +668,13 @@ class GPTTerminalService: ObservableObject {
     
     // MARK: - Request creation
     private func createRequest(userRequest: String) -> OpenAIRequest {
+        var contextIntro = ""
+        if !lastTaskSummaries.isEmpty {
+            let clipped = lastTaskSummaries.suffix(3).map { sanitizeForGPT($0, maxChars: 600) }
+            let joined = clipped.enumerated().map { "\($0.offset+1). \($0.element)" }.joined(separator: "\n\n")
+            contextIntro = "Previous task summaries (up to 3, newest last; use only if relevant, do not repeat):\n\n" + joined + "\n\n"
+        }
+        
         let systemMessage = Message(
             role: "system",
             content: """
@@ -667,6 +690,7 @@ class GPTTerminalService: ObservableObject {
             - Handle errors gracefully and suggest alternatives
             - For file operations, consider permissions and safety
             - For system operations, be aware of potential impacts
+            \(contextIntro)
             """
         )
         
@@ -716,7 +740,10 @@ class GPTTerminalService: ObservableObject {
         
         // Minimalistic chat notice about waiting for OpenAI response
         await MainActor.run {
-            self.addChatMessage(ChatMessage(type: .system, content: "⏳ Ожидаю ответ OpenAI…"))
+            if !self.isWaitingOpenAIShown {
+                self.addChatMessage(ChatMessage(type: .system, content: "⏳ Ожидаю ответ OpenAI…"))
+                self.isWaitingOpenAIShown = true
+            }
         }
 
         var lastError: Error?
@@ -741,13 +768,13 @@ class GPTTerminalService: ObservableObject {
                 let requestData = try encoder.encode(request)
                 urlRequest.httpBody = requestData
                 
-                // Guard with Task timeout as well
+                // Guard with Task timeout as well (hard limit ~20s)
                 let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group -> (Data, URLResponse) in
                     group.addTask {
                         return try await URLSession.shared.data(for: urlRequest)
                     }
                     group.addTask {
-                        try await Task.sleep(nanoseconds: 31_000_000_000)
+                        try await Task.sleep(nanoseconds: 21_000_000_000)
                         throw GPTError.apiError("Request timed out")
                     }
                     let result = try await group.next()!
@@ -796,6 +823,7 @@ class GPTTerminalService: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
+        await MainActor.run { self.isWaitingOpenAIShown = false }
         throw lastError ?? GPTError.apiError("Unknown error")
     }
     
@@ -1226,12 +1254,40 @@ class GPTTerminalService: ObservableObject {
             LoggingService.shared.info("🤖 GPT summary: \(conciseAnswer)", source: "GPTTerminalService")
             
             if !conciseAnswer.isEmpty {
+                // Persist concise summary for context in next tasks
+                persistSummary(conciseAnswer)
                 return conciseAnswer
             }
         }
         
         // Fallback: simple completion message
-        return "✅ Задача выполнена успешно!"
+        let message = "✅ Задача выполнена успешно!"
+        persistSummary(message)
+        return message
+    }
+
+    // MARK: - Persistent lightweight context
+    private func summaryStorageKey() -> String {
+        let host = terminalService.getCurrentProfile()?.host ?? "unknown-host"
+        return "GPT_LastTaskSummaries_\(host)"
+    }
+    
+    private func persistSummary(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let clipped = String(trimmed.prefix(2000))
+        // Append and keep last 3
+        lastTaskSummaries.append(clipped)
+        if lastTaskSummaries.count > 3 { lastTaskSummaries = Array(lastTaskSummaries.suffix(3)) }
+        UserDefaults.standard.set(lastTaskSummaries, forKey: summaryStorageKey())
+    }
+    
+    private func loadLastSummaries() {
+        if let arr = UserDefaults.standard.array(forKey: summaryStorageKey()) as? [String] {
+            lastTaskSummaries = Array(arr.suffix(3))
+        } else {
+            lastTaskSummaries = []
+        }
     }
     
     private func extractUniversalAnswerFromOutputs() -> String {

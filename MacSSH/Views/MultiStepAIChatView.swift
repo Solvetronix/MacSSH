@@ -59,13 +59,13 @@ struct ChatMessagesView: View {
     private func scrollToBottom(proxy: ScrollViewProxy) {
         // Первый проход — сразу после обновления данных
         DispatchQueue.main.async {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.none) {
                 proxy.scrollTo("bottom-anchor", anchor: .bottom)
             }
         }
         // Второй проход — после компоновки, чтобы исключить скрытие за рамкой
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.none) {
                 proxy.scrollTo("bottom-anchor", anchor: .bottom)
             }
         }

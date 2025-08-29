@@ -96,7 +96,12 @@ class SwiftTermProfessionalService: ObservableObject {
                                 
                                 // Сохраняем вывод для GPT анализа
                                 if let output = String(data: data, encoding: .utf8) {
+                                    // Cap buffer size to avoid memory bloat and UI thrash
                                     self?.currentOutput += output
+                                    let maxChars = 200_000
+                                    if let co = self?.currentOutput, co.count > maxChars {
+                                        self?.currentOutput = String(co.suffix(maxChars))
+                                    }
                                     
                                     // Уведомляем об изменении буфера
                                     self?.notifyBufferChanged()
@@ -247,6 +252,11 @@ class SwiftTermProfessionalService: ObservableObject {
     
     func getTerminalView() -> TerminalView? {
         return terminalView
+    }
+    
+    // Expose current profile for context-aware features
+    func getCurrentProfile() -> Profile? {
+        return currentProfile
     }
     
 // MARK: - SSH Command Building
