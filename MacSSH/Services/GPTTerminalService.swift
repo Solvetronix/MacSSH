@@ -750,6 +750,9 @@ class GPTTerminalService: ObservableObject {
     // MARK: - OpenAI API call
     func callOpenAI(_ request: OpenAIRequest) async throws -> OpenAIResponse {
         LoggingService.shared.info("🌐 OpenAI API call", source: "GPTTerminalService")
+        // Show global busy indicator for any OpenAI call
+        await MainActor.run { self.isProcessing = true }
+        defer { Task { await MainActor.run { self.isProcessing = false; self.isWaitingOpenAIShown = false } } }
         
         guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
             LoggingService.shared.error("❌ Invalid OpenAI API URL", source: "GPTTerminalService")
