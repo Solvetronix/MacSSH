@@ -200,6 +200,8 @@ class SwiftTermProfessionalService: ObservableObject {
     
     // Method to notify about buffer changes for command completion detection (throttled)
     func notifyBufferChanged() {
+        // Avoid posting notifications when there is no active connection or terminal view
+        guard self.isConnected, self.terminalView != nil else { return }
         bufferDebounceQueue.async {
             self.bufferCoalescedCount += 1
             self.bufferDebounceWorkItem?.cancel()

@@ -172,6 +172,7 @@ class GPTTerminalService: ObservableObject {
     
     // OpenAI rate limiting
     private let openAIThrottle = OpenAIThrottle(minIntervalSeconds: 2.0, maxConcurrent: 1)
+    private let tokenLimiter = TokenRateLimiter(tokensPerMinuteLimit: 28000)
     private let openAIMaxRetries = 4
     private let openAIBaseBackoff: TimeInterval = 2.0
     private let openAIMaxBackoff: TimeInterval = 18.0
@@ -203,12 +204,8 @@ class GPTTerminalService: ObservableObject {
         } else {
             LoggingService.shared.info("🔑 OpenAI API key loaded", source: "GPTTerminalService")
         }
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleTerminalBufferChanged),
-            name: .terminalBufferChanged,
-            object: nil
-        )
+        // Lazily subscribe to terminal buffer events only when a command is running
+        // to avoid idle wakeups while the app sits unused on the main screen.
         // Load persisted summaries for current host
         loadLastSummaries()
     }
@@ -221,6 +218,25 @@ class GPTTerminalService: ObservableObject {
     @objc private func handleTerminalBufferChanged() {
         currentCompletionHandler?.bufferChanged()
     }
+
+    // Subscribe when we start waiting for completion, unsubscribe when done
+    private func subscribeBufferIfNeeded() {
+        guard bufferObserver == nil else { return }
+        bufferObserver = NotificationCenter.default.addObserver(
+            forName: .terminalBufferChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleTerminalBufferChanged()
+        }
+    }
+    private func unsubscribeBufferIfNeeded() {
+        if let obs = bufferObserver {
+            NotificationCenter.default.removeObserver(obs)
+            bufferObserver = nil
+        }
+    }
+    private var bufferObserver: NSObjectProtocol?
     
     private static func resolveApiKey() -> String {
         // Try multiple locations to improve robustness
@@ -428,8 +444,8 @@ class GPTTerminalService: ObservableObject {
         conversationHistory.append(planningRequest)
         
         do {
-            // Clip planning prompt to avoid model limits
-            let clippedPlanning = sanitizeForGPT(planningRequest.content, maxChars: 12000)
+            // Clip planning prompt stronger to reduce tokens
+            let clippedPlanning = sanitizeForGPT(planningRequest.content, maxChars: 6000)
             let openAIRequest = OpenAIRequest(
                 model: "gpt-4o",
                 messages: conversationHistory.dropLast() + [Message(role: "user", content: clippedPlanning)],
@@ -447,10 +463,12 @@ class GPTTerminalService: ObservableObject {
             let explanation = responseContent
             
             // Use GPT to determine if task is complete (only if we have execution history and at least 1 step)
-            let gptCompletionCheck = executionHistory.count >= 1 ? await checkTaskCompletionWithGPT(
+            // Reduce completion checks to every 2 steps to save tokens
+            let shouldCheckCompletion = executionHistory.count >= 1 && (currentStep % 2 == 1)
+            let gptCompletionCheck = shouldCheckCompletion ? await checkTaskCompletionWithGPT(
                 originalTask: currentTask,
                 executionHistory: executionHistory,
-                responseContent: sanitizeForGPT(responseContent, maxChars: 6000)
+                responseContent: sanitizeForGPT(responseContent, maxChars: 4000)
             ) : false
             
             let phraseCompletion = executionHistory.count >= 1 && currentStep >= 1 && responseContent.lowercased().contains("task complete")
@@ -767,6 +785,9 @@ class GPTTerminalService: ObservableObject {
                 let encoder = JSONEncoder()
                 let requestData = try encoder.encode(request)
                 urlRequest.httpBody = requestData
+                // Estimate request tokens and wait if TPM budget is low
+                let estimatedRequestTokens = TokenRateLimiter.estimateTokens(fromBytes: requestData.count)
+                await tokenLimiter.acquire(tokens: estimatedRequestTokens)
                 
                 // Guard with Task timeout as well (hard limit ~20s)
                 let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group -> (Data, URLResponse) in
@@ -788,6 +809,9 @@ class GPTTerminalService: ObservableObject {
                 if httpResponse.statusCode == 200 {
                     let decoder = JSONDecoder()
                     let openAIResponse = try decoder.decode(OpenAIResponse.self, from: data)
+                    // Account for response tokens best-effort
+                    let responseTokens = TokenRateLimiter.estimateTokens(fromBytes: data.count)
+                    tokenLimiter.record(tokens: estimatedRequestTokens + responseTokens)
                     return openAIResponse
                 } else {
                     let errorData = String(data: data, encoding: .utf8) ?? "Unknown error"
@@ -798,8 +822,14 @@ class GPTTerminalService: ObservableObject {
                         if errorData.contains("insufficient_quota") {
                             throw GPTError.quotaExceeded
                         }
-                        // Rate limit: retry with backoff
-                        lastError = GPTError.apiError("HTTP 429: rate limit")
+                        // Rate limit: honor Retry-After / rate-limit headers if available
+                        var waitSeconds: Double = 2.0
+                        if let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After"),
+                           let s = Double(retryAfter.trimmingCharacters(in: .whitespaces)) { waitSeconds = max(waitSeconds, s) }
+                        if let resetTokens = httpResponse.value(forHTTPHeaderField: "x-ratelimit-reset-tokens"),
+                           let s = Double(resetTokens.trimmingCharacters(in: .whitespaces)) { waitSeconds = max(waitSeconds, s) }
+                        await tokenLimiter.delayForRateLimit(minSeconds: waitSeconds)
+                        lastError = GPTError.apiError("HTTP 429: rate limit; waited ~\(String(format: "%.1f", waitSeconds))s")
                     } else if (500...599).contains(httpResponse.statusCode) {
                         // Server error: retry
                         lastError = GPTError.apiError("HTTP \(httpResponse.statusCode): server error")
@@ -832,8 +862,8 @@ class GPTTerminalService: ObservableObject {
         let request = OpenAIRequest(
             model: "gpt-4o",
             messages: [
-                Message(role: "system", content: systemPrompt),
-                Message(role: "user", content: sanitizeForGPT(prompt, maxChars: 12000))
+                Message(role: "system", content: sanitizeForGPT(systemPrompt, maxChars: 4000)),
+                Message(role: "user", content: sanitizeForGPT(prompt, maxChars: 6000))
             ]
         )
         
@@ -1001,11 +1031,14 @@ class GPTTerminalService: ObservableObject {
         LoggingService.shared.info("⏳ Waiting for command completion (prompt-based, event-driven): '\(command)'", source: "GPTTerminalService")
         
         return await withCheckedContinuation { continuation in
+            // Subscribe to buffer updates only for the duration of waiting
+            self.subscribeBufferIfNeeded()
             let completionHandler = PromptCompletionHandler(
                 initialOutputLength: outputBeforeCommand.count,
                 terminalService: terminalService,
                 onComplete: { [weak self] output in
                     self?.currentCompletionHandler = nil
+                    self?.unsubscribeBufferIfNeeded()
                     continuation.resume(returning: output)
                 }
             )
@@ -1604,6 +1637,67 @@ final class OpenAIThrottle {
     
     func release() async {
         queue.async { self.semaphore.signal() }
+    }
+}
+
+// MARK: - Token Rate Limiter (best-effort TPM limiter)
+final class TokenRateLimiter {
+    private let limitPerMinute: Int
+    private var windowStart: Date
+    private var usedTokens: Int
+    private let queue = DispatchQueue(label: "macssh.openai.tpm")
+    
+    init(tokensPerMinuteLimit: Int) {
+        self.limitPerMinute = tokensPerMinuteLimit
+        self.windowStart = Date()
+        self.usedTokens = 0
+    }
+    
+    // Rough estimate: ~4 chars per token; keep conservative margin
+    static func estimateTokens(fromBytes bytes: Int) -> Int {
+        // bytes -> chars approx 1:1 for ASCII/UTF-8 english text
+        let chars = bytes
+        let tokens = max(1, chars / 4)
+        return tokens
+    }
+    
+    func acquire(tokens: Int) async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            queue.async {
+                self.rolloverWindowIfNeeded()
+                if self.usedTokens + tokens <= self.limitPerMinute {
+                    self.usedTokens += tokens
+                    cont.resume()
+                } else {
+                    // Need to wait until next minute window
+                    let wait = max(0, 60.0 - Date().timeIntervalSince(self.windowStart))
+                    Thread.sleep(forTimeInterval: wait)
+                    self.rolloverWindowIfNeeded(force: true)
+                    self.usedTokens += tokens
+                    cont.resume()
+                }
+            }
+        }
+    }
+    
+    func record(tokens: Int) {
+        queue.async {
+            self.rolloverWindowIfNeeded()
+            self.usedTokens = min(self.limitPerMinute, self.usedTokens + tokens)
+        }
+    }
+    
+    func delayForRateLimit(minSeconds: Double) async {
+        let secs = max(0.5, minSeconds)
+        try? await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
+    }
+    
+    private func rolloverWindowIfNeeded(force: Bool = false) {
+        let now = Date()
+        if force || now.timeIntervalSince(windowStart) >= 60.0 {
+            windowStart = now
+            usedTokens = 0
+        }
     }
 }
 

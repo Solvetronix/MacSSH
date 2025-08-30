@@ -78,11 +78,39 @@ class LoggingService: ObservableObject {
     @Published var logs: [LogMessage] = []
     @Published var isEnabled: Bool = true
     
-    private init() {}
+    // Minimum log level to record. In release builds we default to .info
+    // to avoid high-frequency debug logging that can cause UI churn and
+    // unnecessary energy usage while the app is idle.
+    private let minLevel: LogLevel
+    
+    private init() {
+        #if DEBUG
+        self.minLevel = .debug
+        #else
+        self.minLevel = .info
+        #endif
+    }
     
     // Основные методы логирования
     func log(_ message: String, level: LogLevel = .info, source: String = "System") {
         guard isEnabled else { return }
+        // Drop logs below the configured minimum level
+        let allowed: Bool
+        switch (minLevel, level) {
+        case (_, .error): allowed = true
+        case (.warning, .success): allowed = false
+        case (.warning, .info): allowed = false
+        case (.warning, .debug): allowed = false
+        case (.info, .success): allowed = true
+        case (.info, .info): allowed = true
+        case (.info, .debug): allowed = false
+        case (.success, .success): allowed = true
+        case (.success, .info): allowed = false
+        case (.success, .debug): allowed = false
+        case (.debug, _): allowed = true
+        default: allowed = true
+        }
+        guard allowed else { return }
         
         // Выводим в системную консоль для отладки
         let consoleMessage = "[\(level.rawValue)] [\(source)] \(message)"

@@ -45,6 +45,7 @@ private class ReliableCompletionHandler {
     // Monitoring components
     private var monitoringTimer: Timer?
     private var dataReceivedObserver: NSObjectProtocol?
+    private var isCompleted = false
     
     init(command: String, terminalService: SwiftTermProfessionalService?, onComplete: @escaping (String) -> Void) {
         self.command = command
@@ -95,6 +96,7 @@ private class ReliableCompletionHandler {
     
     private func checkOutputStability() {
         Task { @MainActor in
+            guard !isCompleted else { return }
             let currentOutput = await terminalService?.getCurrentOutput() ?? ""
             
             if currentOutput.count == lastOutputLength {
@@ -117,6 +119,7 @@ private class ReliableCompletionHandler {
     
     private func cleanupAndComplete() {
         LoggingService.shared.info("🧹 [Reliable] Cleaning up monitoring for: '\(command)'", source: "ReliableCommandCompletion")
+        isCompleted = true
         
         // Cleanup timer
         monitoringTimer?.invalidate()

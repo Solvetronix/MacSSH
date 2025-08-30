@@ -20,9 +20,17 @@ struct MultiStepAIChatWindow: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Multi-Step AI Assistant")
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 8) {
+                        Text("Multi-Step AI Assistant")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        if gptService.isProcessing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .controlSize(.small)
+                                .accessibilityLabel("Loading")
+                        }
+                    }
                     
                     Text("Connected to \(profile.host)")
                         .font(.caption)
