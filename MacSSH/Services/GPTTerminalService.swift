@@ -148,6 +148,7 @@ class GPTTerminalService: ObservableObject {
     @Published var currentStep = 0
     @Published var totalSteps = 0
     @Published var pendingCommand: String?
+    @Published var pendingCommandDisplay: String?
     @Published var pendingExplanation: String?
     @Published var isWaitingForConfirmation = false
     @Published var executionHistory: [ExecutionStep] = []
@@ -562,8 +563,8 @@ class GPTTerminalService: ObservableObject {
             } else if let script = scriptRaw, !script.isEmpty {
                 // Resolve placeholders from previous outputs before wrapping
                 let resolvedScript = resolvePlaceholders(in: script)
-                // Build heredoc-wrapped command for execution
-                let heredocCmd = buildHeredocScript(resolvedScript)
+                // Build base64-wrapped script for robust transport
+                let scriptCmd = buildBase64Script(resolvedScript)
                 let displayFirstLine = resolvedScript.split(separator: "\n").first.map { String($0) } ?? "<script>"
                 let isDanger = isDangerousCommand(script)
 
@@ -584,11 +585,16 @@ class GPTTerminalService: ObservableObject {
                 addAssistantMessage(explanation, command: displayFirstLine, isDangerous: isDanger, stepNumber: currentStep + 1)
                 trace("planning", "step planned script firstLine='\(displayFirstLine)' waiting_for_confirmation=true")
 
+                let yolo = UserDefaults.standard.bool(forKey: "YOLOEnabled")
                 await MainActor.run {
-                    pendingCommand = heredocCmd
+                    pendingCommand = scriptCmd
+                    pendingCommandDisplay = resolvedScript
                     pendingExplanation = explanation
-                    isWaitingForConfirmation = true
+                    isWaitingForConfirmation = !yolo
                     isPendingCommandDangerous = isDanger
+                }
+                if yolo {
+                    Task { await self.confirmNextStep() }
                 }
 
                 LoggingService.shared.info("📋 Planned step \(currentStep + 1): <script> (first line: \(displayFirstLine))", source: "GPTTerminalService")
@@ -612,11 +618,16 @@ class GPTTerminalService: ObservableObject {
                 addAssistantMessage(explanation, command: resolvedCommand, isDangerous: isDangerousCommand(resolvedCommand), stepNumber: currentStep + 1)
                 trace("planning", "step planned command='\(command)' waiting_for_confirmation=true")
                 
+                let yolo = UserDefaults.standard.bool(forKey: "YOLOEnabled")
                 await MainActor.run {
                     pendingCommand = resolvedCommand
+                    pendingCommandDisplay = resolvedCommand
                     pendingExplanation = explanation
-                    isWaitingForConfirmation = true
+                    isWaitingForConfirmation = !yolo
                     isPendingCommandDangerous = isDangerousCommand(resolvedCommand)
+                }
+                if yolo {
+                    Task { await self.confirmNextStep() }
                 }
                 
                 LoggingService.shared.info("📋 Planned step \(currentStep + 1): \(resolvedCommand)", source: "GPTTerminalService")
@@ -700,6 +711,7 @@ class GPTTerminalService: ObservableObject {
         await MainActor.run {
             isWaitingForConfirmation = false
             pendingCommand = nil
+            pendingCommandDisplay = nil
             pendingExplanation = nil
             isPendingCommandDangerous = false
         }
@@ -773,6 +785,7 @@ class GPTTerminalService: ObservableObject {
         await MainActor.run {
             isWaitingForConfirmation = false
             pendingCommand = nil
+            pendingCommandDisplay = nil
             pendingExplanation = nil
             isPendingCommandDangerous = false
             isMultiStepMode = false
@@ -786,6 +799,7 @@ class GPTTerminalService: ObservableObject {
             isMultiStepMode = false
             isWaitingForConfirmation = false
             pendingCommand = nil
+            pendingCommandDisplay = nil
             pendingExplanation = nil
             totalSteps = currentStep
         }
@@ -1072,9 +1086,11 @@ class GPTTerminalService: ObservableObject {
         
         // Avoid interactive pagers (less/more) that can block: force non-paging
         let nonPagingPrefix = "export PAGER=cat; export LESS='-F -X -R';"
-        // Add lightweight safety for heavy-output commands
+        // Add lightweight safety for heavy-output commands (no inline timeout here)
         let safeCmd = makeNonBlocking(command)
-        let wrappedCommand = "\(nonPagingPrefix) \(safeCmd)"
+        // Apply global timeout wrapper with fallback
+        let timeoutWrapped = wrapWithTimeoutIfAvailable(safeCmd)
+        let wrappedCommand = "\(nonPagingPrefix) \(timeoutWrapped)"
         trace("terminal", "wrapped_command='\(wrappedCommand)'")
         await MainActor.run {
             terminalService.sendCommand(wrappedCommand)
@@ -1622,15 +1638,11 @@ class GPTTerminalService: ObservableObject {
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // Heuristic wrapper to prevent UI lockups on massive outputs
+    // Heuristic wrapper to prevent UI lockups on massive outputs (no timeout here)
     private func makeNonBlocking(_ command: String) -> String {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
         var cmd = trimmed
-        // Add global timeout (5 minutes)
-        if !lower.hasPrefix("timeout ") {
-            cmd = "timeout 300s \(cmd)"
-        }
         // Cap output for known heavy listings
         let heavyPatterns = ["dpkg -l", "rpm -qa", "journalctl", "find ", "du -a", "ls -la /", "cat /var/log"]
         if heavyPatterns.contains(where: { lower.contains($0) }) && !lower.contains("| head") {
@@ -1639,14 +1651,28 @@ class GPTTerminalService: ObservableObject {
         return cmd
     }
 
-    // Build a heredoc script wrapper with safety flags and global timeout
+    // Build a heredoc script wrapper with safety flags (no inline timeout)
     private func buildHeredocScript(_ rawScript: String) -> String {
         // Do not normalize whitespace; run as-is inside bash with strict flags
         let heredoc = """
         bash -lc 'set -euo pipefail; cat > /tmp/_macssh_step.sh <<\"EOF\"
-        \(rawScript)\nEOF\nchmod +x /tmp/_macssh_step.sh; timeout 300s /tmp/_macssh_step.sh'
+        \(rawScript)\nEOF\nchmod +x /tmp/_macssh_step.sh; /tmp/_macssh_step.sh'
         """
         return heredoc
+    }
+
+    // Build a base64 script wrapper to avoid heredoc/quoting pitfalls
+    private func buildBase64Script(_ rawScript: String) -> String {
+        let scriptData = rawScript.data(using: .utf8) ?? Data()
+        let b64 = scriptData.base64EncodedString()
+        // Use double-quoted bash -lc to allow a single-quoted base64 payload safely
+        let inner = "set -euo pipefail; tmp=\\\"/tmp/_macssh_step.sh\\\"; echo '\(b64)' | base64 -d > \\\"$tmp\\\"; chmod +x \\\"$tmp\\\"; \\\"$tmp\\\""
+        return "bash -lc \"\(inner)\""
+    }
+
+    // Apply a global timeout if available to avoid hangs
+    private func wrapWithTimeoutIfAvailable(_ command: String, seconds: Int = 300) -> String {
+        return "if command -v timeout >/dev/null 2>&1; then timeout \(seconds)s \(command); else \(command); fi"
     }
     
     private func checkTaskCompletionWithGPT(originalTask: String, executionHistory: [ExecutionStep], responseContent: String) async -> Bool {
