@@ -20,6 +20,7 @@ struct ChatMessagesView: View {
     @ObservedObject var gptService: GPTTerminalService
     @State private var pendingScrollWork: DispatchWorkItem?
     private let scrollDebounceInterval: TimeInterval = 0.12
+    @State private var isUserDragging: Bool = false
     
     // Ключ последнего сообщения (учитывает изменение текста/вывода)
     private var lastMessageKey: String {
@@ -49,10 +50,31 @@ struct ChatMessagesView: View {
                 }
                 .padding(.horizontal)
             }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { _ in
+                        if !isUserDragging { isUserDragging = true }
+                    }
+                    .onEnded { _ in
+                        // Небольшая задержка, чтобы избежать гонки с обновлением контента
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            isUserDragging = false
+                        }
+                    }
+            )
             .onAppear { scrollToBottom(proxy: proxy) }
-            .onChange(of: gptService.chatMessages.count) { _, _ in debounceScroll(proxy: proxy) }
-            .onChange(of: gptService.isWaitingForConfirmation) { _, _ in debounceScroll(proxy: proxy) }
-            .onChange(of: lastMessageKey) { _, _ in debounceScroll(proxy: proxy) }
+            .onChange(of: gptService.chatMessages.count) { _, _ in
+                guard !isUserDragging else { return }
+                debounceScroll(proxy: proxy)
+            }
+            .onChange(of: gptService.isWaitingForConfirmation) { _, _ in
+                guard !isUserDragging else { return }
+                debounceScroll(proxy: proxy)
+            }
+            .onChange(of: lastMessageKey) { _, _ in
+                guard !isUserDragging else { return }
+                debounceScroll(proxy: proxy)
+            }
         }
     }
     
@@ -100,6 +122,7 @@ struct ChatInputView: View {
             // Action buttons
             HStack {
                 Button("Начать выполнение") {
+                    LoggingService.shared.uiInfo("Отправка задачи пользователем", source: "ChatInput")
                     startMultiStepExecution()
                 }
                 .buttonStyle(.borderedProminent)

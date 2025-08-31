@@ -340,7 +340,7 @@ struct LogToolbar: View {
             Spacer()
             
             // Log count indicator
-            Text("\(loggingService.logs.count) logs")
+            Text("\(loggingService.uiLogs.count) info logs")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -358,7 +358,7 @@ struct LogContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(loggingService.logs) { log in
+                    ForEach(loggingService.uiLogs) { log in
                         LogMessageView(log: log)
                             .id(log.id)
                     }
@@ -372,8 +372,8 @@ struct LogContent: View {
             )
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
-            .onChange(of: loggingService.logs.count) { _, newCount in
-                if let last = loggingService.logs.last {
+            .onChange(of: loggingService.uiLogs.count) { _, newCount in
+                if let last = loggingService.uiLogs.last {
                     withAnimation(.easeInOut(duration: 0.3)) { 
                         proxy.scrollTo(last.id, anchor: .bottom) 
                     }

@@ -76,7 +76,11 @@ class LoggingService: ObservableObject {
     static let shared = LoggingService()
     
     @Published var logs: [LogMessage] = []
+    // Minimal user-facing logs for in-app log panel (no debug spam)
+    @Published var uiLogs: [LogMessage] = []
     @Published var isEnabled: Bool = true
+    // Gate for developer logs (debug/info). In production can be disabled via Info.plist key 'DevLoggingEnabled'.
+    @Published var devLoggingEnabled: Bool
     
     // Minimum log level to record. In release builds we default to .info
     // to avoid high-frequency debug logging that can cause UI churn and
@@ -86,9 +90,16 @@ class LoggingService: ObservableObject {
     private init() {
         #if DEBUG
         self.minLevel = .debug
+        let defaultDev = true
         #else
         self.minLevel = .info
+        let defaultDev = false
         #endif
+        if let override = Bundle.main.object(forInfoDictionaryKey: "DevLoggingEnabled") as? Bool {
+            self.devLoggingEnabled = override
+        } else {
+            self.devLoggingEnabled = defaultDev
+        }
     }
     
     // Основные методы логирования
@@ -112,7 +123,11 @@ class LoggingService: ObservableObject {
         }
         guard allowed else { return }
         
-        // Выводим в системную консоль для отладки
+        // Дополнительный гейт: детальные dev-логи (debug) можно отключить
+        if level == .debug, !devLoggingEnabled {
+            return
+        }
+        // Выводим в системную консоль для отладки (только разрешенные по гейту)
         let consoleMessage = "[\(level.rawValue)] [\(source)] \(message)"
         print(consoleMessage)
         
@@ -128,6 +143,12 @@ class LoggingService: ObservableObject {
             // Ограничиваем количество логов для производительности
             if self.logs.count > 1000 {
                 self.logs.removeFirst(100)
+            }
+
+            // В UI показываем только информационные логи
+            if level == .info {
+                let simplified = self.simplifyForUI(logMessage)
+                self.appendToUILogsCoalesced(simplified)
             }
         }
     }
@@ -152,6 +173,27 @@ class LoggingService: ObservableObject {
     func error(_ message: String, source: String = "System") {
         log(message, level: .error, source: source)
     }
+
+    // MARK: - UI-focused minimal logging helpers
+    func ui(_ message: String, level: LogLevel = .info, source: String = "UI") {
+        // Only affect UI panel; still print to console for traceability
+        let consoleMessage = "[\(level.rawValue)] [\(source)] \(message)"
+        print(consoleMessage)
+        DispatchQueue.main.async {
+            let logMessage = LogMessage(
+                timestamp: Date(),
+                level: level,
+                source: source,
+                message: message
+            )
+            let simplified = self.simplifyForUI(logMessage)
+            self.appendToUILogsCoalesced(simplified)
+        }
+    }
+    func uiInfo(_ message: String, source: String = "UI") { ui(message, level: .info, source: source) }
+    func uiSuccess(_ message: String, source: String = "UI") { ui(message, level: .success, source: source) }
+    func uiWarning(_ message: String, source: String = "UI") { ui(message, level: .warning, source: source) }
+    func uiError(_ message: String, source: String = "UI") { ui(message, level: .error, source: source) }
     
     // Очистка логов
     func clear() {
@@ -246,6 +288,57 @@ class LoggingService: ObservableObject {
         return importantLogs.map { log in
             "[\(log.formattedTimestamp)] \(log.level.icon) \(log.message)"
         }.joined(separator: "\n")
+    }
+
+    // MARK: - UI simplification & coalescing
+    private func simplifyForUI(_ log: LogMessage) -> LogMessage {
+        // Remove technical noise and clamp long messages
+        let raw = log.displayMessage
+        let maxLen = 180
+        var text = raw
+            .replacingOccurrences(of: "[TRACE", with: "")
+            .replacingOccurrences(of: "]", with: "]")
+            .replacingOccurrences(of: "BEGIN", with: "")
+            .replacingOccurrences(of: "END", with: "")
+            .replacingOccurrences(of: "attempt=", with: "")
+            .replacingOccurrences(of: "status=200", with: "")
+            .replacingOccurrences(of: "duration_s=", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.count > maxLen {
+            let endIndex = text.index(text.startIndex, offsetBy: maxLen)
+            text = String(text[..<endIndex]) + "…"
+        }
+        return LogMessage(timestamp: log.timestamp, level: compressLevel(log.level), source: compressSource(log.source), message: text)
+    }
+    private func compressLevel(_ level: LogLevel) -> LogLevel {
+        // Map debug->info for UI
+        if level == .debug { return .info }
+        return level
+    }
+    private func compressSource(_ source: String) -> String {
+        // Shorten common sources
+        switch source.lowercased() {
+        case "gptterminalservice": return "GPT"
+        case "swifttermservice": return "SSH"
+        case "loggingservice": return "LOG"
+        default: return source
+        }
+    }
+    private func appendToUILogsCoalesced(_ log: LogMessage) {
+        // Merge with previous if same level+source+message within 1.5s
+        if let last = uiLogs.last {
+            let sameText = last.message == log.message && last.level == log.level && last.source == log.source
+            let interval = log.timestamp.timeIntervalSince(last.timestamp)
+            if sameText && interval <= 1.5 {
+                // Replace timestamp to latest, drop duplicates
+                uiLogs[uiLogs.count - 1] = LogMessage(timestamp: log.timestamp, level: log.level, source: log.source, message: log.message)
+            } else {
+                uiLogs.append(log)
+            }
+        } else {
+            uiLogs.append(log)
+        }
+        if uiLogs.count > 200 { uiLogs.removeFirst(40) }
     }
     
     // Метод для получения краткого резюме логов

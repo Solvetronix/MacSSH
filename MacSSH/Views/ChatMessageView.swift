@@ -39,11 +39,33 @@ struct ChatMessageView: View {
                 
                 // Main content
                 VStack(alignment: .leading, spacing: 8) {
-                    GPTMarkdownView(normalizeOutput(message.content))
-                        .textSelection(.enabled)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if message.content.count > 600 {
+                        // Collapsed long content with Show more
+                        VStack(alignment: .leading, spacing: 6) {
+                            if isExpanded {
+                                GPTMarkdownView(normalizeOutput(message.content))
+                                    .textSelection(.enabled)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } else {
+                                let preview = String(message.content.prefix(600)) + "…"
+                                GPTMarkdownView(normalizeOutput(preview))
+                                    .textSelection(.enabled)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Button(isExpanded ? "Скрыть" : "Показать полностью") {
+                                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        }
+                    } else {
+                        GPTMarkdownView(normalizeOutput(message.content))
+                            .textSelection(.enabled)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     
                     // Command section (if exists)
                     if let command = message.command {
@@ -113,29 +135,27 @@ struct ChatMessageView: View {
                             }
                             
                             if isExpanded {
-                                ScrollView {
-                                    Text(normalizeOutput(output))
-                                        .font(.system(.caption, design: .monospaced))
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color.purple.opacity(0.1))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                                                )
-                                        )
-                                        .foregroundColor(.purple)
-                                        .textSelection(.enabled)
-                                        .multilineTextAlignment(.leading)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxHeight: 300)
+                                // Show full output without nested ScrollView to avoid scroll conflicts
+                                Text(normalizeOutput(output))
+                                    .font(.system(.caption, design: .monospaced))
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.purple.opacity(0.1))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                                            )
+                                    )
+                                    .foregroundColor(.purple)
+                                    .textSelection(.enabled)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                             } else {
-                                let full = normalizeOutput(output)
-                                let previewText = full.prefix(100)
-                                let hasMore = full.count > 100
-                                let displayText = hasMore ? String(previewText) + "..." : String(previewText)
+                                // Optimize: take preview slice before normalization to reduce cost
+                                let rawPreview = output.prefix(120)
+                                let fullPreview = String(rawPreview)
+                                let displayText = normalizeOutput(fullPreview) + (output.count > rawPreview.count ? "..." : "")
                                 
                                 Text(displayText)
                                     .font(.system(.caption, design: .monospaced))

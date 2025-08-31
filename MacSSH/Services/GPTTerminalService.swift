@@ -299,80 +299,38 @@ class GPTTerminalService: ObservableObject {
     
     // MARK: - Multi-step execution
     func startMultiStepExecution(task: String) async {
+        // UI-facing minimal log for user action
+        LoggingService.shared.uiInfo("Задача отправлена: \(task)", source: "GPTTerminalService")
         LoggingService.shared.info("🚀 Starting multi-step execution: '\(task)'", source: "GPTTerminalService")
         
         await MainActor.run {
-            isMultiStepMode = true
-            currentStep = 0
-            totalSteps = 0
-            currentTask = task
-            executionHistory.removeAll()
-            conversationHistory.removeAll()
-            showingTaskInput = false
-            taskInput = ""
-            
-            // Keep chat history across tasks; reset only internal collector
-            infoCollector = UniversalInfoCollector()
-            addUserMessage(task)
-            addAssistantMessage("Я начну выполнение задачи: \(task)")
+            // Persist the objective before any resets
+            self.currentTask = task.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.isMultiStepMode = true
+            self.currentStep = 0
+            self.pendingCommand = nil
+            self.isPendingCommandDangerous = false
+            self.executionHistory.removeAll()
+            self.chatMessages.removeAll()
         }
         
-        // Initialize conversation with task
-        // Reload summaries for current host (profile may be available only now)
-        loadLastSummaries()
-        var planningContextIntro = ""
-        if !lastTaskSummaries.isEmpty {
-            let clipped = lastTaskSummaries.suffix(3).map { sanitizeForGPT($0, maxChars: 600) }
-            let joined = clipped.enumerated().map { "\($0.offset+1). \($0.element)" }.joined(separator: "\n\n")
-            planningContextIntro = "Previous task summaries (up to 3, newest last; use only if relevant, do not repeat):\n\n" + joined + "\n\n"
-        }
-        let systemMessage = Message(
-            role: "system",
-            content: """
-            You are an advanced AI terminal assistant with deep expertise in Unix/Linux systems, shell scripting, and system administration. You can execute multi-step tasks intelligently.
-            
-            Guidelines:
-            - Break down complex tasks into logical, efficient steps
-            - Use the execute_terminal_command tool for each step
-            - Provide clear, detailed explanations for each command
-            - Analyze terminal output critically to understand what happened
-            - Use the terminal output to make intelligent decisions about next steps
-            - If a command fails, analyze the error and try smarter alternative approaches
-            - For navigation tasks: execute the final navigation command (like cd www) and then say "TASK COMPLETE"
-            - For file operations: verify the file/directory exists, check permissions, and ensure safety
-            - For system operations: consider security implications and use best practices
-            - Use **bold text** for important information and `code` for commands
-            - Maximum \(maxSteps) steps allowed for safety
-            
-            Current task: \(task)
-            
-            IMPORTANT: 
-            - After each command execution, you will receive the terminal output
-            - Use this output to understand what happened and plan your next step accordingly
-            - For navigation tasks: execute the actual navigation command (cd, etc.) and then say "TASK COMPLETE"
-            - If a step fails, analyze the error message and try alternative approaches
-            - Be proactive - if you see potential issues, address them before they become problems
-            - Use your knowledge of Unix/Linux systems to make intelligent decisions
-            - Don't just plan navigation - actually execute the cd command when you know the target directory exists
-            - Say "TASK COMPLETE" only after successfully executing the final command based on actual terminal output
-            - Do NOT say "TASK COMPLETE" during initial planning (before any command is executed)
-            - For information gathering tasks, say "TASK COMPLETE" after collecting comprehensive information
-            - Use **bold text** for emphasis and `code` formatting for commands and paths
-            - IMPORTANT: After 3-5 steps of information gathering, provide a summary and say "TASK COMPLETE"
-            
-            \(planningContextIntro)
-            """
-        )
-        
-        conversationHistory = [systemMessage]
-        
-        // Start the first step
+        addUserMessage(task)
         await planNextStep()
     }
     
     func planNextStep() async {
         // Stop immediately if multi-step mode was turned off
         guard isMultiStepMode else { return }
+        // Ensure task objective is present
+        let objective = currentTask.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !objective.isEmpty else {
+            await MainActor.run {
+                isMultiStepMode = false
+            }
+            LoggingService.shared.uiWarning("Цель задачи пуста. Уточните текст задачи и запустите снова.", source: "GPTTerminalService")
+            addChatMessage(ChatMessage(type: .system, content: "⚠️ Цель задачи не задана. Введите задачу и повторите запуск."))
+            return
+        }
         guard currentStep < maxSteps else {
             await MainActor.run {
                 isMultiStepMode = false
@@ -792,8 +750,8 @@ class GPTTerminalService: ObservableObject {
             trace("openai", "attempt=\(attempt+1) acquire throttle")
             LoggingService.shared.info("🔁 OpenAI attempt \(attempt + 1)/\(openAIMaxRetries + 1)", source: "GPTTerminalService")
             // Throttle and serialize calls
-            await openAIThrottle.acquire()
-            trace("openai", "attempt=\(attempt+1) acquired throttle")
+            let acquired = await openAIThrottle.acquire()
+            trace("openai", "attempt=\(attempt+1) acquired throttle=\(acquired)")
             
             // Small jitter before each call to avoid bursts
             let jitterMs = Int.random(in: 120...360)
@@ -843,7 +801,7 @@ class GPTTerminalService: ObservableObject {
                     let dt = String(format: "%.3f", Date().timeIntervalSince(t0))
                     trace("openai", "attempt=\(attempt+1) status=200 bytes=\(data.count) duration_s=\(dt)")
                     // Release throttle immediately on success
-                    await openAIThrottle.release()
+                    if acquired { await openAIThrottle.release() }
                     return openAIResponse
                 } else {
                     let errorData = String(data: data, encoding: .utf8) ?? "Unknown error"
@@ -879,7 +837,7 @@ class GPTTerminalService: ObservableObject {
             }
             
             // Release throttle before sleeping/backoff to avoid blocking further attempts
-            await openAIThrottle.release()
+            if acquired { await openAIThrottle.release() }
 
             // Backoff before next attempt if any
             if attempt < openAIMaxRetries {
@@ -1661,6 +1619,7 @@ final class OpenAIThrottle {
     private var lastCallTime: Date = .distantPast
     private let semaphore: DispatchSemaphore
     private let queue = DispatchQueue(label: "macssh.openai.throttle")
+    private let acquireTimeout: TimeInterval = 8.0
     
     init(minIntervalSeconds: TimeInterval, maxConcurrent: Int) {
         self.minInterval = minIntervalSeconds
@@ -1668,11 +1627,18 @@ final class OpenAIThrottle {
         self.semaphore = DispatchSemaphore(value: maxConcurrent)
     }
     
-    func acquire() async {
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+    func acquire() async -> Bool {
+        await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             queue.async {
                 // Limit concurrency
-                self.semaphore.wait()
+                let deadline = DispatchTime.now() + self.acquireTimeout
+                let waited = self.semaphore.wait(timeout: deadline)
+                if waited == .timedOut {
+                    // Failed to acquire within timeout
+                    LoggingService.shared.warning("[Throttle] acquire timed out after \(self.acquireTimeout)s", source: "GPTTerminalService")
+                    cont.resume(returning: false)
+                    return
+                }
                 
                 // Enforce minimal interval
                 let now = Date()
@@ -1682,7 +1648,7 @@ final class OpenAIThrottle {
                     Thread.sleep(forTimeInterval: waitSeconds)
                 }
                 self.lastCallTime = Date()
-                cont.resume()
+                cont.resume(returning: true)
             }
         }
     }
