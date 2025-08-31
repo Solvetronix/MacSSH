@@ -169,6 +169,15 @@ class GPTTerminalService: ObservableObject {
     private let terminalService: SwiftTermProfessionalService
     private var conversationHistory: [Message] = []
     private let maxSteps = 10 // Safety limit
+    // Toggle to disable secondary OpenAI calls for completion checks to avoid UI stalls
+    private let enableGptCompletionCheck = false
+    // Trace session identifier for deep diagnostics across the whole workflow
+    private var sessionTraceId: String = UUID().uuidString
+
+    // Lightweight trace helper to unify verbose diagnostics
+    private func trace(_ scope: String, _ message: String) {
+        LoggingService.shared.debug("[TRACE \(sessionTraceId):\(scope)] \(message)", source: "GPTTerminalService")
+    }
     
     // OpenAI rate limiting
     private let openAIThrottle = OpenAIThrottle(minIntervalSeconds: 2.0, maxConcurrent: 1)
@@ -373,6 +382,7 @@ class GPTTerminalService: ObservableObject {
         }
         
         LoggingService.shared.info("🧠 Planning step \(currentStep + 1)", source: "GPTTerminalService")
+        trace("planning", "BEGIN step=\(currentStep + 1) history_count=\(executionHistory.count)")
         
         // Create request for next step planning
         let planningRequest = Message(
@@ -453,18 +463,21 @@ class GPTTerminalService: ObservableObject {
                 tool_choice: "none"
             )
             
+            trace("planning", "OpenAI request prepared, sending…")
             let response = try await callOpenAI(openAIRequest)
+            trace("planning", "OpenAI response received")
             
             // Extract the planned command from GPT's response
             let responseContent = response.choices.first?.message.content ?? ""
             
             // Parse command from GPT's response (look for code blocks or quoted commands)
             let command = extractCommandFromResponse(responseContent)
+            trace("planning", "parsed_command='\(command)' contains_task_complete=\(responseContent.lowercased().contains("task complete"))")
             let explanation = responseContent
             
             // Use GPT to determine if task is complete (only if we have execution history and at least 1 step)
-            // Reduce completion checks to every 2 steps to save tokens
-            let shouldCheckCompletion = executionHistory.count >= 1 && (currentStep % 2 == 1)
+            // Disabled by default to prevent potential UI stalls due to nested OpenAI calls
+            let shouldCheckCompletion = enableGptCompletionCheck && executionHistory.count >= 1 && (currentStep % 2 == 1)
             let gptCompletionCheck = shouldCheckCompletion ? await checkTaskCompletionWithGPT(
                 originalTask: currentTask,
                 executionHistory: executionHistory,
@@ -483,6 +496,7 @@ class GPTTerminalService: ObservableObject {
                     isMultiStepMode = false
                     totalSteps = currentStep
                 }
+                trace("planning", "TASK COMPLETE per GPT/phrase or max steps; step=\(currentStep)")
                 
                 // Add summary message to chat
                 let summary = await createTaskSummary()
@@ -506,6 +520,7 @@ class GPTTerminalService: ObservableObject {
                 
                 // Add assistant message to chat with command included (merged message)
                 addAssistantMessage(explanation, command: command, isDangerous: isDangerousCommand(command), stepNumber: currentStep + 1)
+                trace("planning", "step planned command='\(command)' waiting_for_confirmation=true")
                 
                 await MainActor.run {
                     pendingCommand = command
@@ -555,12 +570,14 @@ class GPTTerminalService: ObservableObject {
                 } else {
                     // Continue with next step
                     LoggingService.shared.info("🔄 GPT didn't indicate task completion. Planning next step...", source: "GPTTerminalService")
+                    trace("planning", "no command & not complete; recursing planNextStep")
                     await planNextStep()
                     return
                 }
             }
             
         } catch {
+            trace("planning", "error=\(error.localizedDescription)")
             let errText = error.localizedDescription.lowercased()
             if errText.contains("429") || errText.contains("rate limit") {
                 LoggingService.shared.error("❌ OpenAI rate limit: \(error.localizedDescription)", source: "GPTTerminalService")
@@ -749,6 +766,8 @@ class GPTTerminalService: ObservableObject {
     
     // MARK: - OpenAI API call
     func callOpenAI(_ request: OpenAIRequest) async throws -> OpenAIResponse {
+        let callId = UUID().uuidString
+        trace("openai", "BEGIN call id=\(callId)")
         LoggingService.shared.info("🌐 OpenAI API call", source: "GPTTerminalService")
         // Show global busy indicator for any OpenAI call
         await MainActor.run { self.isProcessing = true }
@@ -769,15 +788,19 @@ class GPTTerminalService: ObservableObject {
 
         var lastError: Error?
         for attempt in 0...openAIMaxRetries {
+            // Attempt log for better observability
+            trace("openai", "attempt=\(attempt+1) acquire throttle")
+            LoggingService.shared.info("🔁 OpenAI attempt \(attempt + 1)/\(openAIMaxRetries + 1)", source: "GPTTerminalService")
             // Throttle and serialize calls
             await openAIThrottle.acquire()
-            defer { Task { await openAIThrottle.release() } }
+            trace("openai", "attempt=\(attempt+1) acquired throttle")
             
             // Small jitter before each call to avoid bursts
             let jitterMs = Int.random(in: 120...360)
             try? await Task.sleep(nanoseconds: UInt64(jitterMs) * 1_000_000)
             
             do {
+                let t0 = Date()
                 var urlRequest = URLRequest(url: url)
                 urlRequest.httpMethod = "POST"
                 urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -788,12 +811,14 @@ class GPTTerminalService: ObservableObject {
                 let encoder = JSONEncoder()
                 let requestData = try encoder.encode(request)
                 urlRequest.httpBody = requestData
+                trace("openai", "attempt=\(attempt+1) request bytes=\(requestData.count)")
                 // Estimate request tokens and wait if TPM budget is low
                 let estimatedRequestTokens = TokenRateLimiter.estimateTokens(fromBytes: requestData.count)
                 await tokenLimiter.acquire(tokens: estimatedRequestTokens)
                 
                 // Guard with Task timeout as well (hard limit ~20s)
                 let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group -> (Data, URLResponse) in
+                    trace("openai", "attempt=\(attempt+1) sending via URLSession")
                     group.addTask {
                         return try await URLSession.shared.data(for: urlRequest)
                     }
@@ -815,10 +840,15 @@ class GPTTerminalService: ObservableObject {
                     // Account for response tokens best-effort
                     let responseTokens = TokenRateLimiter.estimateTokens(fromBytes: data.count)
                     tokenLimiter.record(tokens: estimatedRequestTokens + responseTokens)
+                    let dt = String(format: "%.3f", Date().timeIntervalSince(t0))
+                    trace("openai", "attempt=\(attempt+1) status=200 bytes=\(data.count) duration_s=\(dt)")
+                    // Release throttle immediately on success
+                    await openAIThrottle.release()
                     return openAIResponse
                 } else {
                     let errorData = String(data: data, encoding: .utf8) ?? "Unknown error"
                     LoggingService.shared.error("❌ OpenAI API error: HTTP \(httpResponse.statusCode) - \(errorData)", source: "GPTTerminalService")
+                    trace("openai", "attempt=\(attempt+1) status=\(httpResponse.statusCode) bytes=\(data.count)")
                     
                     if httpResponse.statusCode == 429 {
                         // Quota vs. rate limit
@@ -845,18 +875,24 @@ class GPTTerminalService: ObservableObject {
                 // Network/timeouts: retry
                 lastError = error
                 LoggingService.shared.warning("⏳ OpenAI call failed (attempt #\(attempt + 1)): \(error.localizedDescription)", source: "GPTTerminalService")
+                trace("openai", "attempt=\(attempt+1) error=\(error.localizedDescription)")
             }
             
+            // Release throttle before sleeping/backoff to avoid blocking further attempts
+            await openAIThrottle.release()
+
             // Backoff before next attempt if any
             if attempt < openAIMaxRetries {
                 let base = openAIBaseBackoff * pow(2.0, Double(attempt))
                 let jitter = Double(Int.random(in: 200...900)) / 1000.0
                 let delay = min(openAIMaxBackoff, base + jitter)
                 LoggingService.shared.warning("⏳ Backing off \(String(format: "%.1f", delay))s before retry (attempt #\(attempt + 1))", source: "GPTTerminalService")
+                trace("openai", "attempt=\(attempt+1) backing_off_s=\(String(format: "%.3f", delay))")
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
         await MainActor.run { self.isWaitingOpenAIShown = false }
+        trace("openai", "END call id=\(callId) error=\(lastError?.localizedDescription ?? "unknown")")
         throw lastError ?? GPTError.apiError("Unknown error")
     }
     
@@ -930,12 +966,14 @@ class GPTTerminalService: ObservableObject {
         }
         
         LoggingService.shared.info("📝 Parsed command: '\(command)'", source: "GPTTerminalService")
+        trace("terminal", "BEGIN execute command='\(command)'")
         
         // Execute command through existing terminal service
         LoggingService.shared.info("🚀 Sending command to terminal: '\(command)'", source: "GPTTerminalService")
         
         // Save current output state before executing command
         outputBeforeCommand = await terminalService.getCurrentOutput() ?? ""
+        trace("terminal", "output_before_len=\(outputBeforeCommand.count)")
         
         // Wait a moment for terminal to stabilize
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -945,21 +983,25 @@ class GPTTerminalService: ObservableObject {
         // Add lightweight safety for heavy-output commands
         let safeCmd = makeNonBlocking(command)
         let wrappedCommand = "\(nonPagingPrefix) \(safeCmd)"
+        trace("terminal", "wrapped_command='\(wrappedCommand)'")
         await MainActor.run {
             terminalService.sendCommand(wrappedCommand)
         }
         
         // Ожидаем строго по событию промпта
         let actualOutput = await waitForCommandCompletion(command: command)
+        trace("terminal", "waitForCommandCompletion returned len=\(actualOutput.count)")
         
         // Финальная проверка
         let finalCheck = await terminalService.getCurrentOutput() ?? ""
         let finalNewOutput = String(finalCheck.dropFirst(outputBeforeCommand.count))
+        trace("terminal", "final_check_len=\(finalCheck.count) final_new_len=\(finalNewOutput.count)")
         
         let verifiedOutput = finalNewOutput.isEmpty ? actualOutput : actualOutput
         
         LoggingService.shared.success("✅ GPT executed command successfully: '\(command)'", source: "GPTTerminalService")
         LoggingService.shared.info("📋 Final verified command output: '\(verifiedOutput)'", source: "GPTTerminalService")
+        trace("terminal", "END execute command='\(command)' verified_len=\(verifiedOutput.count)")
         
         return verifiedOutput
     }
@@ -1081,15 +1123,21 @@ class GPTTerminalService: ObservableObject {
         }
         
         func bufferChanged() {
+            // Trace each buffer change event
+            // We don't have outer trace helper here; log directly
+            LoggingService.shared.debug("[TRACE prompt] bufferChanged", source: "GPTTerminalService")
             checkNow()
         }
         
         func checkNow() {
             Task { @MainActor in
+                LoggingService.shared.debug("[TRACE prompt] checkNow invoked", source: "GPTTerminalService")
                 let full = await terminalService?.getCurrentOutput() ?? ""
+                LoggingService.shared.debug("[TRACE prompt] full_len=\(full.count) initial_offset=\(initialOutputLength)", source: "GPTTerminalService")
                 // Work only with the suffix produced after command start
                 let start = full.index(full.startIndex, offsetBy: max(0, initialOutputLength))
                 let suffix = String(full[start...])
+                LoggingService.shared.debug("[TRACE prompt] suffix_len=\(suffix.count)", source: "GPTTerminalService")
                 guard let tailInSuffix = promptTailRange(in: suffix) else { return }
                 var shouldResume = false
                 resumeQueue.sync { if !didResume { didResume = true; shouldResume = true } }
@@ -1099,6 +1147,7 @@ class GPTTerminalService: ObservableObject {
                 // Safe content range [start ..< tailLower]
                 let contentRange: Range<String.Index> = start <= tailLower ? start..<tailLower : start..<start
                 let result = String(full[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                LoggingService.shared.debug("[TRACE prompt] matched_prompt tail_lower_offset computed; result_len=\(result.count)", source: "GPTTerminalService")
                 onComplete(result.isEmpty ? "Command executed successfully" : result)
             }
         }
