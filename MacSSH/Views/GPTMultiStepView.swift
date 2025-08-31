@@ -100,7 +100,7 @@ struct GPTMultiStepView: View {
                                     .cornerRadius(8)
                             }
                             
-                            if let command = (gptService.pendingCommandDisplay ?? gptService.pendingCommand) {
+                            if let command = gptService.pendingCommand {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Command to execute:")
                                         .font(.subheadline)

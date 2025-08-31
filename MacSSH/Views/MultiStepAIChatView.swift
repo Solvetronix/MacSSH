@@ -179,7 +179,7 @@ struct PendingCommandView: View {
                 Spacer()
             }
             
-            if let command = (gptService.pendingCommandDisplay ?? gptService.pendingCommand) {
+            if let command = gptService.pendingCommand {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Команда:")
                         .font(.subheadline)
