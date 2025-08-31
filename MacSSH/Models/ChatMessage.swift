@@ -19,8 +19,10 @@ struct ChatMessage: Identifiable, Codable {
     let output: String?
     let isDangerous: Bool
     let stepNumber: Int?
+    // User can pin result to include in the next GPT planning prompt
+    var includeInNextPrompt: Bool
     
-    init(type: ChatMessageType, content: String, command: String? = nil, output: String? = nil, isDangerous: Bool = false, stepNumber: Int? = nil) {
+    init(type: ChatMessageType, content: String, command: String? = nil, output: String? = nil, isDangerous: Bool = false, stepNumber: Int? = nil, includeInNextPrompt: Bool = false) {
         self.id = UUID()
         self.type = type
         self.content = content
@@ -29,6 +31,20 @@ struct ChatMessage: Identifiable, Codable {
         self.output = output
         self.isDangerous = isDangerous
         self.stepNumber = stepNumber
+        self.includeInNextPrompt = includeInNextPrompt
+    }
+
+    // Secondary initializer to allow preserving id/timestamp when updating content
+    init(id: UUID, type: ChatMessageType, content: String, timestamp: Date, command: String? = nil, output: String? = nil, isDangerous: Bool = false, stepNumber: Int? = nil, includeInNextPrompt: Bool = false) {
+        self.id = id
+        self.type = type
+        self.content = content
+        self.timestamp = timestamp
+        self.command = command
+        self.output = output
+        self.isDangerous = isDangerous
+        self.stepNumber = stepNumber
+        self.includeInNextPrompt = includeInNextPrompt
     }
     
     var formattedTime: String {

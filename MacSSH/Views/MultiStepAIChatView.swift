@@ -35,7 +35,9 @@ struct ChatMessagesView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(gptService.chatMessages) { message in
-                        ChatMessageView(message: message)
+                        ChatMessageView(message: message, onToggleInclude: { id, newVal in
+                            gptService.toggleIncludeMessageInNextPrompt(id: id, include: newVal)
+                        })
                             .id(message.id)
                     }
                     

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ChatMessageView: View {
     let message: ChatMessage
+    // Callback to toggle inclusion of this message into next prompt context
+    var onToggleInclude: ((UUID, Bool) -> Void)? = nil
     @State private var isExpanded = false
     
     var body: some View {
@@ -67,6 +69,19 @@ struct ChatMessageView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     
+                    // Show pin only for final summary messages (even without output)
+                    if let onToggleInclude, message.type == .summary {
+                        Toggle(isOn: Binding(
+                            get: { message.includeInNextPrompt },
+                            set: { newVal in onToggleInclude(message.id, newVal) }
+                        )) {
+                            Text("В контекст следующего шага")
+                        }
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    
                     // Command section (if exists)
                     if let command = message.command {
                         VStack(alignment: .leading, spacing: 4) {
@@ -93,6 +108,19 @@ struct ChatMessageView: View {
                                         .padding(.vertical, 2)
                                         .background(Color.blue.opacity(0.1))
                                         .cornerRadius(4)
+                                }
+                                
+                                // Do not show pin for command messages anymore (context only from summary)
+                                if false, let onToggleInclude, message.output == nil {
+                                    Toggle(isOn: Binding(
+                                        get: { message.includeInNextPrompt },
+                                        set: { newVal in onToggleInclude(message.id, newVal) }
+                                    )) {
+                                        Text("В контекст следующего шага")
+                                    }
+                                    .toggleStyle(.checkbox)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                                 }
                             }
                             
@@ -124,6 +152,18 @@ struct ChatMessageView: View {
                                     .foregroundColor(.secondary)
                                 
                                 Spacer()
+                                // Show pin only for final summary messages
+                                if let onToggleInclude, message.type == .summary {
+                                    Toggle(isOn: Binding(
+                                        get: { message.includeInNextPrompt },
+                                        set: { newVal in onToggleInclude(message.id, newVal) }
+                                    )) {
+                                        Text("В контекст следующего шага")
+                                    }
+                                    .toggleStyle(.checkbox)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                }
                                 
                                 Button(isExpanded ? "Hide" : "Show") {
                                     withAnimation(.easeInOut(duration: 0.2)) {

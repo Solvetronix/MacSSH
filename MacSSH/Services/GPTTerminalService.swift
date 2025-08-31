@@ -178,6 +178,93 @@ class GPTTerminalService: ObservableObject {
     private func trace(_ scope: String, _ message: String) {
         LoggingService.shared.debug("[TRACE \(sessionTraceId):\(scope)] \(message)", source: "GPTTerminalService")
     }
+
+    // MARK: - Placeholder resolution from previous outputs
+    private func resolvePlaceholders(in text: String) -> String {
+        var result = text
+        // Replace <PID> with PID parsed from last execution output
+        if result.contains("<PID>") {
+            if let lastOutput = executionHistory.last?.output {
+                let lines = lastOutput.components(separatedBy: .newlines)
+                if let dataLine = lines.first(where: { line in
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.isEmpty { return false }
+                    if trimmed.lowercased().hasPrefix("pid ") { return false }
+                    return trimmed.range(of: "^\\d+\\b", options: .regularExpression) != nil
+                }) {
+                    if let range = dataLine.range(of: "^\\s*(\\d+)", options: .regularExpression) {
+                        let pidRaw = String(dataLine[range])
+                        let pidDigits = pidRaw.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                        if !pidDigits.isEmpty {
+                            result = result.replacingOccurrences(of: "<PID>", with: pidDigits)
+                        }
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    // MARK: - Terminal wait countdown (UI feedback)
+    private var terminalWaitCountdownTask: Task<Void, Never>?
+    private var terminalWaitMessageId: UUID?
+
+    @MainActor
+    private func startTerminalWaitCountdown(totalSeconds: Int) {
+        // Create or replace a single countdown system message
+        let msg = ChatMessage(type: .system, content: formattedCountdownMessage(secondsLeft: totalSeconds))
+        self.chatMessages.append(msg)
+        self.terminalWaitMessageId = msg.id
+
+        // Cancel previous task if any
+        terminalWaitCountdownTask?.cancel()
+        terminalWaitCountdownTask = Task { [weak self] in
+            var secondsLeft = totalSeconds
+            while !Task.isCancelled, secondsLeft >= 0 {
+                await MainActor.run {
+                    guard let self = self, let id = self.terminalWaitMessageId,
+                          let idx = self.chatMessages.firstIndex(where: { $0.id == id }) else { return }
+                    let current = self.chatMessages[idx]
+                    let updated = ChatMessage(
+                        id: current.id,
+                        type: .system,
+                        content: self.formattedCountdownMessage(secondsLeft: secondsLeft),
+                        timestamp: current.timestamp
+                    )
+                    self.chatMessages[idx] = updated
+                    self.terminalWaitMessageId = updated.id
+                }
+                if secondsLeft == 0 { break }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                secondsLeft -= 1
+            }
+        }
+    }
+
+    @MainActor
+    private func stopTerminalWaitCountdown(finalText: String? = nil) {
+        terminalWaitCountdownTask?.cancel()
+        terminalWaitCountdownTask = nil
+        if let id = terminalWaitMessageId, let idx = chatMessages.firstIndex(where: { $0.id == id }) {
+            if let final = finalText {
+                let current = chatMessages[idx]
+                let updated = ChatMessage(id: current.id, type: .system, content: final, timestamp: current.timestamp)
+                chatMessages[idx] = updated
+                terminalWaitMessageId = updated.id
+            } else {
+                terminalWaitMessageId = nil
+            }
+        }
+        terminalWaitMessageId = nil
+    }
+
+    private func formattedCountdownMessage(secondsLeft: Int) -> String {
+        let m = secondsLeft / 60
+        let s = secondsLeft % 60
+        let mm = String(format: "%02d", m)
+        let ss = String(format: "%02d", s)
+        return "⏳ Ожидаю ответ терминала… \(mm):\(ss)"
+    }
     
     // OpenAI rate limiting
     private let openAIThrottle = OpenAIThrottle(minIntervalSeconds: 2.0, maxConcurrent: 1)
@@ -311,7 +398,6 @@ class GPTTerminalService: ObservableObject {
             self.pendingCommand = nil
             self.isPendingCommandDangerous = false
             self.executionHistory.removeAll()
-            self.chatMessages.removeAll()
         }
         
         addUserMessage(task)
@@ -363,6 +449,17 @@ class GPTTerminalService: ObservableObject {
                 - Output preview: \(String(step.output.prefix(200)))\(step.output.count > 200 ? "..." : "")
                 """
             }.joined(separator: "\n\n"))
+
+            // User pinned results to include in context for the next step (only final summary)
+            PINNED RESULTS:
+            \(chatMessages.filter { $0.includeInNextPrompt && $0.type == .summary }.map { m in
+                let out = m.output ?? m.content
+                return """
+                - From step: \(m.stepNumber ?? -1)
+                - Kind: summary
+                - Preview: \(String(out.prefix(800)))\(out.count > 800 ? "..." : "")
+                """
+            }.joined(separator: "\n"))
             
             ANALYSIS INSTRUCTIONS:
             Based on the terminal output from previous steps, what is the next command to execute? 
@@ -416,6 +513,7 @@ class GPTTerminalService: ObservableObject {
             let clippedPlanning = sanitizeForGPT(planningRequest.content, maxChars: 6000)
             let openAIRequest = OpenAIRequest(
                 model: "gpt-4o",
+                // Replace just-appended un-clipped planning request with clipped version, keep prior history
                 messages: conversationHistory.dropLast() + [Message(role: "user", content: clippedPlanning)],
                 tools: [], // Remove tools to prevent GPT from executing commands
                 tool_choice: "none"
@@ -425,12 +523,11 @@ class GPTTerminalService: ObservableObject {
             let response = try await callOpenAI(openAIRequest)
             trace("planning", "OpenAI response received")
             
-            // Extract the planned command from GPT's response
+            // Extract the planned command/script from GPT's response
             let responseContent = response.choices.first?.message.content ?? ""
-            
-            // Parse command from GPT's response (look for code blocks or quoted commands)
-            let command = extractCommandFromResponse(responseContent)
-            trace("planning", "parsed_command='\(command)' contains_task_complete=\(responseContent.lowercased().contains("task complete"))")
+            let scriptRaw = extractScriptFromResponse(responseContent)
+            let command = scriptRaw == nil ? extractCommandFromResponse(responseContent) : ""
+            trace("planning", "parsed_script_len=\(scriptRaw?.count ?? 0) parsed_command='\(command)' contains_task_complete=\(responseContent.lowercased().contains("task complete"))")
             let explanation = responseContent
             
             // Use GPT to determine if task is complete (only if we have execution history and at least 1 step)
@@ -462,6 +559,39 @@ class GPTTerminalService: ObservableObject {
                 
                 LoggingService.shared.success("✅ Task completed in \(currentStep) steps", source: "GPTTerminalService")
                 return
+            } else if let script = scriptRaw, !script.isEmpty {
+                // Resolve placeholders from previous outputs before wrapping
+                let resolvedScript = resolvePlaceholders(in: script)
+                // Build heredoc-wrapped command for execution
+                let heredocCmd = buildHeredocScript(resolvedScript)
+                let displayFirstLine = resolvedScript.split(separator: "\n").first.map { String($0) } ?? "<script>"
+                let isDanger = isDangerousCommand(script)
+
+                // Check if this script was already executed recently (by display line)
+                let recentCommands = executionHistory.suffix(2).map { $0.command }
+                if recentCommands.contains(displayFirstLine) {
+                    LoggingService.shared.warning("⚠️ Script (first line) was already executed recently. Concluding task to avoid loop.", source: "GPTTerminalService")
+                    await MainActor.run {
+                        isMultiStepMode = false
+                        totalSteps = currentStep
+                    }
+                    let summary = await createTaskSummary()
+                    addSummaryMessage("**Задача завершена!** \(summary)")
+                    return
+                }
+
+                // Show assistant message with preview of the script
+                addAssistantMessage(explanation, command: displayFirstLine, isDangerous: isDanger, stepNumber: currentStep + 1)
+                trace("planning", "step planned script firstLine='\(displayFirstLine)' waiting_for_confirmation=true")
+
+                await MainActor.run {
+                    pendingCommand = heredocCmd
+                    pendingExplanation = explanation
+                    isWaitingForConfirmation = true
+                    isPendingCommandDangerous = isDanger
+                }
+
+                LoggingService.shared.info("📋 Planned step \(currentStep + 1): <script> (first line: \(displayFirstLine))", source: "GPTTerminalService")
             } else if !command.isEmpty {
                 // Check if this command was already executed recently
                 let recentCommands = executionHistory.suffix(2).map { $0.command }
@@ -476,18 +606,20 @@ class GPTTerminalService: ObservableObject {
                     return
                 }
                 
+                // Resolve placeholders from previous outputs
+                let resolvedCommand = resolvePlaceholders(in: command)
                 // Add assistant message to chat with command included (merged message)
-                addAssistantMessage(explanation, command: command, isDangerous: isDangerousCommand(command), stepNumber: currentStep + 1)
+                addAssistantMessage(explanation, command: resolvedCommand, isDangerous: isDangerousCommand(resolvedCommand), stepNumber: currentStep + 1)
                 trace("planning", "step planned command='\(command)' waiting_for_confirmation=true")
                 
                 await MainActor.run {
-                    pendingCommand = command
+                    pendingCommand = resolvedCommand
                     pendingExplanation = explanation
                     isWaitingForConfirmation = true
-                    isPendingCommandDangerous = isDangerousCommand(command)
+                    isPendingCommandDangerous = isDangerousCommand(resolvedCommand)
                 }
                 
-                LoggingService.shared.info("📋 Planned step \(currentStep + 1): \(command)", source: "GPTTerminalService")
+                LoggingService.shared.info("📋 Planned step \(currentStep + 1): \(resolvedCommand)", source: "GPTTerminalService")
             } else {
                 // No command found and no task completion detected
                 // Check if we're repeating the same command multiple times
@@ -928,6 +1060,8 @@ class GPTTerminalService: ObservableObject {
         
         // Execute command through existing terminal service
         LoggingService.shared.info("🚀 Sending command to terminal: '\(command)'", source: "GPTTerminalService")
+        // Start UI countdown for terminal wait (5 minutes)
+        await MainActor.run { startTerminalWaitCountdown(totalSeconds: 300) }
         
         // Save current output state before executing command
         outputBeforeCommand = await terminalService.getCurrentOutput() ?? ""
@@ -952,6 +1086,7 @@ class GPTTerminalService: ObservableObject {
         
         // Финальная проверка
         let finalCheck = await terminalService.getCurrentOutput() ?? ""
+        await MainActor.run { stopTerminalWaitCountdown(finalText: "✅ Терминал ответил") }
         let finalNewOutput = String(finalCheck.dropFirst(outputBeforeCommand.count))
         trace("terminal", "final_check_len=\(finalCheck.count) final_new_len=\(finalNewOutput.count)")
         
@@ -1234,6 +1369,17 @@ class GPTTerminalService: ObservableObject {
             self.chatMessages.append(message)
         }
     }
+
+    // Toggle pin flag for message to include in next planning prompt
+    func toggleIncludeMessageInNextPrompt(id: UUID, include: Bool) {
+        DispatchQueue.main.async {
+            if let idx = self.chatMessages.firstIndex(where: { $0.id == id }) {
+                var m = self.chatMessages[idx]
+                m.includeInNextPrompt = include
+                self.chatMessages[idx] = m
+            }
+        }
+    }
     
     func clearChatHistory() {
         DispatchQueue.main.async {
@@ -1437,6 +1583,20 @@ class GPTTerminalService: ObservableObject {
         LoggingService.shared.warning("⚠️ No command found in response", source: "GPTTerminalService")
         return ""
     }
+
+    // Extract the FIRST fenced code block as a raw multi-line script (no whitespace normalization)
+    private func extractScriptFromResponse(_ response: String) -> String? {
+        // Use DOTALL inline flag (?s) so . matches newlines; raw string to avoid Swift escapes
+        let pattern = #"(?s)```(?:bash|shell)?\s*(.*?)```"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+              let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) else {
+            return nil
+        }
+        let bodyRange = match.range(at: 1)
+        guard let range = Range(bodyRange, in: response) else { return nil }
+        let script = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return script.isEmpty ? nil : script
+    }
     
     private func cleanCommand(_ command: String) -> String {
         var cleaned = command
@@ -1467,9 +1627,9 @@ class GPTTerminalService: ObservableObject {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
         var cmd = trimmed
-        // Add timeout for long-running commands
+        // Add global timeout (5 minutes)
         if !lower.hasPrefix("timeout ") {
-            cmd = "timeout 30s \(cmd)"
+            cmd = "timeout 300s \(cmd)"
         }
         // Cap output for known heavy listings
         let heavyPatterns = ["dpkg -l", "rpm -qa", "journalctl", "find ", "du -a", "ls -la /", "cat /var/log"]
@@ -1477,6 +1637,16 @@ class GPTTerminalService: ObservableObject {
             cmd += " | head -n 500"
         }
         return cmd
+    }
+
+    // Build a heredoc script wrapper with safety flags and global timeout
+    private func buildHeredocScript(_ rawScript: String) -> String {
+        // Do not normalize whitespace; run as-is inside bash with strict flags
+        let heredoc = """
+        bash -lc 'set -euo pipefail; cat > /tmp/_macssh_step.sh <<\"EOF\"
+        \(rawScript)\nEOF\nchmod +x /tmp/_macssh_step.sh; timeout 300s /tmp/_macssh_step.sh'
+        """
+        return heredoc
     }
     
     private func checkTaskCompletionWithGPT(originalTask: String, executionHistory: [ExecutionStep], responseContent: String) async -> Bool {
