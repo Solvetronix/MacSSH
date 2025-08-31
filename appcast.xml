@@ -7,19 +7,23 @@
         <language>en</language>
         
         <item>
-            <title>MacSSH 1.8.34 - Release</title>
-            <sparkle:version>214</sparkle:version>
-            <sparkle:shortVersionString>1.8.34</sparkle:shortVersionString>
+            <title>MacSSH 1.8.35 - Release</title>
+            <sparkle:version>215</sparkle:version>
+            <sparkle:shortVersionString>1.8.35</sparkle:shortVersionString>
             <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.34</h2>
+                <h2>What's New in MacSSH 1.8.35</h2>
                 <ul>
-<li>Fix errors</li>
+<li>...</li>
+<li>Add commands context</li>
+<li>...</li>
+<li>FIx errors and add script commands generation</li>
+<li>...</li>
 </ul>
             ]]></description>
-            <pubDate>Sun, 31 Aug 2025 10:10:25 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.34/MacSSH-1.8.34.dmg"
+            <pubDate>Sun, 31 Aug 2025 21:26:47 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.35/MacSSH-1.8.35.dmg"
                        sparkle:os="macos"
-                       length="7512931"
+                       length="7566401"
                        type="application/octet-stream"/>
         </item>
     </channel>
