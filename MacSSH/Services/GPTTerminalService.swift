@@ -1082,8 +1082,12 @@ class GPTTerminalService: ObservableObject {
         let nonPagingPrefix = "export PAGER=cat; export LESS='-F -X -R';"
         // Add lightweight safety for heavy-output commands
         let safeCmd = makeNonBlocking(command)
-        let wrappedCommand = "\(nonPagingPrefix) \(safeCmd)"
-        trace("terminal", "wrapped_command='\(wrappedCommand)'")
+        var wrappedCommand = "\(nonPagingPrefix) \(safeCmd)"
+        // Inject sudo password for non-interactive execution if needed
+        wrappedCommand = injectSudoPasswordIfNeeded(wrappedCommand)
+        // If we're running a heredoc script, force sudo for the script run step only
+        wrappedCommand = wrapHeredocRunWithSudoIfNeeded(wrappedCommand)
+        trace("terminal", "wrapped_command='\(sanitizeSudoInLogs(wrappedCommand))'")
         await MainActor.run {
             terminalService.sendCommand(wrappedCommand)
         }
@@ -1645,6 +1649,54 @@ class GPTTerminalService: ObservableObject {
             cmd += " | head -n 500"
         }
         return cmd
+    }
+
+    // MARK: - Sudo non-interactive helper
+    private func injectSudoPasswordIfNeeded(_ command: String) -> String {
+        guard let profile = terminalService.getCurrentProfile(),
+              let password = profile.password, !password.isEmpty else { return command }
+        // Quick path: no 'sudo ' substring
+        let lower = command.lowercased()
+        guard lower.contains("sudo ") else { return command }
+        // Escape single quotes for safe single-quoted string: ' -> '\''
+        let escaped = password.replacingOccurrences(of: "'", with: "'\"'\"'"
+        )
+        let feeder = "printf '%s\\n' '\(escaped)' | sudo -S -p '' "
+        var result = command
+        // Replace start-of-string sudo
+        if result.hasPrefix("sudo ") {
+            result = result.replacingOccurrences(of: "sudo ", with: feeder)
+        }
+        // Replace new-line delimited sudo invocations
+        result = result.replacingOccurrences(of: "\nsudo ", with: "\n" + feeder)
+        // Also handle tabs just in case
+        result = result.replacingOccurrences(of: "\nsudo\t", with: "\n" + feeder)
+        return result
+    }
+
+    private func sanitizeSudoInLogs(_ command: String) -> String {
+        guard let profile = terminalService.getCurrentProfile(),
+              let password = profile.password, !password.isEmpty else { return command }
+        return command.replacingOccurrences(of: password, with: "******")
+    }
+
+    // Wrap the execution of /tmp/_macssh_step.sh with sudo feeder if profile has a password
+    private func wrapHeredocRunWithSudoIfNeeded(_ command: String) -> String {
+        guard let profile = terminalService.getCurrentProfile(),
+              let password = profile.password, !password.isEmpty else { return command }
+        // Detect call to /tmp/_macssh_step.sh (with or without timeout prefix)
+        if command.contains("/tmp/_macssh_step.sh") {
+            let escaped = password.replacingOccurrences(of: "'", with: "'\"'\"'")
+            let feederPrefix = "printf '%s\\n' '\(escaped)' | sudo -S -p '' "
+            var result = command
+            // Replace common execution patterns safely
+            result = result.replacingOccurrences(of: "timeout 300s /tmp/_macssh_step.sh",
+                                                 with: feederPrefix + "timeout 300s /tmp/_macssh_step.sh")
+            result = result.replacingOccurrences(of: "/tmp/_macssh_step.sh",
+                                                 with: feederPrefix + "/tmp/_macssh_step.sh")
+            return result
+        }
+        return command
     }
 
     // Build a heredoc script wrapper with safety flags and global timeout
