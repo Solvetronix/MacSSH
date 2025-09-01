@@ -41,7 +41,7 @@ struct SwiftTermProfessionalTerminalView: View {
                 }
                 
                 // Multi-Step AI button
-                if terminalService.isConnected {
+                if terminalService.isConnected || (profile.isLocal ?? false) {
                     Button(action: {
                         WindowManager.shared.openMultiStepAIChatWindow(for: profile)
                     }) {
@@ -69,7 +69,7 @@ struct SwiftTermProfessionalTerminalView: View {
             
             Divider()
             
-            // SwiftTerm терминал - всегда видимый
+            // Всегда используем единый SwiftTerminalView, сервис сам решает (SSH/локальный)
             if terminalService.isConnected, let _ = terminalService.getTerminalView() {
                 SwiftTerminalView(terminalService: terminalService)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -113,7 +113,7 @@ struct SwiftTermProfessionalTerminalView: View {
         }
         .frame(minWidth: 800, minHeight: 600)
         .onAppear {
-            // Подключаемся при появлении view
+            // Инициализация подключения для любого профиля (локальный/удалённый)
             if !terminalService.isConnected && !terminalService.isLoading {
                 connectToSSH()
             }
@@ -207,6 +207,8 @@ struct TerminalCommandLineView: View {
         }
     }
 }
+
+// Удалённый/локальный терминал отображается через SwiftTerminalView
 
 struct SwiftTerminalView: NSViewRepresentable {
     let terminalService: SwiftTermProfessionalService
@@ -838,7 +840,10 @@ struct SwiftTerminalView: NSViewRepresentable {
 
 extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
     func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
-        // Обработка изменения размера терминала
+        // Обработка изменения размера терминала с защитой от нулевых значений
+        let safeCols = max(1, newCols)
+        let safeRows = max(1, newRows)
+        terminalService?.updateLocalPTYSize(cols: safeCols, rows: safeRows)
     }
     
     func setTerminalTitle(source: TerminalView, title: String) {
@@ -850,7 +855,7 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
     }
     
     func send(source: TerminalView, data: ArraySlice<UInt8>) {
-        // Отправляем данные от терминала в SSH процесс
+        // Отправляем данные от терминала в активный процесс (SSH или локальный PTY)
         terminalService?.sendData(Array(data))
         
         // Логируем для отладки
@@ -990,4 +995,19 @@ struct ExecutionStepView: View {
         ),
         terminalService: SwiftTermProfessionalService()
     )
+}
+
+struct LocalShellView: NSViewRepresentable {
+    func makeNSView(context: Context) -> LocalProcessTerminalView {
+        let view = LocalProcessTerminalView(frame: .zero)
+        // keep SwiftTerm defaults (dark background)
+        view.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        var env = Terminal.getEnvironmentVariables(termName: "xterm-256color")
+        env.append("PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH")
+        view.startProcess(executable: shell, args: ["-l"], environment: env)
+        return view
+    }
+    
+    func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {}
 }

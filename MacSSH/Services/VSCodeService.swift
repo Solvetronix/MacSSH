@@ -92,6 +92,23 @@ class VSCodeService {
     static func openFileInVSCode(_ profile: Profile, remotePath: String) async throws -> [String] {
         var debugLogs: [String] = []
         
+        if (profile.isLocal ?? false) {
+            let timestamp = Date().timeIntervalSince1970
+            debugLogs.append("[blue][\(timestamp)] Local mode: opening file directly in VS Code/Cursor")
+            if !checkVSCodeAvailability() {
+                debugLogs.append("[red][\(timestamp)] ❌ VS Code/Cursor not found")
+                throw VSCodeError.vscodeNotFound("VS Code or Cursor not found. Please ensure 'code' command is available.")
+            }
+            let vscodePath = getVSCodePath() ?? "code"
+            let openProcess = Process()
+            openProcess.executableURL = URL(fileURLWithPath: vscodePath)
+            openProcess.arguments = [remotePath]
+            try openProcess.run()
+            openProcess.waitUntilExit()
+            debugLogs.append("[green][\(timestamp)] ✅ File opened locally in VS Code/Cursor")
+            return debugLogs
+        }
+
         let timestamp = Date().timeIntervalSince1970
         debugLogs.append("[blue][\(timestamp)] VSCodeService: openFileInVSCode STARTED")
         debugLogs.append("[blue][\(timestamp)] Opening file in VS Code/Cursor: \(remotePath)")

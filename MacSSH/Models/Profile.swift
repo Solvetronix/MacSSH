@@ -18,8 +18,9 @@ struct Profile: Identifiable, Codable, Equatable {
     var keyType: SSHKeyType
     var lastConnectionDate: Date?
     var description: String?
+    var isLocal: Bool?
     
-    init(id: UUID = UUID(), name: String, host: String, port: Int = 22, username: String, password: String? = nil, privateKeyPath: String? = nil, keyType: SSHKeyType = .password, lastConnectionDate: Date? = nil, description: String? = nil) {
+    init(id: UUID = UUID(), name: String, host: String, port: Int = 22, username: String, password: String? = nil, privateKeyPath: String? = nil, keyType: SSHKeyType = .password, lastConnectionDate: Date? = nil, description: String? = nil, isLocal: Bool? = nil) {
         self.id = id
         self.name = name
         self.host = host
@@ -30,5 +31,6 @@ struct Profile: Identifiable, Codable, Equatable {
         self.keyType = keyType
         self.lastConnectionDate = lastConnectionDate
         self.description = description
+        self.isLocal = isLocal
     }
 } 

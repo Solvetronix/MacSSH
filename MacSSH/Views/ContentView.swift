@@ -179,8 +179,16 @@ struct ConnectionHostCell: View {
     let profile: Profile
     
     var body: some View {
-        Text(profile.host)
-            .font(.system(.body, design: .monospaced))
+        Group {
+            if profile.isLocal ?? false {
+                // Пустое место фиксированной ширины (чтобы не сдвигались колонки)
+                Text("")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(profile.host)
+            }
+        }
+        .font(.system(.body, design: .monospaced))
     }
 }
 
@@ -188,8 +196,15 @@ struct ConnectionPortCell: View {
     let profile: Profile
     
     var body: some View {
-        Text("\(profile.port)")
-            .font(.system(.body, design: .monospaced))
+        Group {
+            if profile.isLocal ?? false {
+                // Empty space so columns do not shift for local profile
+                Text("")
+            } else {
+                Text("\(profile.port)")
+            }
+        }
+        .font(.system(.body, design: .monospaced))
     }
 }
 
@@ -239,23 +254,26 @@ struct ConnectionActionsCell: View {
         HStack(spacing: 12) {
             Button(action: { selectedProfile = profile }) {
                 HoverableIcon(systemName: "pencil", help: "Edit")
+                    .opacity((profile.isLocal ?? false) ? 0 : 1)
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(viewModel.isConnecting)
+            .disabled(viewModel.isConnecting || (profile.isLocal ?? false))
             
             Button(action: { profileToDelete = profile }) {
                 HoverableIcon(systemName: "trash", help: "Delete")
+                    .opacity((profile.isLocal ?? false) ? 0 : 1)
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(viewModel.isConnecting)
+            .disabled(viewModel.isConnecting || (profile.isLocal ?? false))
             
             Button(action: {
                 Task { await viewModel.testConnection(profile) }
             }) {
                 HoverableIcon(systemName: "network", help: "Test Connection & Open Terminal")
+                    .opacity((profile.isLocal ?? false) ? 0 : 1)
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(viewModel.isConnecting)
+            .disabled(viewModel.isConnecting || (profile.isLocal ?? false))
             
             Button(action: {
                 viewModel.openProfessionalTerminal(for: profile)
@@ -279,9 +297,10 @@ struct ConnectionActionsCell: View {
                 }
             }) {
                 HoverableIcon(systemName: "folder", help: "Open File Browser")
+                    .opacity((profile.isLocal ?? false) ? 0 : 1)
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(viewModel.isConnecting)
+            .disabled(viewModel.isConnecting || (profile.isLocal ?? false))
         }
     }
 }

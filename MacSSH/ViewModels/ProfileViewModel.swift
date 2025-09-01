@@ -83,7 +83,8 @@ class ProfileViewModel: ObservableObject {
     }
     
     private func saveProfiles() {
-        if let encoded = try? JSONEncoder().encode(profiles) {
+        let profilesToPersist = profiles.filter { ($0.isLocal ?? false) == false }
+        if let encoded = try? JSONEncoder().encode(profilesToPersist) {
             userDefaults.set(encoded, forKey: profilesKey)
         }
     }
@@ -92,6 +93,25 @@ class ProfileViewModel: ObservableObject {
         if let data = userDefaults.data(forKey: profilesKey),
            let decoded = try? JSONDecoder().decode([Profile].self, from: data) {
             profiles = decoded
+        }
+        // Inject a default local profile at the top (not persisted)
+        let localUsername = NSUserName()
+        let localHost = "localhost"
+        let localProfile = Profile(
+            name: "This Mac",
+            host: localHost,
+            port: 22,
+            username: localUsername,
+            password: nil,
+            privateKeyPath: nil,
+            keyType: .none,
+            lastConnectionDate: nil,
+            description: "Local machine access",
+            isLocal: true
+        )
+        // Ensure no duplicate if already present
+        if !profiles.contains(where: { ($0.isLocal ?? false) == true }) {
+            profiles.insert(localProfile, at: 0)
         }
     }
     
@@ -253,6 +273,25 @@ class ProfileViewModel: ObservableObject {
 
     
     func testConnection(_ profile: Profile) async {
+        if (profile.isLocal ?? false) {
+            await MainActor.run {
+                self.isConnecting = true
+                self.connectionError = nil
+                self.connectionLog.removeAll()
+                self.connectionLog.append("[blue]Testing local environment on this Mac...")
+                self.connectionLog.append("[green]✅ Local environment available")
+                if let index = self.profiles.firstIndex(where: { $0.id == profile.id }) {
+                    self.profiles[index].lastConnectionDate = Date()
+                    self.saveProfiles()
+                }
+            }
+            await MainActor.run {
+                self.connectionLog.append("[blue]Automatically opening local terminal...")
+                WindowManager.shared.openTerminalWindow(for: profile)
+                self.isConnecting = false
+            }
+            return
+        }
         await MainActor.run {
             self.isConnecting = true
             self.connectionError = nil

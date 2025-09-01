@@ -1194,6 +1194,7 @@ class GPTTerminalService: ObservableObject {
             let completionHandler = PromptCompletionHandler(
                 initialOutputLength: outputBeforeCommand.count,
                 terminalService: terminalService,
+                isLocalSession: terminalService.isLocalSessionActive() || (terminalService.getCurrentProfile()?.isLocal ?? false),
                 onComplete: { [weak self] output in
                     self?.currentCompletionHandler = nil
                     self?.unsubscribeBufferIfNeeded()
@@ -1211,27 +1212,39 @@ class GPTTerminalService: ObservableObject {
         private let initialOutputLength: Int
         private let onComplete: (String) -> Void
         private weak var terminalService: SwiftTermProfessionalService?
+        private let isLocalSession: Bool
         
         // Guard against multiple resumes
         private var didResume = false
         private let resumeQueue = DispatchQueue(label: "macssh.prompt-completion.resume")
         
-        // Common prompt patterns (configurable later via Profile if needed)
-        private let promptRegexes: [NSRegularExpression] = {
+        // Separate regex sets for remote vs local sessions
+        private lazy var promptRegexesRemote: [NSRegularExpression] = {
             let patterns = [
                 "[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:[^\n]*\\$\\s*$", // user@host:path$
                 "[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:[^\n]*#\\s*$",     // root prompt
                 "\\$\\s*$",                                        // simple $
-                "#\\s*$",                                             // simple #
-                ">\\s*$",                                             // simple > (some shells)
-                "\\[[^\\]]+\\]\\s?\\$\\s*$"                 // [venv] $
+                "#\\s*$",                                            // simple #
+                ">\\s*$",                                            // simple >
+                "\\[[^\\]]+\\]\\s?\\$\\s*$"                // [venv] $
             ]
             return patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.anchorsMatchLines]) }
         }()
+        private lazy var promptRegexesLocal: [NSRegularExpression] = {
+            let patterns = [
+                "[^\n]*~\\s%\\s*$",                              // e.g. user@host ~ %
+                "[^\n]*%\\s$",                                   // zsh %
+                "[^\n]*❯\\s$",                                   // powerlevel10k '❯'
+                "[^\n]*➜\\s$"                                    // oh-my-zsh arrow '➜'
+            ]
+            return patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.anchorsMatchLines]) }
+        }()
+        private var promptRegexes: [NSRegularExpression] { isLocalSession ? promptRegexesLocal : promptRegexesRemote }
         
-        init(initialOutputLength: Int, terminalService: SwiftTermProfessionalService, onComplete: @escaping (String) -> Void) {
+        init(initialOutputLength: Int, terminalService: SwiftTermProfessionalService, isLocalSession: Bool, onComplete: @escaping (String) -> Void) {
             self.initialOutputLength = initialOutputLength
             self.terminalService = terminalService
+            self.isLocalSession = isLocalSession
             self.onComplete = onComplete
         }
         
@@ -1250,16 +1263,14 @@ class GPTTerminalService: ObservableObject {
                 // Work only with the suffix produced after command start
                 let start = full.index(full.startIndex, offsetBy: max(0, initialOutputLength))
                 let suffix = String(full[start...])
+                let plainSuffix = stripANSI(suffix)
                 LoggingService.shared.debug("[TRACE prompt] suffix_len=\(suffix.count)", source: "GPTTerminalService")
-                guard let tailInSuffix = promptTailRange(in: suffix) else { return }
+                guard let tailInSuffix = promptTailRange(in: plainSuffix) else { return }
                 var shouldResume = false
                 resumeQueue.sync { if !didResume { didResume = true; shouldResume = true } }
                 guard shouldResume else { return }
-                // Compute tail range in original 'full'
-                let tailLower = full.index(start, offsetBy: suffix.distance(from: suffix.startIndex, to: tailInSuffix.lowerBound))
-                // Safe content range [start ..< tailLower]
-                let contentRange: Range<String.Index> = start <= tailLower ? start..<tailLower : start..<start
-                let result = String(full[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Use ANSI-stripped suffix up to the matched prompt
+                let result = String(plainSuffix[..<tailInSuffix.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 LoggingService.shared.debug("[TRACE prompt] matched_prompt tail_lower_offset computed; result_len=\(result.count)", source: "GPTTerminalService")
                 onComplete(result.isEmpty ? "Command executed successfully" : result)
             }
@@ -1277,6 +1288,16 @@ class GPTTerminalService: ObservableObject {
                 }
             }
             return nil
+        }
+
+        private func stripANSI(_ text: String) -> String {
+            let pattern = "\u{001B}\\[[0-9;?]*[ -/]*[@-~]"
+            if let rx = try? NSRegularExpression(pattern: pattern, options: []) {
+                let ns = text as NSString
+                let range = NSRange(location: 0, length: ns.length)
+                return rx.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")
+            }
+            return text
         }
     }
     
@@ -1562,12 +1583,15 @@ class GPTTerminalService: ObservableObject {
         LoggingService.shared.info("🔍 Extracting command from response: \(response.prefix(200))...", source: "GPTTerminalService")
         
         // Look for commands in code blocks (```command```)
-        let codeBlockPattern = "```(?:bash|shell)?\\s*([^`]+)```"
+        // Accept any fenced block; we'll clean language header lines like "plaintext"
+        let codeBlockPattern = "(?s)```(?:[a-zA-Z0-9_+-]*)?\\s*\\n?([^`]+)```"
         if let regex = try? NSRegularExpression(pattern: codeBlockPattern, options: [.caseInsensitive]),
            let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) {
             let commandRange = match.range(at: 1)
             if let range = Range(commandRange, in: response) {
-                let command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                var command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Drop misleading first-line labels like 'plaintext'
+                if command.lowercased().hasPrefix("plaintext\n") { command = String(command.dropFirst("plaintext\n".count)) }
                 let cleaned = cleanCommand(command)
                 LoggingService.shared.info("🔍 Found command in code block: '\(cleaned)'", source: "GPTTerminalService")
                 return cleaned
@@ -1580,7 +1604,8 @@ class GPTTerminalService: ObservableObject {
            let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) {
             let commandRange = match.range(at: 1)
             if let range = Range(commandRange, in: response) {
-                let command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                var command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if command.lowercased().hasPrefix("plaintext\n") { command = String(command.dropFirst("plaintext\n".count)) }
                 let cleaned = cleanCommand(command)
                 LoggingService.shared.info("🔍 Found command in backticks: '\(cleaned)'", source: "GPTTerminalService")
                 return cleaned
@@ -1593,7 +1618,8 @@ class GPTTerminalService: ObservableObject {
            let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) {
             let commandRange = match.range(at: 1)
             if let range = Range(commandRange, in: response) {
-                let command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                var command = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if command.lowercased().hasPrefix("plaintext ") { command = String(command.dropFirst("plaintext ".count)) }
                 let cleaned = cleanCommand(command)
                 LoggingService.shared.info("🔍 Found command in quotes: '\(cleaned)'", source: "GPTTerminalService")
                 return cleaned
@@ -1606,15 +1632,16 @@ class GPTTerminalService: ObservableObject {
 
     // Extract the FIRST fenced code block as a raw multi-line script (no whitespace normalization)
     private func extractScriptFromResponse(_ response: String) -> String? {
-        // Use DOTALL inline flag (?s) so . matches newlines; raw string to avoid Swift escapes
-        let pattern = #"(?s)```(?:bash|shell)?\s*(.*?)```"#
+        // Use DOTALL inline flag; accept any language tag; strip language header like 'plaintext' if present
+        let pattern = #"(?s)```(?:[a-zA-Z0-9_+-]*)?\s*\n?(.*?)```"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
               let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) else {
             return nil
         }
         let bodyRange = match.range(at: 1)
         guard let range = Range(bodyRange, in: response) else { return nil }
-        let script = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        var script = String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if script.lowercased().hasPrefix("plaintext\n") { script = String(script.dropFirst("plaintext\n".count)) }
         return script.isEmpty ? nil : script
     }
     
@@ -1647,9 +1674,13 @@ class GPTTerminalService: ObservableObject {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
         var cmd = trimmed
-        // Add global timeout (5 minutes)
-        if !lower.hasPrefix("timeout ") {
-            cmd = "timeout 300s \(cmd)"
+        // For local macOS terminal, do not use GNU 'timeout' (not present by default)
+        let isLocal = terminalService.isLocalSessionActive() || (terminalService.getCurrentProfile()?.isLocal ?? false)
+        if !isLocal {
+            // Add global timeout (5 minutes) only for remote/Linux where 'timeout' exists
+            if !lower.hasPrefix("timeout ") {
+                cmd = "timeout 300s \(cmd)"
+            }
         }
         // Cap output for known heavy listings
         let heavyPatterns = ["dpkg -l", "rpm -qa", "journalctl", "find ", "du -a", "ls -la /", "cat /var/log"]
@@ -1662,7 +1693,12 @@ class GPTTerminalService: ObservableObject {
 
     // Build a heredoc script wrapper with safety flags and global timeout
     private func buildHeredocScript(_ rawScript: String) -> String {
-        // Do not normalize whitespace; run as-is inside bash with strict flags
+        // For local macOS terminal, send the script directly without GNU timeout/bash wrapping
+        let isLocal = terminalService.getCurrentProfile()?.isLocal ?? false
+        if isLocal {
+            return rawScript
+        }
+        // Remote/Linux: run as-is inside bash with strict flags and timeout
         let heredoc = """
         bash -lc 'set -euo pipefail; timeout 300s bash -s <<"EOF"
         \(rawScript)

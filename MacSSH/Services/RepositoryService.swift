@@ -413,6 +413,20 @@ class SSHService {
     static func openTerminal(for profile: Profile) async throws -> [String] {
         var debugLogs: [String] = []
         
+        if (profile.isLocal ?? false) {
+            debugLogs.append("[blue]Opening local Terminal app...")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-a", "Terminal"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+            try process.run()
+            process.waitUntilExit()
+            debugLogs.append("[green]✅ Local Terminal opened")
+            return debugLogs
+        }
+
         LoggingService.shared.info("Starting terminal opening process...", source: "SSHService")
         debugLogs.append("[blue]Starting terminal opening process...")
         
@@ -552,6 +566,40 @@ class SSHService {
     
     /// Get list of files and folders in specified directory
     static func listDirectory(_ profile: Profile, path: String = ".") async throws -> SFTPResult {
+        if (profile.isLocal ?? false) {
+            var debugLogs: [String] = []
+            var files: [RemoteFile] = []
+            let fm = FileManager.default
+            let basePath: String
+            if path == "." { basePath = NSHomeDirectory() } else if path.hasPrefix("/") { basePath = path } else { basePath = (NSHomeDirectory() as NSString).appendingPathComponent(path) }
+            debugLogs.append("[blue]Listing local directory: \(basePath)")
+            do {
+                let items = try fm.contentsOfDirectory(atPath: basePath)
+                for name in items {
+                    let full = (basePath as NSString).appendingPathComponent(name)
+                    var isDir: ObjCBool = false
+                    fm.fileExists(atPath: full, isDirectory: &isDir)
+                    let attrs = try? fm.attributesOfItem(atPath: full)
+                    let size = (attrs?[.size] as? NSNumber)?.int64Value
+                    let modified = attrs?[.modificationDate] as? Date
+                    let permissionsOctal: String? = {
+                        if let posix = attrs?[.posixPermissions] as? NSNumber {
+                            let oct = String(posix.intValue, radix: 8)
+                            return oct
+                        }
+                        return nil
+                    }()
+                    files.append(RemoteFile(name: name, path: full, isDirectory: isDir.boolValue, size: isDir.boolValue ? nil : (size ?? 0), permissions: permissionsOctal, modifiedDate: modified))
+                }
+                return SFTPResult(success: true, files: files.sorted { a, b in
+                    if a.isDirectory != b.isDirectory { return a.isDirectory && !b.isDirectory }
+                    return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+                }, logs: debugLogs, error: nil)
+            } catch {
+                debugLogs.append("[red]❌ Local directory listing error: \(error.localizedDescription)")
+                throw SSHConnectionError.sftpError(error.localizedDescription)
+            }
+        }
         let timestamp = Date().timeIntervalSince1970
         LoggingService.shared.info("Listing directory: \(path) for \(profile.name) (\(profile.host))", source: "FileManager")
         
@@ -621,6 +669,18 @@ class SSHService {
     static func openFileInFinder(_ profile: Profile, remotePath: String) async throws -> [String] {
         var debugLogs: [String] = []
         
+        if (profile.isLocal ?? false) {
+            let path = remotePath
+            debugLogs.append("[blue]Opening local file in Finder: \(path)")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-R", path]
+            try process.run()
+            process.waitUntilExit()
+            debugLogs.append("[green]✅ Local file revealed in Finder")
+            return debugLogs
+        }
+
         LoggingService.shared.info("Opening file in Finder: \(remotePath)", source: "FileManager")
         debugLogs.append("[blue]Opening file in Finder: \(remotePath)")
         
@@ -691,6 +751,17 @@ class SSHService {
     
     /// Монтировать удаленную директорию в Finder
     static func mountDirectoryInFinder(_ profile: Profile, remotePath: String) async throws -> [String] {
+        if (profile.isLocal ?? false) {
+            var debugLogs: [String] = []
+            debugLogs.append("[blue]Opening local directory in Finder: \(remotePath)")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = [remotePath]
+            try process.run()
+            process.waitUntilExit()
+            debugLogs.append("[green]✅ Local directory opened in Finder")
+            return debugLogs
+        }
         LoggingService.shared.info("Mounting directory in Finder: \(remotePath) for \(profile.name) (\(profile.host))", source: "FileManager")
         print("=== ENTERING mountDirectoryInFinder FUNCTION ===")
         print("Profile: \(profile.name), Host: \(profile.host)")

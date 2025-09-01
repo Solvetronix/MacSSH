@@ -57,6 +57,13 @@ class WindowManager: ObservableObject {
         
         // Сохраняем ссылку на окно
         terminalWindows[windowId] = window
+
+        // Автоматически открываем окно ассистента рядом
+        openMultiStepAIChatWindow(for: profile)
+        // Если получилось найти оба окна, расположим их рядом
+        if let ai = aiChatWindows["ai_chat_\(profile.id.uuidString)"] {
+            tileAIWindowNextToTerminal(profile: profile, aiWindow: ai)
+        }
     }
     
     @MainActor
@@ -140,11 +147,43 @@ class WindowManager: ObservableObject {
         
         window.title = "Multi-Step AI Assistant — \(profile.username)@\(profile.host)"
         window.contentViewController = hostingController
-        window.center()
+        // Пытаемся расположить рядом с окном терминала, если оно уже существует
+        if let _ = terminalWindows["terminal_\(profile.id.uuidString)"] {
+            // Поставим временно в (0,0), затем выровняем
+            window.setFrame(NSRect(x: 0, y: 0, width: 900, height: 700), display: false)
+        } else {
+            window.center()
+        }
         window.makeKeyAndOrderFront(nil)
         
         // Сохраняем ссылку на окно
         aiChatWindows[windowId] = window
+
+        // Финальное выравнивание возле терминала, если он есть
+        tileAIWindowNextToTerminal(profile: profile, aiWindow: window)
+    }
+
+    // Размещает окно ассистента справа от терминала (или слева, если не помещается)
+    @MainActor
+    private func tileAIWindowNextToTerminal(profile: Profile, aiWindow: NSWindow) {
+        let termId = "terminal_\(profile.id.uuidString)"
+        guard let termWindow = terminalWindows[termId], termWindow.isVisible else { return }
+        guard let screen = termWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
+        let gap: CGFloat = 8
+        let termFrame = termWindow.frame
+        var newFrame = aiWindow.frame
+        // Подгоняем размер ассистента под размер терминала
+        newFrame.size = termFrame.size
+        newFrame.origin.y = max(screen.minY, min(termFrame.origin.y, screen.maxY - newFrame.height))
+        newFrame.origin.x = termFrame.maxX + gap
+        // Если не помещается справа — ставим слева
+        if newFrame.maxX > screen.maxX {
+            newFrame.origin.x = termFrame.origin.x - gap - newFrame.width
+        }
+        // Клэмп по экрану
+        if newFrame.origin.x < screen.minX { newFrame.origin.x = screen.minX }
+        if newFrame.maxX > screen.maxX { newFrame.origin.x = screen.maxX - newFrame.width }
+        aiWindow.setFrame(newFrame, display: true, animate: true)
     }
 }
 
