@@ -7,19 +7,22 @@
         <language>en</language>
         
         <item>
-            <title>MacSSH 1.8.36 - Release</title>
-            <sparkle:version>216</sparkle:version>
-            <sparkle:shortVersionString>1.8.36</sparkle:shortVersionString>
+            <title>MacSSH 1.8.37 - Release</title>
+            <sparkle:version>217</sparkle:version>
+            <sparkle:shortVersionString>1.8.37</sparkle:shortVersionString>
             <description><![CDATA[
-                <h2>What's New in MacSSH 1.8.36</h2>
+                <h2>What's New in MacSSH 1.8.37</h2>
                 <ul>
-<li>Fix errors</li>
+<li>Fix small errors</li>
+<li>Stop the process when the terminal is closed</li>
+<li>More smart working strategy</li>
+<li>Added Local Terminal “This Mac“</li>
 </ul>
             ]]></description>
-            <pubDate>Mon, 01 Sep 2025 18:35:37 +0000</pubDate>
-            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.36/MacSSH-1.8.36.dmg"
+            <pubDate>Mon, 01 Sep 2025 22:12:40 +0000</pubDate>
+            <enclosure url="https://github.com/Solvetronix/MacSSH/releases/download/v1.8.37/MacSSH-1.8.37.dmg"
                        sparkle:os="macos"
-                       length="7536069"
+                       length="7616165"
                        type="application/octet-stream"/>
         </item>
     </channel>
