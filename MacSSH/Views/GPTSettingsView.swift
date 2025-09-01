@@ -121,8 +121,13 @@ struct GPTSettingsView: View {
                 .padding()
             }
 
-            // Bottom action bar with Save button - always visible
+            // Bottom action bar with Save/Clear buttons - always visible
             HStack {
+                Button("Clear Env Cache") {
+                    clearEnvCache()
+                }
+                .buttonStyle(.bordered)
+                .help("Remove cached local/remote environment info. It will be re-collected later.")
                 Spacer()
                 Button("Save Settings") {
                     saveSettings()
@@ -179,6 +184,25 @@ struct GPTSettingsView: View {
         
         // Immediately close the modal after saving
         isPresented = false
+    }
+    
+    private func clearEnvCache() {
+        LoggingService.shared.info("🧹 Clearing environment cache (local & remote)", source: "GPTSettingsView")
+        let defaults = UserDefaults.standard
+        // Remove local cache
+        defaults.removeObject(forKey: "local_env::v1")
+        // Remove all remote caches
+        let dict = defaults.dictionaryRepresentation()
+        for key in dict.keys where key.hasPrefix("remote_env::") {
+            defaults.removeObject(forKey: key)
+        }
+        // Remove base context caches
+        for key in dict.keys where key.hasPrefix("base_ctx::") {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.synchronize()
+        alertMessage = "Environment cache cleared. It will be refreshed on next connection."
+        showingAlert = true
     }
     
     private func loadSettings() {

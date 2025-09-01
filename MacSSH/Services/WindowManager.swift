@@ -78,6 +78,12 @@ class WindowManager: ObservableObject {
             window.close()
             terminalWindows.removeValue(forKey: windowId)
             windowDelegates.removeValue(forKey: windowId)
+            // Закрываем связанное окно ассистента
+            let aiId = "ai_chat_\(profile.id.uuidString)"
+            if let aiWindow = aiChatWindows[aiId] {
+                aiWindow.close()
+                aiChatWindows.removeValue(forKey: aiId)
+            }
         }
     }
     
@@ -112,6 +118,15 @@ class WindowManager: ObservableObject {
         
         terminalWindows.removeValue(forKey: windowId)
         windowDelegates.removeValue(forKey: windowId)
+        // Если закрывается терминал, закрываем и связанное окно ассистента
+        if windowId.hasPrefix("terminal_") {
+            let suffix = String(windowId.dropFirst("terminal_".count))
+            let aiId = "ai_chat_" + suffix
+            if let aiWindow = aiChatWindows[aiId] {
+                aiWindow.close()
+                aiChatWindows.removeValue(forKey: aiId)
+            }
+        }
     }
     
     @MainActor

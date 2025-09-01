@@ -199,6 +199,7 @@ class LoggingService: ObservableObject {
     func clear() {
         DispatchQueue.main.async {
             self.logs.removeAll()
+            self.uiLogs.removeAll()
         }
     }
     

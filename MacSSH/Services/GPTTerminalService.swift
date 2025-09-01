@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Darwin
 
 // MARK: - Notification Names
 extension Notification.Name {
@@ -104,12 +105,57 @@ struct ExecutionStep: Identifiable, Codable {
     }
 }
 
+// MARK: - Planned Step JSON (for structured next-step planning)
+private struct PlannedStep: Decodable {
+    struct OnFail: Decodable {
+        let apply: [String]?
+        let replace: [String]?
+        let retry: Bool?
+    }
+    let reason: String
+    let command: String
+    let verify: [String]?
+    let on_fail: OnFail?
+    let stop_reason: String?
+    var stopReason: String { stop_reason ?? "CONTINUE" }
+}
+
+private func extractJSONFromText(_ response: String) -> String {
+    // Try to extract JSON from markdown code blocks first
+    let codeBlockPattern = "```(?:json)?\\s*([\\s\\S]*?)\\s*```"
+    if let regex = try? NSRegularExpression(pattern: codeBlockPattern, options: []),
+       let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) {
+        let jsonRange = match.range(at: 1)
+        if let range = Range(jsonRange, in: response) {
+            return String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+    // If no code block found, try to find JSON directly
+    let jsonPattern = "\\{[\\s\\S]*\\}"
+    if let regex = try? NSRegularExpression(pattern: jsonPattern, options: []),
+       let match = regex.firstMatch(in: response, options: [], range: NSRange(response.startIndex..., in: response)) {
+        let jsonRange = match.range
+        if let range = Range(jsonRange, in: response) {
+            return String(response[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+    return response.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func parsePlannedStepJSON(_ s: String) -> PlannedStep? {
+    let json = extractJSONFromText(s)
+    guard let data = json.data(using: .utf8) else { return nil }
+    return try? JSONDecoder().decode(PlannedStep.self, from: data)
+}
+
 // MARK: - Universal Information Collector
 struct UniversalInfoCollector {
     var collectedData: [String: String] = [:]
     
     mutating func collectFromOutput(_ output: String, command: String) {
-        let lines = output.components(separatedBy: .newlines)
+        // Clean noisy control chars and internal prefixes for better summaries
+        let cleaned = UniversalInfoCollector.cleanTerminalText(output)
+        let lines = cleaned.components(separatedBy: .newlines)
         
         for line in lines {
             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
@@ -135,6 +181,20 @@ struct UniversalInfoCollector {
         }
         
         return summary
+    }
+    
+    // Static helper: sanitize terminal output for summaries
+    static func cleanTerminalText(_ text: String) -> String {
+        var s = text
+        // Remove backspace and preceding char artifacts
+        s = s.replacingOccurrences(of: "\u{0008}", with: "") // Backspace
+        s = s.replacingOccurrences(of: "\u{0007}", with: "") // Bell
+        // Remove common ANSI escape sequences
+        let ansiPattern = "\u{001B}[[0-9;?]*[ -/]*[@-~]"
+        s = s.replacingOccurrences(of: ansiPattern, with: "", options: .regularExpression)
+        // Trim noisy export prefix lines we add for non-paging
+        s = s.replacingOccurrences(of: "export PAGER=cat; export LESS='-F -X -R'; ", with: "")
+        return s
     }
 }
 
@@ -173,6 +233,24 @@ class GPTTerminalService: ObservableObject {
     private let enableGptCompletionCheck = false
     // Trace session identifier for deep diagnostics across the whole workflow
     private var sessionTraceId: String = UUID().uuidString
+    // Structured planning feature toggle
+    private var structuredPlanningEnabled: Bool {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: "StructuredPlannerEnabled") == nil { return true }
+        return defaults.bool(forKey: "StructuredPlannerEnabled")
+    }
+    // Pending metadata for verify/repair
+    private var pendingVerifyCommands: [String]? = nil
+    private var pendingOnFail: PlannedStep.OnFail? = nil
+    // Base session context for planning
+    private var baseContextSummary: String = ""
+    private func baseContextCacheKey() -> String {
+        let prof = terminalService.getCurrentProfile()
+        let host = prof?.host ?? "local"
+        let user = prof?.username ?? NSUserName()
+        let isLocal = prof?.isLocal ?? terminalService.isLocalSessionActive()
+        return "base_ctx::\(isLocal ? "local" : "remote")::\(user)@\(host)"
+    }
 
     // Lightweight trace helper to unify verbose diagnostics
     private func trace(_ scope: String, _ message: String) {
@@ -401,6 +479,7 @@ class GPTTerminalService: ObservableObject {
         }
         
         addUserMessage(task)
+        await gatherBaseContext()
         await planNextStep()
     }
     
@@ -422,6 +501,10 @@ class GPTTerminalService: ObservableObject {
                 isMultiStepMode = false
                 lastError = "Maximum number of steps (\(maxSteps)) reached. Task stopped for safety."
             }
+            // Always emit final summary on max steps
+            let summary = await createTaskSummary()
+            addSummaryMessage("**Задача завершена (лимит шагов)** \n\n" + summary)
+            LoggingService.shared.success("✅ Task finalized at max steps with summary", source: "GPTTerminalService")
             return
         }
         
@@ -438,6 +521,7 @@ class GPTTerminalService: ObservableObject {
             - Current step: \(currentStep)
             - Total steps executed: \(executionHistory.count)
             - Task objective: \(currentTask)
+            - Base context (safe diagnostics):\n\(String(baseContextSummary.prefix(1200)))
             
             PREVIOUS STEPS DETAILED:
             \(executionHistory.map { step in
@@ -446,6 +530,7 @@ class GPTTerminalService: ObservableObject {
                 - Command: \(step.command)
                 - Explanation: \(step.explanation)
                 - Output length: \(step.output.count) characters
+                - Error hints: \(classifyOutputForErrorHints(step.output))
                 - Output preview: \(String(step.output.prefix(200)))\(step.output.count > 200 ? "..." : "")
                 """
             }.joined(separator: "\n\n"))
@@ -462,44 +547,32 @@ class GPTTerminalService: ObservableObject {
             }.joined(separator: "\n"))
             
             ANALYSIS INSTRUCTIONS:
-            Based on the terminal output from previous steps, what is the next command to execute? 
-            Analyze the output to understand what worked, what failed, and what needs to be done next.
+            Based on the terminal output from previous steps, decide the next concrete command.
+            Analyze outputs to identify what worked/failed and what to do next.
             
-            CRITICAL: The "Output:" section contains the ACTUAL terminal output from each command. 
-            This is the real data you need to analyze to make decisions.
+            CRITICAL: Analyze ONLY actual terminal outputs. Do not fabricate results.
             
-            TASK COMPLETION ANALYSIS:
-            - If the requested information has been successfully gathered from the command outputs, say "TASK COMPLETE"
-            - If the command outputs contain the data that was asked for in the original task, say "TASK COMPLETE"
-            - If no further commands are needed to complete the task objective, say "TASK COMPLETE"
-            - If you have executed 2-3 successful commands with useful output, say "TASK COMPLETE"
-            - Do not repeat the same command multiple times
-            - Maximum \(maxSteps) steps allowed - if you've reached this limit, say "TASK COMPLETE"
+            RESPONSE SCHEMA (JSON only, no extra text):
+            {
+              "reason": "why this step is needed based on outputs",
+              "command": "single-line shell command to run next (no placeholders)",
+              "verify": ["safe command to validate result", "..."],
+              "on_fail": {
+                "apply": ["optional prep commands before retry"],
+                "replace": ["alternative command(s) if main fails"],
+                "retry": true
+              },
+              "stop_reason": "TASK_COMPLETE | MAX_STEPS | NEEDS_INPUT | CONTINUE"
+            }
             
-            IMPORTANT SAFETY:
-            - Do NOT say "TASK COMPLETE" if no commands have been executed yet (Total steps executed == 0)
-            - Only declare completion after analyzing real terminal output from at least one executed command
+            RULES:
+            - NEVER use placeholders like [name], <id>, {ARG}, or UPPER_CASE tokens.
+            - If an argument is unknown, FIRST output a discovery command in "command" to find it.
+            - Prefer non-interactive, idempotent, safe commands.
+            - Do not repeat semantically identical commands.
             
-            COMMAND FORMATTING:
-            - When providing commands, use ONLY the command itself in code blocks, like: `cut -d: -f1 /etc/passwd`
-            - DO NOT add 'sh' prefix or extra formatting to commands
-            - DO NOT use ```sh or ```bash - use only ``` for code blocks
-            - Commands should be clean and ready to execute directly
-            
-            ARGUMENT COMPLETENESS (CRITICAL):
-            - NEVER return commands containing placeholders like [name], <id>, {arg}, or UPPER_CASE tokens (e.g., SERVICE, PROCESS_NAME)
-            - If a required argument is unknown, FIRST propose a discovery command to find it, THEN return the final concrete command with the resolved value
-            - Prefer robust, non-interactive discovery (e.g., for pm2: `pm2 jlist` or `pm2 ls --no-color` and parse the result)
-            - Examples:
-              • Instead of `pm2 show [process-name]` → run `pm2 jlist` to get names/ids, choose the correct one by context, then use `pm2 show exact-name-or-id`
-              • Instead of `systemctl status SERVICE` → run `systemctl list-units --type=service --no-pager | grep -i pattern` to resolve the exact unit name
-            - Absolutely NO placeholders in the final command you output
-            
-            Provide a clear explanation of what this command will do and why it's needed.
-            
-            Be intelligent and proactive - suggest the most efficient approach. Use the best command for the task.
-            
-            IMPORTANT: If you believe the task is complete based on the command outputs, say "TASK COMPLETE" instead of suggesting another command.
+            TASK COMPLETION:
+            - Use TASK_COMPLETE only if prior outputs already satisfy the goal and would pass verification.
             """
         )
         
@@ -534,6 +607,66 @@ class GPTTerminalService: ObservableObject {
             
             // Extract the planned command/script from GPT's response
             let responseContent = response.choices.first?.message.content ?? ""
+            if structuredPlanningEnabled, let planned = parsePlannedStepJSON(responseContent) {
+                trace("planning", "structured JSON parsed; stop=\(planned.stopReason)")
+                let explanation = planned.reason
+                let plannedCommand = cleanCommand(planned.command)
+                // Если GPT заявил TASK_COMPLETE, но при этом вернул команду — выполним команду.
+                // Завершаем без выполнения только когда команда пустая.
+                if planned.stopReason.uppercased() == "TASK_COMPLETE" && plannedCommand.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    await MainActor.run {
+                        isMultiStepMode = false
+                        totalSteps = currentStep
+                    }
+                    let summary = await createTaskSummary()
+                    addSummaryMessage("**Задача завершена!** \(summary)")
+                    LoggingService.shared.success("✅ Task completed by planner decision", source: "GPTTerminalService")
+                    return
+                }
+                // NEEDS_INPUT: не отправляем в терминал подсказки типа echo/please, просим ввод у пользователя
+                if planned.stopReason.uppercased() == "NEEDS_INPUT" || plannedCommand.lowercased().contains("please specify") || plannedCommand.lowercased().contains("please provide") || plannedCommand.lowercased().contains("verification step") {
+                    let question = explanation.isEmpty ? "Уточните, пожалуйста, путь к папке (или полный путь)." : explanation
+                    addAssistantMessage(question)
+                    await MainActor.run {
+                        // Останавливаем автопроцесс и просим пользователя уточнение
+                        self.isMultiStepMode = false
+                        self.totalSteps = self.currentStep
+                        self.showingTaskInput = true
+                        self.taskInput = ""
+                    }
+                    LoggingService.shared.info("⏸️ Waiting for user input instead of echo", source: "GPTTerminalService")
+                    return
+                }
+                // Anti-loop: avoid repeating last 5 semantically similar commands
+                let recentCommands = executionHistory.suffix(5).map { normalizeForDedup($0.command) }
+                if recentCommands.contains(normalizeForDedup(plannedCommand)) {
+                    LoggingService.shared.warning("⚠️ Planned command was executed recently. Skipping to avoid loop.", source: "GPTTerminalService")
+                    await MainActor.run {
+                        isMultiStepMode = false
+                        totalSteps = currentStep
+                    }
+                    let summary = await createTaskSummary()
+                    addSummaryMessage("**Задача завершена!** \(summary)")
+                    return
+                }
+                // Store verify/repair metadata for confirmNextStep
+                pendingVerifyCommands = planned.verify
+                pendingOnFail = planned.on_fail
+                // Show assistant message and queue command
+                let isDanger = isDangerousCommand(plannedCommand)
+                addAssistantMessage(explanation, command: plannedCommand, isDangerous: isDanger, stepNumber: currentStep + 1)
+                trace("planning", "structured step planned command='\(plannedCommand)' waiting_for_confirmation=true")
+                let yolo = UserDefaults.standard.bool(forKey: "YOLOEnabled")
+                await MainActor.run {
+                    pendingCommand = plannedCommand
+                    pendingExplanation = explanation
+                    isWaitingForConfirmation = !yolo
+                    isPendingCommandDangerous = isDanger
+                }
+                if yolo { Task { await self.confirmNextStep() } }
+                LoggingService.shared.info("📋 Planned step \(currentStep + 1): \(plannedCommand)", source: "GPTTerminalService")
+                return
+            }
             let scriptRaw = extractScriptFromResponse(responseContent)
             let commandCandidate = extractCommandFromResponse(responseContent)
             // Treat only multi-line code blocks as scripts; single-line blocks run as plain commands
@@ -609,9 +742,9 @@ class GPTTerminalService: ObservableObject {
 
                 LoggingService.shared.info("📋 Planned step \(currentStep + 1): <script> (first line: \(displayFirstLine))", source: "GPTTerminalService")
             } else if !command.isEmpty {
-                // Check if this command was already executed recently
-                let recentCommands = executionHistory.suffix(2).map { $0.command }
-                if recentCommands.contains(command) {
+                // Check if this command was already executed recently (dedup over last 5)
+                let recentCommands = executionHistory.suffix(5).map { normalizeForDedup($0.command) }
+                if recentCommands.contains(normalizeForDedup(command)) {
                     LoggingService.shared.warning("⚠️ Command '\(command)' was already executed recently. Concluding task to avoid loop.", source: "GPTTerminalService")
                     await MainActor.run {
                         isMultiStepMode = false
@@ -745,8 +878,8 @@ class GPTTerminalService: ObservableObject {
             
             LoggingService.shared.info("🔍 Final verified output for analysis: '\(finalTerminalOutput)'", source: "GPTTerminalService")
             
-            // Collect information from output
-            infoCollector.collectFromOutput(finalTerminalOutput, command: command)
+            // Collect information from output (cleaned)
+            infoCollector.collectFromOutput(UniversalInfoCollector.cleanTerminalText(finalTerminalOutput), command: command)
             
             // Add output to the existing assistant message
             addOutputToLastAssistantMessage(finalTerminalOutput)
@@ -762,6 +895,14 @@ class GPTTerminalService: ObservableObject {
             await MainActor.run {
                 executionHistory.append(step)
                 currentStep += 1 // Increment step counter
+            }
+            
+            // Structured verify/repair (optional)
+            if structuredPlanningEnabled {
+                await runVerifyAndRepairIfNeeded(originalCommand: command)
+                // Clear metadata after attempt
+                pendingVerifyCommands = nil
+                pendingOnFail = nil
             }
             
             // Plan next step
@@ -785,6 +926,118 @@ class GPTTerminalService: ObservableObject {
             // Plan next step even on error
             await planNextStep()
         }
+    }
+
+    // MARK: - Verify/Repair helpers
+    private func evaluateVerifyOutput(_ out: String) -> Bool {
+        let lower = out.lowercased()
+        if out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+        if lower.contains("error") || lower.contains("command not found") || lower.contains("permission denied") || lower.contains("no such file") { return false }
+        return true
+    }
+    
+    private func runVerifyAndRepairIfNeeded(originalCommand: String) async {
+        // Run verify commands if any
+        if let verify = pendingVerifyCommands, !verify.isEmpty {
+            var allPassed = true
+            for v in verify {
+                do {
+                    let escaped = v.replacingOccurrences(of: "\"", with: "\\\"")
+                    let json = "{\"command\":\"\(escaped)\"}"
+                    let out = try await executeTerminalCommand(json)
+                    LoggingService.shared.info("🔎 Verify command output: \(String(out.prefix(200)))", source: "GPTTerminalService")
+                    let step = ExecutionStep(stepNumber: currentStep, command: v, explanation: "Verify", output: out)
+                    await MainActor.run { executionHistory.append(step); currentStep += 1 }
+                    if !evaluateVerifyOutput(out) { allPassed = false }
+                } catch {
+                    allPassed = false
+                }
+            }
+            if allPassed { return }
+        }
+        // If verification failed, try on_fail.apply then retry
+        if let onFail = pendingOnFail {
+            if let apply = onFail.apply, !apply.isEmpty {
+                LoggingService.shared.info("🛠️ Repair path: apply", source: "GPTTerminalService")
+                for a in apply {
+                    do {
+                        let escaped = a.replacingOccurrences(of: "\"", with: "\\\"")
+                        let json = "{\"command\":\"\(escaped)\"}"
+                        let out = try await executeTerminalCommand(json)
+                        let step = ExecutionStep(stepNumber: currentStep, command: a, explanation: "Repair: apply", output: out)
+                        await MainActor.run { executionHistory.append(step); currentStep += 1 }
+                    } catch { /* ignore, continue */ }
+                }
+                if (onFail.retry ?? true) {
+                    LoggingService.shared.info("🔁 Repair path: retry original after apply", source: "GPTTerminalService")
+                    do {
+                        let escaped = originalCommand.replacingOccurrences(of: "\"", with: "\\\"")
+                        let json = "{\"command\":\"\(escaped)\"}"
+                        let out = try await executeTerminalCommand(json)
+                        let step = ExecutionStep(stepNumber: currentStep, command: originalCommand, explanation: "Retry after apply", output: out)
+                        await MainActor.run { executionHistory.append(step); currentStep += 1 }
+                        // Optional quick verify: pass if output looks good
+                        if evaluateVerifyOutput(out) { return }
+                    } catch { /* continue to replace */ }
+                }
+            }
+            if let replace = onFail.replace, !replace.isEmpty {
+                // Execute first replacement command
+                let alt = replace[0]
+                LoggingService.shared.info("🔀 Repair path: replace -> \(alt)", source: "GPTTerminalService")
+                do {
+                    let escaped = alt.replacingOccurrences(of: "\"", with: "\\\"")
+                    let json = "{\"command\":\"\(escaped)\"}"
+                    let out = try await executeTerminalCommand(json)
+                    let step = ExecutionStep(stepNumber: currentStep, command: alt, explanation: "Repair: replace", output: out)
+                    await MainActor.run { executionHistory.append(step); currentStep += 1 }
+                } catch { /* ignore */ }
+            }
+        }
+    }
+
+    private func classifyOutputForErrorHints(_ text: String) -> String {
+        let lower = text.lowercased()
+        if lower.contains("command not found") { return "command_not_found" }
+        if lower.contains("no such file") { return "no_such_file" }
+        if lower.contains("permission denied") { return "permission" }
+        if lower.contains("timed out") || lower.contains("timeout") { return "timeout" }
+        if lower.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "empty" }
+        return "ok/mixed"
+    }
+
+    private func normalizeForDedup(_ cmd: String) -> String {
+        return cleanCommand(cmd).lowercased()
+    }
+
+    // Gather small, safe base context for better planning decisions
+    private func gatherBaseContext() async {
+        // Reuse cached summary if available to avoid re-sending commands
+        let cacheKey = baseContextCacheKey()
+        if let cached = UserDefaults.standard.string(forKey: cacheKey), !cached.isEmpty {
+            baseContextSummary = cached
+            LoggingService.shared.info("🔎 Using cached base context summary", source: "GPTTerminalService")
+            return
+        }
+        let commands = [
+            "pwd",
+            "whoami",
+            "uname -a",
+            "printenv | head -n 20"
+        ]
+        var summary = ""
+        for c in commands {
+            do {
+                let escaped = c.replacingOccurrences(of: "\"", with: "\\\"")
+                let json = "{\"command\":\"\(escaped)\"}"
+                let out = try await executeTerminalCommand(json)
+                summary += "# \(c)\n" + String(out.prefix(600)) + "\n\n"
+            } catch {
+                summary += "# \(c)\n<error>\n\n"
+            }
+        }
+        baseContextSummary = summary
+        UserDefaults.standard.set(baseContextSummary, forKey: cacheKey)
     }
     
     func cancelStep() async {
@@ -820,6 +1073,17 @@ class GPTTerminalService: ObservableObject {
             contextIntro = "Previous task summaries (up to 3, newest last; use only if relevant, do not repeat):\n\n" + joined + "\n\n"
         }
         
+        // Add device context (local or remote) depending on session type
+        let deviceIntro: String = {
+            if terminalService.isLocalSessionActive() || (terminalService.getCurrentProfile()?.isLocal ?? false) {
+                let ctx = buildLocalDeviceContext()
+                return ctx.isEmpty ? "" : "Environment (local): \n" + ctx + "\n\n"
+            } else {
+                let ctx = terminalService.getRemoteDeviceContext()
+                return ctx.isEmpty ? "" : "Environment (remote): \n" + sanitizeForGPT(ctx, maxChars: 800) + "\n\n"
+            }
+        }()
+
         let systemMessage = Message(
             role: "system",
             content: """
@@ -835,7 +1099,12 @@ class GPTTerminalService: ObservableObject {
             - Handle errors gracefully and suggest alternatives
             - For file operations, consider permissions and safety
             - For system operations, be aware of potential impacts
-            \(contextIntro)
+            - Never fabricate terminal output; reason only from provided outputs and exit codes
+            - When encountering failures, ALWAYS propose corrective actions (apply/replace/retry) or discovery to resolve unknowns
+            - If required arguments are unknown, FIRST propose a discovery command, THEN the final command with resolved value
+            - Do not return commands with placeholders like [name], <id>, {ARG}, or UPPER_CASE tokens
+            - Prefer non-interactive, idempotent, safe commands; avoid interactive pagers
+            \(deviceIntro)\(contextIntro)
             """
         )
         
@@ -872,6 +1141,51 @@ class GPTTerminalService: ObservableObject {
         let head = String(clean.prefix(headCount))
         let tail = String(clean.suffix(tailCount))
         return head + marker + tail
+    }
+    
+    // MARK: - Local device context helpers
+    /// Read a sysctl string value by name (e.g., "hw.model")
+    private func sysctlString(_ name: String) -> String? {
+        var size: Int = 0
+        if sysctlbyname(name, nil, &size, nil, 0) != 0 || size <= 0 {
+            return nil
+        }
+        var buffer = [CChar](repeating: 0, count: size)
+        let result = sysctlbyname(name, &buffer, &size, nil, 0)
+        if result == 0 {
+            return String(cString: buffer)
+        }
+        return nil
+    }
+
+    /// Try to get Mac hardware model identifier (e.g., "MacBookPro18,4")
+    private func getMacModelIdentifier() -> String? {
+        return sysctlString("hw.model")
+    }
+
+    /// Build a short environment description for local sessions on this Mac (cached)
+    private func buildLocalDeviceContext() -> String {
+        // Cache key for local environment context
+        let cacheKey = "local_env::v1"
+        if let cached = UserDefaults.standard.string(forKey: cacheKey), !cached.isEmpty {
+            return cached
+        }
+        let os = ProcessInfo.processInfo.operatingSystemVersionString
+        let user = NSUserName()
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let model = getMacModelIdentifier() ?? "UnknownMac"
+        let arch = sysctlString("hw.machine") ?? "unknown"
+        let isMacBook = model.lowercased().contains("macbook")
+        var context: [String] = []
+        context.append("Host: Local macOS device (" + (isMacBook ? "MacBook" : "Mac") + ")")
+        context.append("Model: \(model)")
+        context.append("Arch: \(arch)")
+        context.append("OS: \(os)")
+        context.append("User: \(user)")
+        context.append("Shell: \(shell)")
+        let summary = context.joined(separator: " | ")
+        UserDefaults.standard.set(summary, forKey: cacheKey)
+        return summary
     }
     
     // MARK: - OpenAI API call
@@ -1185,7 +1499,7 @@ class GPTTerminalService: ObservableObject {
     private var lastCommandTime: Date = Date()
     private var outputBeforeCommand: String = ""
     
-    private func waitForCommandCompletion(command: String) async -> String {
+    private func waitForCommandCompletion(command: String, hardLimitSeconds: Int = 180) async -> String {
         LoggingService.shared.info("⏳ Waiting for command completion (prompt-based, event-driven): '\(command)'", source: "GPTTerminalService")
         
         return await withCheckedContinuation { continuation in
@@ -1195,6 +1509,7 @@ class GPTTerminalService: ObservableObject {
                 initialOutputLength: outputBeforeCommand.count,
                 terminalService: terminalService,
                 isLocalSession: terminalService.isLocalSessionActive() || (terminalService.getCurrentProfile()?.isLocal ?? false),
+                hardLimitSeconds: hardLimitSeconds,
                 onComplete: { [weak self] output in
                     self?.currentCompletionHandler = nil
                     self?.unsubscribeBufferIfNeeded()
@@ -1213,10 +1528,14 @@ class GPTTerminalService: ObservableObject {
         private let onComplete: (String) -> Void
         private weak var terminalService: SwiftTermProfessionalService?
         private let isLocalSession: Bool
+        private let hardLimitSeconds: Int
         
         // Guard against multiple resumes
         private var didResume = false
         private let resumeQueue = DispatchQueue(label: "macssh.prompt-completion.resume")
+        
+        // Timeout watchdog
+        private var timeoutTimer: Timer?
         
         // Separate regex sets for remote vs local sessions
         private lazy var promptRegexesRemote: [NSRegularExpression] = {
@@ -1241,11 +1560,19 @@ class GPTTerminalService: ObservableObject {
         }()
         private var promptRegexes: [NSRegularExpression] { isLocalSession ? promptRegexesLocal : promptRegexesRemote }
         
-        init(initialOutputLength: Int, terminalService: SwiftTermProfessionalService, isLocalSession: Bool, onComplete: @escaping (String) -> Void) {
+        init(initialOutputLength: Int, terminalService: SwiftTermProfessionalService, isLocalSession: Bool, hardLimitSeconds: Int, onComplete: @escaping (String) -> Void) {
             self.initialOutputLength = initialOutputLength
             self.terminalService = terminalService
             self.isLocalSession = isLocalSession
+            self.hardLimitSeconds = hardLimitSeconds
             self.onComplete = onComplete
+            // Start timeout watchdog
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.timeoutTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(hardLimitSeconds), repeats: false) { [weak self] _ in
+                    self?.handleTimeout()
+                }
+            }
         }
         
         func bufferChanged() {
@@ -1269,10 +1596,25 @@ class GPTTerminalService: ObservableObject {
                 var shouldResume = false
                 resumeQueue.sync { if !didResume { didResume = true; shouldResume = true } }
                 guard shouldResume else { return }
+                timeoutTimer?.invalidate(); timeoutTimer = nil
                 // Use ANSI-stripped suffix up to the matched prompt
                 let result = String(plainSuffix[..<tailInSuffix.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 LoggingService.shared.debug("[TRACE prompt] matched_prompt tail_lower_offset computed; result_len=\(result.count)", source: "GPTTerminalService")
                 onComplete(result.isEmpty ? "Command executed successfully" : result)
+            }
+        }
+        
+        private func handleTimeout() {
+            var shouldResume = false
+            resumeQueue.sync { if !didResume { didResume = true; shouldResume = true } }
+            guard shouldResume else { return }
+            Task { @MainActor in
+                let full = await terminalService?.getCurrentOutput() ?? ""
+                let start = full.index(full.startIndex, offsetBy: max(0, initialOutputLength))
+                let suffix = String(full[start...])
+                let plainSuffix = stripANSI(suffix)
+                LoggingService.shared.warning("[TRACE prompt] hard timeout reached (\(hardLimitSeconds)s); returning partial output len=\(plainSuffix.count)", source: "GPTTerminalService")
+                onComplete(plainSuffix.isEmpty ? "Command timed out without output" : plainSuffix)
             }
         }
         
@@ -1529,11 +1871,19 @@ class GPTTerminalService: ObservableObject {
     }
     
     private func generateConciseSummary(from collectedInfo: String, for task: String) async -> String {
+        // Redact sensitive patterns (serial numbers, UUIDs, MAC addresses)
+        let redacted = collectedInfo
+            .replacingOccurrences(of: #"(?i)Serial Number[^\n]*"#, with: "Serial Number: [REDACTED]", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)Hardware UUID[^\n]*"#, with: "Hardware UUID: [REDACTED]", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)Provisioning UDID[^\n]*"#, with: "Provisioning UDID: [REDACTED]", options: .regularExpression)
+            .replacingOccurrences(of: #"\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b"#, with: "[REDACTED-MAC]", options: .regularExpression)
+            .replacingOccurrences(of: #"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b"#, with: "[REDACTED-UUID]", options: .regularExpression)
+
         let prompt = """
         Ты - эксперт по анализу информации с глубокими знаниями Unix/Linux систем. Пользователь задал вопрос: "\(task)"
         
         Вот собранная информация из терминала:
-        \(collectedInfo)
+        \(redacted)
         
         Задача: Выбери самое важное из этой информации и представь это в виде краткой сводки, понятной для человека.
         

@@ -16,6 +16,13 @@ class SwiftTermProfessionalService: ObservableObject {
     private var currentProfile: Profile?
     private var isDisconnecting = false
     private var localProcess: LocalProcess?
+    // Cached summary of remote machine environment (OS, arch, package manager, etc.)
+    private var remoteDeviceContext: String = ""
+    
+    // Build cache key for remote environment context
+    private func remoteEnvCacheKey(for profile: Profile) -> String {
+        return "remote_env::\(profile.username)@\(profile.host):\(profile.port)"
+    }
     
     // Coalesce high-frequency buffer change notifications to avoid UI thrash
     private let bufferDebounceQueue = DispatchQueue(label: "macssh.terminal.buffer.debounce")
@@ -136,6 +143,15 @@ class SwiftTermProfessionalService: ObservableObject {
                         self.connectionStatus = "Connected to \(profile.host)"
                         
                         LoggingService.shared.debug("SwiftTerm SSH connection established", source: "SwiftTermService")
+                        // Remote env context: use cache if available, otherwise collect once
+                        let key = self.remoteEnvCacheKey(for: profile)
+                        if let cached = UserDefaults.standard.string(forKey: key), !cached.isEmpty {
+                            self.remoteDeviceContext = cached
+                            LoggingService.shared.info("🔎 Using cached remote env context", source: "SwiftTermService")
+                        } else {
+                            self.remoteDeviceContext = ""
+                            Task { await self.collectRemoteEnvironmentInfo() }
+                        }
                         continuation.resume()
                     }
                 } catch {
@@ -322,6 +338,90 @@ class SwiftTermProfessionalService: ObservableObject {
             LoggingService.shared.debug("Terminal session disconnected", source: "SwiftTermService")
         }
     }
+
+    // MARK: - Remote environment discovery
+    /// Collect a concise summary of the remote system to help GPT reason about environment.
+    /// Runs lightweight, safe commands, coalesces output, and caches a single-line summary.
+    private func collectRemoteEnvironmentInfo() async {
+        guard sshProcess != nil, let profile = currentProfile, (profile.isLocal ?? false) == false else { return }
+        LoggingService.shared.info("🔎 Collecting remote environment info...", source: "SwiftTermService")
+        let probe = [
+            // Try standard identifiers first
+            "echo OS=$(uname -s) KERNEL=$(uname -r) ARCH=$(uname -m)",
+            // Linux distro info (gracefully degrade)
+            "if command -v lsb_release >/dev/null 2>&1; then echo DISTRO=$(lsb_release -ds); fi",
+            "if [ -f /etc/os-release ]; then . /etc/os-release; echo DISTRO=\"${PRETTY_NAME}\"; fi",
+            // macOS fallback (in case SSH to macOS)
+            "if [ \"$(uname -s)\" = \"Darwin\" ]; then echo MACOS=$(sw_vers -productVersion); fi",
+            // Package manager hints
+            "for pm in apt yum dnf pacman zypper apk brew port; do command -v $pm >/dev/null 2>&1 && echo PM=$pm; done",
+            // Shell and user
+            "echo USER=$USER SHELL=$SHELL",
+            // CPU count (safe, common)
+            "if command -v nproc >/dev/null 2>&1; then echo CPU=$(nproc); elif [ -f /proc/cpuinfo ]; then echo CPU=$(grep -c '^processor' /proc/cpuinfo); fi",
+        ].joined(separator: "; ")
+
+        await MainActor.run { self.sendCommand(probe) }
+        // Wait briefly and use our reliable completion to settle output
+        let reliable = ReliableCommandCompletion(terminalService: self)
+        _ = await reliable.waitForCommandCompletion(command: "__probe_remote_env__")
+
+        // Snapshot current output and extract only the tail we just produced
+        let full = await getCurrentOutput() ?? ""
+        // Extract last ~2k chars for parsing
+        let tail = String(full.suffix(2000))
+        // Parse key=value pairs
+        var os: String = ""
+        var kernel: String = ""
+        var arch: String = ""
+        var distro: String = ""
+        var macos: String = ""
+        var pm: String = ""
+        var user: String = ""
+        var shell: String = ""
+        var cpu: String = ""
+
+        func capture(_ key: String, from text: String) -> String? {
+            // Simple regex-like scan without regex dependency
+            // Looks for lines containing KEY=VALUE and returns VALUE
+            for line in text.split(separator: "\n").map(String.init).reversed() {
+                if line.hasPrefix(key + "=") {
+                    return String(line.dropFirst(key.count + 1)).trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                }
+            }
+            return nil
+        }
+
+        os = capture("OS", from: tail) ?? ""
+        kernel = capture("KERNEL", from: tail) ?? ""
+        arch = capture("ARCH", from: tail) ?? ""
+        distro = capture("DISTRO", from: tail) ?? ""
+        macos = capture("MACOS", from: tail) ?? ""
+        pm = capture("PM", from: tail) ?? ""
+        user = capture("USER", from: tail) ?? ""
+        shell = capture("SHELL", from: tail) ?? ""
+        cpu = capture("CPU", from: tail) ?? ""
+
+        var parts: [String] = []
+        parts.append("Host: \(profile.username)@\(profile.host)")
+        if !distro.isEmpty { parts.append("Distro: \(distro)") }
+        if !macos.isEmpty { parts.append("macOS: \(macos)") }
+        if !os.isEmpty { parts.append("OS: \(os)") }
+        if !kernel.isEmpty { parts.append("Kernel: \(kernel)") }
+        if !arch.isEmpty { parts.append("Arch: \(arch)") }
+        if !pm.isEmpty { parts.append("PM: \(pm)") }
+        if !user.isEmpty { parts.append("User: \(user)") }
+        if !shell.isEmpty { parts.append("Shell: \(shell)") }
+        if !cpu.isEmpty { parts.append("CPU: \(cpu)") }
+
+        let summary = parts.joined(separator: " | ")
+        LoggingService.shared.info("🔎 Remote env: \(summary)", source: "SwiftTermService")
+        self.remoteDeviceContext = summary
+        if let profile = self.currentProfile {
+            let key = self.remoteEnvCacheKey(for: profile)
+            UserDefaults.standard.set(summary, forKey: key)
+        }
+    }
     
     func getTerminalView() -> TerminalView? {
         return terminalView
@@ -330,6 +430,11 @@ class SwiftTermProfessionalService: ObservableObject {
     // Expose current profile for context-aware features
     func getCurrentProfile() -> Profile? {
         return currentProfile
+    }
+    
+    // Expose remote device context summary for GPT prompts
+    func getRemoteDeviceContext() -> String {
+        return remoteDeviceContext
     }
 
     // Indicates if a local PTY session is active

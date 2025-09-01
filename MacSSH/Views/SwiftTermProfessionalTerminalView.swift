@@ -886,7 +886,6 @@ extension SwiftTerminalView.Coordinator: TerminalViewDelegate {
     
     func rangeChanged(source: TerminalView, startY: Int, endY: Int) {
         // Обработка изменения выделенного диапазона
-        LoggingService.shared.debug("🎯 Selection range changed: \(startY) to \(endY)", source: "SwiftTerminalView")
         
         // Проверяем, есть ли активное выделение
         if source.selectionActive {
