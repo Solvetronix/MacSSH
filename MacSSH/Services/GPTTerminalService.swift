@@ -486,6 +486,15 @@ class GPTTerminalService: ObservableObject {
             - DO NOT use ```sh or ```bash - use only ``` for code blocks
             - Commands should be clean and ready to execute directly
             
+            ARGUMENT COMPLETENESS (CRITICAL):
+            - NEVER return commands containing placeholders like [name], <id>, {arg}, or UPPER_CASE tokens (e.g., SERVICE, PROCESS_NAME)
+            - If a required argument is unknown, FIRST propose a discovery command to find it, THEN return the final concrete command with the resolved value
+            - Prefer robust, non-interactive discovery (e.g., for pm2: `pm2 jlist` or `pm2 ls --no-color` and parse the result)
+            - Examples:
+              • Instead of `pm2 show [process-name]` → run `pm2 jlist` to get names/ids, choose the correct one by context, then use `pm2 show exact-name-or-id`
+              • Instead of `systemctl status SERVICE` → run `systemctl list-units --type=service --no-pager | grep -i pattern` to resolve the exact unit name
+            - Absolutely NO placeholders in the final command you output
+            
             Provide a clear explanation of what this command will do and why it's needed.
             
             Be intelligent and proactive - suggest the most efficient approach. Use the best command for the task.
@@ -526,7 +535,10 @@ class GPTTerminalService: ObservableObject {
             // Extract the planned command/script from GPT's response
             let responseContent = response.choices.first?.message.content ?? ""
             let scriptRaw = extractScriptFromResponse(responseContent)
-            let command = scriptRaw == nil ? extractCommandFromResponse(responseContent) : ""
+            let commandCandidate = extractCommandFromResponse(responseContent)
+            // Treat only multi-line code blocks as scripts; single-line blocks run as plain commands
+            let isMultiLineScript = (scriptRaw?.contains("\n") ?? false)
+            let command = isMultiLineScript ? "" : (commandCandidate.isEmpty ? (scriptRaw ?? "") : commandCandidate)
             trace("planning", "parsed_script_len=\(scriptRaw?.count ?? 0) parsed_command='\(command)' contains_task_complete=\(responseContent.lowercased().contains("task complete"))")
             let explanation = responseContent
             
@@ -559,7 +571,7 @@ class GPTTerminalService: ObservableObject {
                 
                 LoggingService.shared.success("✅ Task completed in \(currentStep) steps", source: "GPTTerminalService")
                 return
-            } else if let script = scriptRaw, !script.isEmpty {
+            } else if let script = scriptRaw, isMultiLineScript {
                 // Resolve placeholders from previous outputs before wrapping
                 let resolvedScript = resolvePlaceholders(in: script)
                 // Build heredoc-wrapped command for execution
@@ -1083,11 +1095,7 @@ class GPTTerminalService: ObservableObject {
         // Add lightweight safety for heavy-output commands
         let safeCmd = makeNonBlocking(command)
         var wrappedCommand = "\(nonPagingPrefix) \(safeCmd)"
-        // Inject sudo password for non-interactive execution if needed
-        wrappedCommand = injectSudoPasswordIfNeeded(wrappedCommand)
-        // If we're running a heredoc script, force sudo for the script run step only
-        wrappedCommand = wrapHeredocRunWithSudoIfNeeded(wrappedCommand)
-        trace("terminal", "wrapped_command='\(sanitizeSudoInLogs(wrappedCommand))'")
+        trace("terminal", "wrapped_command='\(wrappedCommand)'")
         await MainActor.run {
             terminalService.sendCommand(wrappedCommand)
         }
@@ -1651,60 +1659,14 @@ class GPTTerminalService: ObservableObject {
         return cmd
     }
 
-    // MARK: - Sudo non-interactive helper
-    private func injectSudoPasswordIfNeeded(_ command: String) -> String {
-        guard let profile = terminalService.getCurrentProfile(),
-              let password = profile.password, !password.isEmpty else { return command }
-        // Quick path: no 'sudo ' substring
-        let lower = command.lowercased()
-        guard lower.contains("sudo ") else { return command }
-        // Escape single quotes for safe single-quoted string: ' -> '\''
-        let escaped = password.replacingOccurrences(of: "'", with: "'\"'\"'"
-        )
-        let feeder = "printf '%s\\n' '\(escaped)' | sudo -S -p '' "
-        var result = command
-        // Replace start-of-string sudo
-        if result.hasPrefix("sudo ") {
-            result = result.replacingOccurrences(of: "sudo ", with: feeder)
-        }
-        // Replace new-line delimited sudo invocations
-        result = result.replacingOccurrences(of: "\nsudo ", with: "\n" + feeder)
-        // Also handle tabs just in case
-        result = result.replacingOccurrences(of: "\nsudo\t", with: "\n" + feeder)
-        return result
-    }
-
-    private func sanitizeSudoInLogs(_ command: String) -> String {
-        guard let profile = terminalService.getCurrentProfile(),
-              let password = profile.password, !password.isEmpty else { return command }
-        return command.replacingOccurrences(of: password, with: "******")
-    }
-
-    // Wrap the execution of /tmp/_macssh_step.sh with sudo feeder if profile has a password
-    private func wrapHeredocRunWithSudoIfNeeded(_ command: String) -> String {
-        guard let profile = terminalService.getCurrentProfile(),
-              let password = profile.password, !password.isEmpty else { return command }
-        // Detect call to /tmp/_macssh_step.sh (with or without timeout prefix)
-        if command.contains("/tmp/_macssh_step.sh") {
-            let escaped = password.replacingOccurrences(of: "'", with: "'\"'\"'")
-            let feederPrefix = "printf '%s\\n' '\(escaped)' | sudo -S -p '' "
-            var result = command
-            // Replace common execution patterns safely
-            result = result.replacingOccurrences(of: "timeout 300s /tmp/_macssh_step.sh",
-                                                 with: feederPrefix + "timeout 300s /tmp/_macssh_step.sh")
-            result = result.replacingOccurrences(of: "/tmp/_macssh_step.sh",
-                                                 with: feederPrefix + "/tmp/_macssh_step.sh")
-            return result
-        }
-        return command
-    }
 
     // Build a heredoc script wrapper with safety flags and global timeout
     private func buildHeredocScript(_ rawScript: String) -> String {
         // Do not normalize whitespace; run as-is inside bash with strict flags
         let heredoc = """
-        bash -lc 'set -euo pipefail; cat > /tmp/_macssh_step.sh <<\"EOF\"
-        \(rawScript)\nEOF\nchmod +x /tmp/_macssh_step.sh; timeout 300s /tmp/_macssh_step.sh'
+        bash -lc 'set -euo pipefail; timeout 300s bash -s <<"EOF"
+        \(rawScript)
+        EOF'
         """
         return heredoc
     }

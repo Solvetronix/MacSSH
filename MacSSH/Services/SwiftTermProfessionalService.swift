@@ -15,10 +15,6 @@ class SwiftTermProfessionalService: ObservableObject {
     private var sshProcess: Process?
     private var currentProfile: Profile?
     private var isDisconnecting = false
-    // Tracks if we just sent a command with sudo and are expecting a password prompt
-    private var awaitingSudoPassword: Bool = false
-    // Debounce repeated password sends while the same prompt is visible
-    private var recentlySentPassword: Bool = false
     
     // Coalesce high-frequency buffer change notifications to avoid UI thrash
     private let bufferDebounceQueue = DispatchQueue(label: "macssh.terminal.buffer.debounce")
@@ -110,33 +106,7 @@ class SwiftTermProfessionalService: ObservableObject {
                                     // Уведомляем об изменении буфера
                                     self?.notifyBufferChanged()
                                     
-                                    // Проверяем, нужно ли отправить пароль (ssh/sudo). Для sudo распознаем расширенно.
-                                    // Сканируем хвост всего буфера, чтобы не терять разрезанные по чанкам строки
-                                    let tailLower = (self?.currentOutput.suffix(512).lowercased() ?? output.lowercased())
-                                    let isSudoPrompt = tailLower.contains("[sudo]") || tailLower.contains("password for ") || tailLower.contains("sudo password") || tailLower.contains("пароль для ")
-                                    let isGenericPasswordPrompt = tailLower.contains("password:") || tailLower.contains("пароль:")
-                                    let shouldReplyToPrompt = isSudoPrompt || ((self?.awaitingSudoPassword ?? false) && isGenericPasswordPrompt)
-                                    if shouldReplyToPrompt && !(self?.recentlySentPassword ?? false) {
-                                        LoggingService.shared.warning("🔐 Password prompt detected (sudo/ssh)", source: "SwiftTermService")
-                                        if let profile = self?.currentProfile, let password = profile.password, !password.isEmpty {
-                                            self?.recentlySentPassword = true
-                                            // auto-reset debounce to allow next prompt later
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in self?.recentlySentPassword = false }
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                                let passwordData = (password + "\n").data(using: .utf8) ?? Data()
-                                                if let inputPipe = process.standardInput as? Pipe {
-                                                    inputPipe.fileHandleForWriting.write(passwordData)
-                                                    LoggingService.shared.success("✅ Password sent automatically", source: "SwiftTermService")
-                                                    // Reset sudo wait flag after send
-                                                    self?.awaitingSudoPassword = false
-                                                } else {
-                                                    LoggingService.shared.error("❌ Failed to get input pipe for password", source: "SwiftTermService")
-                                                }
-                                            }
-                                        } else {
-                                            LoggingService.shared.error("❌ No password available in profile", source: "SwiftTermService")
-                                        }
-                                    }
+                                    // No automatic password submission
                                 }
                             }
                         }
@@ -178,12 +148,7 @@ class SwiftTermProfessionalService: ObservableObject {
     func sendCommand(_ command: String) {
         guard let process = sshProcess, isConnected else { return }
         
-        // If command involves sudo, set expectation for sudo password prompt briefly
-        let lower = command.lowercased()
-        if lower.contains("sudo ") || lower.hasPrefix("sudo") {
-            awaitingSudoPassword = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in self?.awaitingSudoPassword = false }
-        }
+        // No special handling for sudo prompts
         
         let commandData = (command + "\n").data(using: .utf8) ?? Data()
         if let inputPipe = process.standardInput as? Pipe {
