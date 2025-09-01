@@ -186,14 +186,38 @@ struct UniversalInfoCollector {
     // Static helper: sanitize terminal output for summaries
     static func cleanTerminalText(_ text: String) -> String {
         var s = text
-        // Remove backspace and preceding char artifacts
-        s = s.replacingOccurrences(of: "\u{0008}", with: "") // Backspace
-        s = s.replacingOccurrences(of: "\u{0007}", with: "") // Bell
+        // Process backspaces properly: remove the char before \b
+        var buffer: [Character] = []
+        for ch in s {
+            if ch == "\u{0008}" { // backspace
+                if !buffer.isEmpty { buffer.removeLast() }
+                continue
+            }
+            if ch == "\u{0007}" { // bell
+                continue
+            }
+            buffer.append(ch)
+        }
+        s = String(buffer)
+        // Normalize CR and mixed newlines
+        s = s.replacingOccurrences(of: "\r", with: "")
         // Remove common ANSI escape sequences
         let ansiPattern = "\u{001B}[[0-9;?]*[ -/]*[@-~]"
         s = s.replacingOccurrences(of: ansiPattern, with: "", options: .regularExpression)
         // Trim noisy export prefix lines we add for non-paging
         s = s.replacingOccurrences(of: "export PAGER=cat; export LESS='-F -X -R'; ", with: "")
+        // Join soft-wrapped splits inside words/paths (e.g., "Desk\n t\n top" -> "Desktop")
+        if let joinRegex = try? NSRegularExpression(pattern: "([\\p{L}\\p{N}_/\\.\\-])\\s*\n\\s*([\\p{L}\\p{N}_/\\.\\-])") {
+            var prev: String
+            var i = 0
+            repeat {
+                prev = s
+                s = joinRegex.stringByReplacingMatches(in: s, options: [], range: NSRange(s.startIndex..., in: s), withTemplate: "$1$2")
+                i += 1
+            } while s != prev && i < 3
+        }
+        // Collapse excessive blank lines
+        s = s.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
         return s
     }
 }
