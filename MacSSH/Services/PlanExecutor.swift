@@ -23,6 +23,11 @@ class PlanExecutor: ObservableObject {
         self.gptService = gptService
         self.reliableCompletion = ReliableCommandCompletion(terminalService: terminalService)
         self.yoloEnabled = UserDefaults.standard.bool(forKey: "YOLOEnabled")
+        // Stop ongoing execution if terminal session is closing
+        NotificationCenter.default.addObserver(forName: .terminalSessionWillClose, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.isExecuting = false
+        }
     }
     
     // MARK: - Plan Execution

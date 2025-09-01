@@ -2,6 +2,10 @@ import Foundation
 import SwiftUI
 import AppKit
 
+extension Notification.Name {
+    static let terminalSessionWillClose = Notification.Name("terminalSessionWillClose")
+}
+
 class WindowManager: ObservableObject {
     static let shared = WindowManager()
     
@@ -70,6 +74,8 @@ class WindowManager: ObservableObject {
     func closeTerminalWindow(for profile: Profile) {
         let windowId = "terminal_\(profile.id.uuidString)"
         if let window = terminalWindows[windowId] {
+            // Сообщаем подписчикам о скором закрытии сессии (чтобы они остановили процессы/таймеры)
+            NotificationCenter.default.post(name: .terminalSessionWillClose, object: nil, userInfo: ["windowId": windowId])
             // Отключаем сервис терминала
             terminalServices[windowId]?.disconnect()
             terminalServices.removeValue(forKey: windowId)
@@ -112,6 +118,8 @@ class WindowManager: ObservableObject {
     // Метод для удаления окна из словарей (вызывается делегатом)
     @MainActor
     func removeWindow(withId windowId: String) {
+        // Сообщаем подписчикам о скором закрытии сессии (чтобы они остановили процессы/таймеры)
+        NotificationCenter.default.post(name: .terminalSessionWillClose, object: nil, userInfo: ["windowId": windowId])
         // Отключаем сервис терминала
         terminalServices[windowId]?.disconnect()
         terminalServices.removeValue(forKey: windowId)

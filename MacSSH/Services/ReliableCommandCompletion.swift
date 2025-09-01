@@ -61,6 +61,11 @@ private class ReliableCompletionHandler {
         
         // 2. Monitor output stability
         startStabilityMonitoring()
+
+        // 3. Stop monitoring if terminal session is closing
+        NotificationCenter.default.addObserver(forName: .terminalSessionWillClose, object: nil, queue: .main) { [weak self] _ in
+            self?.cleanupAndComplete()
+        }
     }
     
     // MARK: - Data Received Monitoring

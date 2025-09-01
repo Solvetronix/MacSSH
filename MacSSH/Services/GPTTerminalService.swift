@@ -382,11 +382,28 @@ class GPTTerminalService: ObservableObject {
         // to avoid idle wakeups while the app sits unused on the main screen.
         // Load persisted summaries for current host
         loadLastSummaries()
+        // Subscribe to terminal session close to stop timers/tasks
+        NotificationCenter.default.addObserver(self, selector: #selector(onTerminalSessionWillClose(_:)), name: .terminalSessionWillClose, object: nil)
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
         // Cleanup if needed
+    }
+
+    // Stop any ongoing timers/tasks when terminal session is closing
+    @objc private func onTerminalSessionWillClose(_ note: Notification) {
+        Task { @MainActor in
+            // Stop countdown message
+            stopTerminalWaitCountdown()
+            // Cancel prompt completion handler subscriptions
+            self.currentCompletionHandler = nil
+            unsubscribeBufferIfNeeded()
+            // Stop multi-step execution cleanly
+            if self.isMultiStepMode {
+                self.isMultiStepMode = false
+            }
+        }
     }
     
     @objc private func handleTerminalBufferChanged() {
@@ -1814,6 +1831,23 @@ class GPTTerminalService: ObservableObject {
     }
     
     private func createTaskSummary() async -> String {
+        // Fast-path: if last execution steps contain explicit success/failure cues, summarize deterministically
+        if let last = executionHistory.last {
+            let out = last.output.lowercased()
+            if out.contains("file deleted") || out.contains("removed") || out.contains("no such file or directory") {
+                let title = "**Ключевая сводка:**\n"
+                var bullets: [String] = []
+                if out.contains("file deleted") || out.contains("removed") {
+                    bullets.append("- Файл успешно удалён")
+                }
+                if out.contains("no such file or directory") {
+                    bullets.append("- Файл не найден (возможно уже удалён)")
+                }
+                let summary = title + bullets.joined(separator: "\n")
+                persistSummary(summary)
+                return summary
+            }
+        }
         // Get collected information
         let collectedInfo = infoCollector.generateSummary()
         
