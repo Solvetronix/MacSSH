@@ -11,9 +11,9 @@
     <key>CFBundleIdentifier</key>
     <string>solvetronix.macssh</string>
     	<key>CFBundleVersion</key>
-	<string>217</string>
+	<string>218</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.8.37</string>
+	<string>1.8.38</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSPrincipalClass</key>
