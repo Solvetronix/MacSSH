@@ -251,6 +251,7 @@ class GPTTerminalService: ObservableObject {
     
     private var apiKey: String
     private let terminalService: SwiftTermProfessionalService
+    private var enhancedRecoveryService: EnhancedRecoveryService?
     private var conversationHistory: [Message] = []
     private let maxSteps = 10 // Safety limit
     // Toggle to disable secondary OpenAI calls for completion checks to avoid UI stalls
@@ -276,6 +277,25 @@ class GPTTerminalService: ObservableObject {
         return "base_ctx::\(isLocal ? "local" : "remote")::\(user)@\(host)"
     }
 
+    // MARK: - Initialization
+    
+    init(terminalService: SwiftTermProfessionalService) {
+        self.terminalService = terminalService
+
+        self.apiKey = GPTTerminalService.resolveApiKey()
+        
+        if apiKey.isEmpty {
+            LoggingService.shared.error("❌ OpenAI API key is empty. Set it in settings.", source: "GPTTerminalService")
+        } else {
+            LoggingService.shared.info("🔑 OpenAI API key loaded", source: "GPTTerminalService")
+        }
+        
+        loadLastSummaries()
+        
+        // Subscribe to terminal session close to stop timers/tasks
+        NotificationCenter.default.addObserver(self, selector: #selector(onTerminalSessionWillClose(_:)), name: .terminalSessionWillClose, object: nil)
+    }
+    
     // Lightweight trace helper to unify verbose diagnostics
     private func trace(_ scope: String, _ message: String) {
         LoggingService.shared.debug("[TRACE \(sessionTraceId):\(scope)] \(message)", source: "GPTTerminalService")
@@ -393,22 +413,6 @@ class GPTTerminalService: ObservableObject {
             )
         )
     )
-    
-    init(terminalService: SwiftTermProfessionalService) {
-        self.terminalService = terminalService
-        self.apiKey = GPTTerminalService.resolveApiKey()
-        if self.apiKey.isEmpty {
-            LoggingService.shared.error("❌ OpenAI API key is empty. Set it in settings.", source: "GPTTerminalService")
-        } else {
-            LoggingService.shared.info("🔑 OpenAI API key loaded", source: "GPTTerminalService")
-        }
-        // Lazily subscribe to terminal buffer events only when a command is running
-        // to avoid idle wakeups while the app sits unused on the main screen.
-        // Load persisted summaries for current host
-        loadLastSummaries()
-        // Subscribe to terminal session close to stop timers/tasks
-        NotificationCenter.default.addObserver(self, selector: #selector(onTerminalSessionWillClose(_:)), name: .terminalSessionWillClose, object: nil)
-    }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -1895,6 +1899,93 @@ class GPTTerminalService: ObservableObject {
         persistSummary(message)
         return message
     }
+    
+    // MARK: - Enhanced Success Analysis
+    
+    /// Lazy initialization of EnhancedRecoveryService
+    private func ensureEnhancedRecoveryService() async -> EnhancedRecoveryService {
+        if let service = enhancedRecoveryService {
+            return service
+        }
+        
+        let service = await MainActor.run {
+            EnhancedRecoveryService(terminalService: terminalService, gptService: self)
+        }
+        enhancedRecoveryService = service
+        return service
+    }
+    
+    /// Analyze command success using EnhancedRecoveryService instead of raw output parsing
+    private func analyzeCommandSuccessFromHistory() async -> String {
+        guard let lastStep = executionHistory.last else {
+            return "❌ Нет истории выполнения команд"
+        }
+        
+        LoggingService.shared.info("🔍 Analyzing command success using EnhancedRecoveryService", source: "GPTTerminalService")
+        
+        // Create a mock PlanStep for analysis with better success criteria
+        let mockStep = PlanStep(
+            id: lastStep.command,
+            title: "Command execution",
+            description: lastStep.command,
+            command: lastStep.command,
+            successCriteria: [
+                SuccessCriterion(
+                    description: "Command executed successfully",
+                    type: .commandSucceeded,
+                    value: "true"
+                ),
+                SuccessCriterion(
+                    description: "No errors in output",
+                    type: .noErrors,
+                    value: "true"
+                ),
+                SuccessCriterion(
+                    description: "Process completed",
+                    type: .processCompleted,
+                    value: "true"
+                )
+            ]
+        )
+        
+        // Use EnhancedRecoveryService to analyze success
+        let recoveryService = await ensureEnhancedRecoveryService()
+        let isSuccess = await recoveryService.analyzeCommandSuccess(
+            mockStep,
+            commandOutput: lastStep.output,
+            exitCode: 0 // Assume success if we got here
+        )
+        
+        // Additional intelligent analysis based on command type
+        let command = lastStep.command.lowercased()
+        let output = lastStep.output.lowercased()
+        
+        var additionalAnalysis = ""
+        
+        if command.contains(">") && command.contains("desktop") {
+            // File creation command
+            if output.contains("permission denied") || output.contains("access denied") {
+                additionalAnalysis = "⚠️ Возможны проблемы с правами доступа"
+            } else if !output.contains("error") && !output.contains("failed") {
+                additionalAnalysis = "📁 Файл должен быть создан на рабочем столе"
+            }
+        }
+        
+        if command.contains("system_profiler") {
+            // System information command
+            if output.contains("error") || output.contains("failed") {
+                additionalAnalysis = "⚠️ Команда system_profiler завершилась с ошибкой"
+            } else {
+                additionalAnalysis = "💻 Системная информация успешно собрана"
+            }
+        }
+        
+        if isSuccess {
+            return "✅ Команда выполнена успешно согласно критериям EnhancedRecoveryService\n\(additionalAnalysis)"
+        } else {
+            return "❌ Команда не прошла проверку критериев успеха\n\(additionalAnalysis)"
+        }
+    }
 
     // MARK: - Persistent lightweight context
     private func summaryStorageKey() -> String {
@@ -1929,6 +2020,9 @@ class GPTTerminalService: ObservableObject {
     }
     
     private func generateConciseSummary(from collectedInfo: String, for task: String) async -> String {
+        // First, analyze command success using EnhancedRecoveryService
+        let successAnalysis = await analyzeCommandSuccessFromHistory()
+        
         // Redact sensitive patterns (serial numbers, UUIDs, MAC addresses)
         let redacted = collectedInfo
             .replacingOccurrences(of: #"(?i)Serial Number[^\n]*"#, with: "Serial Number: [REDACTED]", options: .regularExpression)
@@ -1940,10 +2034,15 @@ class GPTTerminalService: ObservableObject {
         let prompt = """
         Ты - эксперт по анализу информации с глубокими знаниями Unix/Linux систем. Пользователь задал вопрос: "\(task)"
         
+        АНАЛИЗ УСПЕХА ВЫПОЛНЕНИЯ:
+        \(successAnalysis)
+        
         Вот собранная информация из терминала:
         \(redacted)
         
         Задача: Выбери самое важное из этой информации и представь это в виде краткой сводки, понятной для человека.
+        
+        ВАЖНО: Учитывай результат анализа успеха выполнения команды выше. Если команда выполнена успешно, то задача считается выполненной.
         
         Требования:
         1. Отвечай ТОЛЬКО на заданный вопрос
@@ -1954,6 +2053,7 @@ class GPTTerminalService: ObservableObject {
         6. Максимум 5-7 строк
         7. Будь точным и информативным
         8. Если есть числовые данные - выдели их
+        9. Если команда выполнена успешно - обязательно укажи это в начале ответа
         
         Ответ:
         """

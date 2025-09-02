@@ -16,16 +16,24 @@ struct PlanStep: Codable, Identifiable {
     let pre: [String]?
     // Optional alternatives to apply on failure
     let alternatives: [StepAlternative]?
+    // Enhanced alternatives with recovery strategies
+    let enhancedAlternatives: [EnhancedStepAlternative]?
     // Optional manual testing checkpoint
     let checkpoint: Bool?
     let testInstructions: String?
     let testPrompts: [String]?
+    // Recovery configuration
+    let enableAutoRecovery: Bool?
+    let maxRecoveryAttempts: Int?
+    let recoveryTimeout: TimeInterval?
     
     init(id: String, title: String, description: String, command: String, 
          successCriteria: [SuccessCriterion] = [], failureCriteria: [FailureCriterion] = [],
          expectedOutput: String? = nil, timeoutSeconds: Int = 30,
          env: [String: String]? = nil, pre: [String]? = nil, alternatives: [StepAlternative]? = nil,
-         checkpoint: Bool? = nil, testInstructions: String? = nil, testPrompts: [String]? = nil) {
+         enhancedAlternatives: [EnhancedStepAlternative]? = nil, checkpoint: Bool? = nil, 
+         testInstructions: String? = nil, testPrompts: [String]? = nil,
+         enableAutoRecovery: Bool? = true, maxRecoveryAttempts: Int? = 3, recoveryTimeout: TimeInterval? = 60) {
         self.id = id
         self.title = title
         self.description = description
@@ -37,9 +45,13 @@ struct PlanStep: Codable, Identifiable {
         self.env = env
         self.pre = pre
         self.alternatives = alternatives
+        self.enhancedAlternatives = enhancedAlternatives
         self.checkpoint = checkpoint
         self.testInstructions = testInstructions
         self.testPrompts = testPrompts
+        self.enableAutoRecovery = enableAutoRecovery
+        self.maxRecoveryAttempts = maxRecoveryAttempts
+        self.recoveryTimeout = recoveryTimeout
     }
 }
 
@@ -103,6 +115,14 @@ enum CriterionType: String, Codable, CaseIterable {
     case outputLength = "output_length"
     case outputEmpty = "output_empty"
     case outputNotEmpty = "output_not_empty"
+    // New criteria for better success detection
+    case commandSucceeded = "command_succeeded"
+    case fileCreated = "file_created"
+    case fileModified = "file_modified"
+    case contentAdded = "content_added"
+    case processCompleted = "process_completed"
+    case noErrors = "no_errors"
+    case expectedPattern = "expected_pattern"
 }
 
 struct ExecutionPlan: Codable, Identifiable {
@@ -172,6 +192,10 @@ struct StepExecutionResult: Codable, Identifiable {
     let notes: String?
     let matchedAlternativeRegex: String?
     let appliedAlternativeType: String? // apply|replace|retry|none
+    // Enhanced recovery tracking
+    let recoveryAttempts: [RecoveryAttempt]?
+    let autoRecoveryEnabled: Bool?
+    let finalRecoveryStrategy: RecoveryStrategy?
     
     var isSuccess: Bool {
         status == .success
@@ -179,6 +203,14 @@ struct StepExecutionResult: Codable, Identifiable {
     
     var isFailed: Bool {
         status == .failed
+    }
+    
+    var recoveryAttemptsCount: Int {
+        return recoveryAttempts?.count ?? 0
+    }
+    
+    var successfulRecovery: Bool {
+        return finalRecoveryStrategy != nil && status == .success
     }
 }
 
@@ -288,4 +320,239 @@ extension ExecutionPlan {
         maxTotalTime: 120,
         maxRetries: 2
     )
+}
+
+// MARK: - Error Analysis Models
+
+enum ErrorPattern: String, Codable, CaseIterable {
+    case commandNotFound = "command_not_found"
+    case permissionDenied = "permission_denied"
+    case fileNotFound = "file_not_found"
+    case directoryNotFound = "directory_not_found"
+    case timeout = "timeout"
+    case connectionFailed = "connection_failed"
+    case insufficientSpace = "insufficient_space"
+    case alreadyExists = "already_exists"
+    case invalidArgument = "invalid_argument"
+    case resourceBusy = "resource_busy"
+    
+    var description: String {
+        switch self {
+        case .commandNotFound:
+            return "Command not found"
+        case .permissionDenied:
+            return "Permission denied"
+        case .fileNotFound:
+            return "File not found"
+        case .directoryNotFound:
+            return "Directory not found"
+        case .timeout:
+            return "Operation timed out"
+        case .connectionFailed:
+            return "Connection failed"
+        case .insufficientSpace:
+            return "Insufficient disk space"
+        case .alreadyExists:
+            return "Resource already exists"
+        case .invalidArgument:
+            return "Invalid argument"
+        case .resourceBusy:
+            return "Resource is busy"
+        }
+    }
+    
+    var recoveryStrategies: [RecoveryStrategy] {
+        switch self {
+        case .commandNotFound:
+            return [.commandAlternatives, .pathDiscovery, .packageInstallation]
+        case .permissionDenied:
+            return [.elevatePrivileges, .changeDirectory, .fixPermissions]
+        case .fileNotFound:
+            return [.pathFix, .fileDiscovery, .createFile]
+        case .directoryNotFound:
+            return [.createDirectory, .pathFix, .directoryDiscovery]
+        case .timeout:
+            return [.increaseTimeout, .retryWithDelay, .simplifyOperation]
+        case .connectionFailed:
+            return [.retryConnection, .checkNetwork, .alternativeEndpoint]
+        case .insufficientSpace:
+            return [.cleanupSpace, .checkQuota, .alternativeLocation]
+        case .alreadyExists:
+            return [.forceOperation, .skipOperation, .backupAndReplace]
+        case .invalidArgument:
+            return [.simplifyArguments, .getHelp, .alternativeSyntax]
+        case .resourceBusy:
+            return [.waitAndRetry, .killProcess, .alternativeResource]
+        }
+    }
+}
+
+enum RecoveryStrategy: String, Codable, CaseIterable {
+    case commandAlternatives = "command_alternatives"
+    case pathDiscovery = "path_discovery"
+    case packageInstallation = "package_installation"
+    case elevatePrivileges = "elevate_privileges"
+    case changeDirectory = "change_directory"
+    case fixPermissions = "fix_permissions"
+    case pathFix = "path_fix"
+    case fileDiscovery = "file_discovery"
+    case createFile = "create_file"
+    case createDirectory = "create_directory"
+    case directoryDiscovery = "directory_discovery"
+    case increaseTimeout = "increase_timeout"
+    case retryWithDelay = "retry_with_delay"
+    case simplifyOperation = "simplify_operation"
+    case retryConnection = "retry_connection"
+    case checkNetwork = "check_network"
+    case alternativeEndpoint = "alternative_endpoint"
+    case cleanupSpace = "cleanup_space"
+    case checkQuota = "check_quota"
+    case alternativeLocation = "alternative_location"
+    case forceOperation = "force_operation"
+    case skipOperation = "skip_operation"
+    case backupAndReplace = "backup_and_replace"
+    case simplifyArguments = "simplify_arguments"
+    case getHelp = "get_help"
+    case alternativeSyntax = "alternative_syntax"
+    case waitAndRetry = "wait_and_retry"
+    case killProcess = "kill_process"
+    case alternativeResource = "alternative_resource"
+    
+    var description: String {
+        switch self {
+        case .commandAlternatives:
+            return "Try alternative commands"
+        case .pathDiscovery:
+            return "Discover available paths"
+        case .packageInstallation:
+            return "Install required packages"
+        case .elevatePrivileges:
+            return "Elevate privileges"
+        case .changeDirectory:
+            return "Change working directory"
+        case .fixPermissions:
+            return "Fix file permissions"
+        case .pathFix:
+            return "Fix file paths"
+        case .fileDiscovery:
+            return "Discover available files"
+        case .createFile:
+            return "Create required file"
+        case .createDirectory:
+            return "Create required directory"
+        case .directoryDiscovery:
+            return "Discover available directories"
+        case .increaseTimeout:
+            return "Increase operation timeout"
+        case .retryWithDelay:
+            return "Retry with delay"
+        case .simplifyOperation:
+            return "Simplify operation"
+        case .retryConnection:
+            return "Retry connection"
+        case .checkNetwork:
+            return "Check network status"
+        case .alternativeEndpoint:
+            return "Try alternative endpoint"
+        case .cleanupSpace:
+            return "Clean up disk space"
+        case .checkQuota:
+            return "Check disk quota"
+        case .alternativeLocation:
+            return "Use alternative location"
+        case .forceOperation:
+            return "Force operation"
+        case .skipOperation:
+            return "Skip operation"
+        case .backupAndReplace:
+            return "Backup and replace"
+        case .simplifyArguments:
+            return "Simplify command arguments"
+        case .getHelp:
+            return "Get command help"
+        case .alternativeSyntax:
+            return "Use alternative syntax"
+        case .waitAndRetry:
+            return "Wait and retry"
+        case .killProcess:
+            return "Kill blocking process"
+        case .alternativeResource:
+            return "Use alternative resource"
+        }
+    }
+}
+
+struct ErrorAnalysis: Codable {
+    let patterns: [ErrorPattern]
+    let output: String
+    let error: String?
+    let exitCode: Int
+    
+    var primaryPattern: ErrorPattern? {
+        return patterns.first
+    }
+    
+    var hasRecoveryStrategies: Bool {
+        return !patterns.isEmpty
+    }
+    
+    var suggestedStrategies: [RecoveryStrategy] {
+        return patterns.flatMap { $0.recoveryStrategies }
+    }
+}
+
+struct RecoveryAttempt: Codable, Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let strategy: RecoveryStrategy
+    let command: String
+    let success: Bool
+    let output: String?
+    let error: String?
+    let duration: TimeInterval
+    
+    init(strategy: RecoveryStrategy, command: String, success: Bool, output: String? = nil, error: String? = nil, duration: TimeInterval = 0) {
+        self.timestamp = Date()
+        self.strategy = strategy
+        self.command = command
+        self.success = success
+        self.output = output
+        self.error = error
+        self.duration = duration
+    }
+}
+
+// MARK: - Enhanced Step Alternatives
+
+struct EnhancedStepAlternative: Codable, Identifiable {
+    let id = UUID()
+    /// Regex pattern to match in combined output to trigger this alternative
+    let whenRegex: String?
+    /// Commands to apply (like mkdir -p, export, etc.) before retrying original command
+    let apply: [String]?
+    /// Replacement commands to execute instead of the original command
+    let replaceCommands: [String]?
+    /// Whether to retry the original command after apply
+    let retry: Bool?
+    /// Recovery strategies to try if this alternative fails
+    let recoveryStrategies: [RecoveryStrategy]?
+    /// Fallback commands if recovery strategies fail
+    let fallbackCommands: [String]?
+    /// Maximum attempts for this alternative
+    let maxAttempts: Int?
+    /// Delay between attempts in seconds
+    let retryDelay: TimeInterval?
+    
+    init(whenRegex: String? = nil, apply: [String]? = nil, replaceCommands: [String]? = nil, retry: Bool? = nil, 
+         recoveryStrategies: [RecoveryStrategy]? = nil, fallbackCommands: [String]? = nil, 
+         maxAttempts: Int? = nil, retryDelay: TimeInterval? = nil) {
+        self.whenRegex = whenRegex
+        self.apply = apply
+        self.replaceCommands = replaceCommands
+        self.retry = retry
+        self.recoveryStrategies = recoveryStrategies
+        self.fallbackCommands = fallbackCommands
+        self.maxAttempts = maxAttempts
+        self.retryDelay = retryDelay
+    }
 }

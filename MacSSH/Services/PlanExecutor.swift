@@ -13,6 +13,7 @@ class PlanExecutor: ObservableObject {
     private let terminalService: SwiftTermProfessionalService
     private let gptService: GPTTerminalService
     private let reliableCompletion: ReliableCommandCompletion
+    private let enhancedRecoveryService: EnhancedRecoveryService
     // Safety & pauses
     private var yoloEnabled: Bool = false
     private var dangerContinuation: CheckedContinuation<Void, Never>?
@@ -22,11 +23,14 @@ class PlanExecutor: ObservableObject {
         self.terminalService = terminalService
         self.gptService = gptService
         self.reliableCompletion = ReliableCommandCompletion(terminalService: terminalService)
+        self.enhancedRecoveryService = EnhancedRecoveryService(terminalService: terminalService, gptService: gptService)
         self.yoloEnabled = UserDefaults.standard.bool(forKey: "YOLOEnabled")
         // Stop ongoing execution if terminal session is closing
         NotificationCenter.default.addObserver(forName: .terminalSessionWillClose, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
-            self.isExecuting = false
+            Task { @MainActor in
+                self.isExecuting = false
+            }
         }
     }
     
@@ -242,7 +246,16 @@ class PlanExecutor: ObservableObject {
         var result = await executeStep(step, retryCount: retryCount, maxRetries: maxRetries)
         if result.isSuccess { return result }
         
-        // If failed, try alternatives based on observed output
+        // If failed and auto-recovery is enabled, try enhanced recovery
+        if step.enableAutoRecovery ?? true {
+            if let recoveryResult = await enhancedRecoveryService.recoverFromFailure(step, failedResult: result) {
+                if recoveryResult.isSuccess {
+                    return recoveryResult
+                }
+            }
+        }
+        
+        // If enhanced recovery failed, try original alternatives based on observed output
         await MainActor.run {
             self.gptService.addAssistantMessage("Адаптация…")
         }
@@ -255,7 +268,7 @@ class PlanExecutor: ObservableObject {
                 }
                 // Apply preparatory commands
                 var appliedType: String? = nil
-                var matchedRegex: String? = alt.whenRegex
+                let matchedRegex: String? = alt.whenRegex
                 if let applyCmds = alt.apply { for cmd in applyCmds { _ = await executeCommand(cmd, timeoutSeconds: 10) }; appliedType = "apply" }
                 // Replace command(s) if provided
                 if let replace = alt.replaceCommands, !replace.isEmpty {
@@ -272,7 +285,8 @@ class PlanExecutor: ObservableObject {
                         timeoutSeconds: step.timeoutSeconds,
                         env: step.env,
                         pre: nil,
-                        alternatives: nil
+                        alternatives: nil,
+                        enhancedAlternatives: nil
                     )
                     await MainActor.run {
                         self.gptService.addAssistantMessage("Ретрай \(retryCount + 1)/\(maxRetries)")
@@ -323,7 +337,10 @@ class PlanExecutor: ObservableObject {
             retryCount: result.retryCount,
             notes: result.notes,
             matchedAlternativeRegex: matchedRegex,
-            appliedAlternativeType: appliedType ?? "none"
+            appliedAlternativeType: appliedType ?? "none",
+            recoveryAttempts: [],
+            autoRecoveryEnabled: true,
+            finalRecoveryStrategy: nil
         )
     }
 
@@ -387,7 +404,10 @@ class PlanExecutor: ObservableObject {
             retryCount: retryCount,
             notes: status == .failed ? "Applied PEOV evaluation. Consider alternatives if provided." : nil,
             matchedAlternativeRegex: nil,
-            appliedAlternativeType: "none"
+            appliedAlternativeType: "none",
+            recoveryAttempts: [],
+            autoRecoveryEnabled: step.enableAutoRecovery ?? true,
+            finalRecoveryStrategy: nil
         )
     }
     
@@ -416,7 +436,7 @@ class PlanExecutor: ObservableObject {
         await MainActor.run { terminalService.sendCommand(wrapped) }
         
         // Wait for completion using reliable monitor
-        let output = await reliableCompletion.waitForCommandCompletion(command: wrapped)
+        _ = await reliableCompletion.waitForCommandCompletion(command: wrapped)
         
         // Additional safety delay to ensure terminal is fully ready
         try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
@@ -700,6 +720,46 @@ class PlanExecutor: ObservableObject {
             actualValue = output.isEmpty ? "empty" : "not empty"
             passed = !output.isEmpty
             message = passed ? "Output is not empty" : "Output is empty"
+            
+        case .commandSucceeded:
+            actualValue = commandResult.ok ? "succeeded" : "failed"
+            passed = commandResult.ok && commandResult.exitCode == 0
+            message = passed ? "Command executed successfully" : "Command failed or returned non-zero exit code"
+            
+        case .fileCreated:
+            actualValue = await checkFileExists(expectedValue) ? "exists" : "not exists"
+            passed = await checkFileExists(expectedValue)
+            message = passed ? "File was created successfully" : "File was not created"
+            
+        case .fileModified:
+            let fileExists = await checkFileExists(expectedValue)
+            actualValue = fileExists ? "exists" : "not exists"
+            passed = fileExists
+            message = passed ? "File exists and can be modified" : "File does not exist for modification"
+            
+        case .contentAdded:
+            actualValue = output.isEmpty ? "empty" : "contains content"
+            passed = !output.isEmpty && output.count > 10 // Basic content check
+            message = passed ? "Content was added successfully" : "No content was added"
+            
+        case .processCompleted:
+            actualValue = commandResult.ok ? "completed" : "failed"
+            passed = commandResult.ok
+            message = passed ? "Process completed successfully" : "Process failed to complete"
+            
+        case .noErrors:
+            let hasErrors = output.lowercased().contains("error") || 
+                           output.lowercased().contains("failed") || 
+                           output.lowercased().contains("permission denied") ||
+                           commandResult.exitCode != 0
+            actualValue = hasErrors ? "has errors" : "no errors"
+            passed = !hasErrors
+            message = passed ? "No errors detected" : "Errors were detected in output"
+            
+        case .expectedPattern:
+            actualValue = output
+            passed = matchesRegex(pattern: expectedValue, text: output)
+            message = passed ? "Expected pattern found" : "Expected pattern not found"
         }
         
         return CriterionResult(
